@@ -12,6 +12,14 @@ A Go-language agentic coding CLI powered by local LLMs via [Ollama](https://olla
 - **Provides agentic foundations** with an agent loop, starter tools, state, and permission management
 - **Provides advanced capabilities** including memory, hooks, MCP, sub-agents, skills, task supervision, HTTP/SSE server mode, and coordinator-mode multi-agent work
 
+## Built With Agentic Engineering
+
+This project was built 100% through an agentic engineering workflow: a human engineer directed the product vision, architecture, review, and release decisions while AI coding agents helped implement, test, document, and iterate inside the repository.
+
+The point is not to hide the engineer behind the tools. It is to show what one engineer can ship by orchestrating agents with clear specifications, local-first tooling, review discipline, and steady technical judgment.
+
+`nandocodego` is both an agentic coding tool and a proof point for agentic engineering as a serious software-development practice.
+
 ## Status
 
 **Current Version:** v0.0.0-dev (Phase 29 complete; Phase 25 remote/bridge mode next)
