@@ -1,0 +1,42 @@
+# Ignore build artifacts
+bin/
+*.exe
+*.dll
+*.so
+*.dylib
+
+# Ignore test files
+*_test.go
+
+# Ignore git
+.git/
+.gitignore
+
+# Ignore documentation
+*.md
+docs/
+.docs/
+book/
+
+# Ignore CI/CD
+.github/
+
+# Ignore IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Ignore temporary files
+*.tmp
+*.log
+*.pid
+
+# Ignore vendor (will be downloaded in container)
+vendor/
+
+# Keep only what's needed
+!go.mod
+!go.sum
+!cmd/
+!internal/

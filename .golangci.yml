@@ -1,0 +1,125 @@
+run:
+  timeout: 5m
+  tests: true
+  build-tags:
+    - integration
+    - e2e
+
+linters:
+  enable:
+    - errcheck         # Check for unchecked errors
+    - gosimple         # Simplify code
+    - govet            # Vet examines Go source code
+    - staticcheck      # Go static analysis
+    - unused           # Check for unused code
+    - revive           # Fast, configurable, extensible linter
+    - gocritic         # Opinionated Go source code linter
+    - gosec            # Security-focused linter
+    - gofumpt          # Stricter gofmt
+    - misspell         # Spell checker
+    - unparam          # Find unused function parameters
+    - prealloc         # Find slice declarations with non-zero initial length
+    - goconst          # Find repeated strings that could be constants
+  disable:
+    - lll              # Line length (gofumpt handles readability well enough)
+
+linters-settings:
+  errcheck:
+    check-type-assertions: true
+    check-blank: true
+    exclude-functions:
+      - (*database/sql.Rows).Close
+      - (*database/sql.DB).Close
+
+  govet:
+    enable-all: true
+    disable:
+      - shadow  # Can be too noisy
+
+  staticcheck:
+    checks: ["all"]
+
+  revive:
+    severity: warning
+    rules:
+      - name: blank-imports
+      - name: context-as-argument
+      - name: context-keys-type
+      - name: dot-imports
+      - name: error-return
+      - name: error-strings
+      - name: error-naming
+      - name: exported
+      - name: if-return
+      - name: increment-decrement
+      - name: var-naming
+      - name: var-declaration
+      - name: package-comments
+      - name: range
+      - name: receiver-naming
+      - name: time-naming
+      - name: unexported-return
+      - name: indent-error-flow
+      - name: errorf
+      - name: empty-block
+      - name: superfluous-else
+      - name: unused-parameter
+      - name: unreachable-code
+      - name: redefines-builtin-id
+
+  gocritic:
+    enabled-tags:
+      - diagnostic
+      - style
+      - performance
+      - experimental
+      - opinionated
+    disabled-checks:
+      - whyNoLint       # We don't require nolint explanations everywhere
+      - hugeParam       # Can be too noisy
+
+  gosec:
+    severity: medium
+    confidence: medium
+    excludes:
+      - G104  # Audit errors not checked (errcheck covers this)
+      - G304  # File path provided as taint input (we validate paths)
+    config:
+      G306: "0600"  # Expect restrictive file permissions
+
+  gofumpt:
+    extra-rules: true
+
+  misspell:
+    locale: US
+    ignore-words:
+      - ollama  # Brand name
+
+  goconst:
+    min-len: 3
+    min-occurrences: 3
+    ignore-tests: true
+
+issues:
+  exclude-rules:
+    # Exclude some linters from running on tests files
+    - path: _test\.go
+      linters:
+        - errcheck
+        - goconst
+        - gosec
+
+    # Exclude generated files
+    - path: ".*\\.pb\\.go$"
+      linters:
+        - all
+
+    # Allow dot imports in tests
+    - path: _test\.go
+      text: "dot-imports"
+
+  max-issues-per-linter: 0
+  max-same-issues: 0
+
+  # Show all issues
+  exclude-use-default: false

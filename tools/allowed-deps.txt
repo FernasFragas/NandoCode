@@ -1,0 +1,34 @@
+# Direct runtime dependencies allowed by the implementation plan.
+# Each line is a Go module path that may appear as a direct dependency in go.mod.
+# Comments (lines starting with #) and blank lines are ignored.
+# Transitive dependencies are not listed here; only direct 'require' statements are checked.
+
+github.com/cenkalti/backoff/v4
+github.com/charmbracelet/bubbles
+github.com/charmbracelet/bubbletea
+github.com/charmbracelet/glamour
+github.com/charmbracelet/lipgloss
+github.com/fsnotify/fsnotify
+github.com/go-git/go-git/v5
+github.com/go-playground/validator/v10
+github.com/modelcontextprotocol/go-sdk
+github.com/knadh/koanf/v2
+github.com/knadh/koanf/parsers/toml/v2
+github.com/knadh/koanf/providers/confmap
+github.com/knadh/koanf/providers/file
+github.com/ollama/ollama
+github.com/spf13/cobra
+github.com/stretchr/testify
+github.com/zalando/go-keyring
+go.opentelemetry.io/otel
+golang.org/x/net
+golang.org/x/oauth2
+golang.org/x/sync
+gopkg.in/yaml.v3
+mvdan.cc/sh/v3
+
+# Tooling-only modules. These may appear in CI installation commands or tools.go,
+# but should not be imported by production packages unless explicitly promoted.
+github.com/securego/gosec/v2
+golang.org/x/vuln
+github.com/golangci/golangci-lint

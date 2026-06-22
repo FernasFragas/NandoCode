@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>nandocodego server</title>
+  <style>
+    :root{--bg:#f6f7fb;--fg:#1f2430;--card:#fff;--accent:#0f766e;--muted:#5b6270;--danger:#b42318}
+    body{margin:0;font-family:ui-sans-serif,system-ui,-apple-system,Segoe UI,sans-serif;background:linear-gradient(160deg,#eef4ff,#f8fafc 50%,#ecfeff);color:var(--fg)}
+    .wrap{max-width:980px;margin:0 auto;padding:20px}
+    .card{background:var(--card);border:1px solid #dde3ef;border-radius:12px;padding:14px;margin-bottom:12px;box-shadow:0 8px 24px rgba(8,25,68,.06)}
+    #log{height:55vh;overflow:auto;white-space:pre-wrap;font-family:ui-monospace,Menlo,monospace;font-size:13px;background:#0b1020;color:#d9e2ff;border-radius:10px;padding:12px}
+    .row{display:flex;gap:8px;flex-wrap:wrap}
+    input,textarea,button{font:inherit}
+    input,textarea{border:1px solid #c8d2e3;border-radius:8px;padding:8px}
+    textarea{flex:1;min-height:70px}
+    button{background:var(--accent);color:#fff;border:0;border-radius:8px;padding:8px 12px;cursor:pointer}
+    .muted{color:var(--muted);font-size:12px}
+    .danger{color:var(--danger)}
+  </style>
+</head>
+<body>
+<div class="wrap">
+  <h1>nandocodego server</h1>
+  <div class="card row">
+    <button id="newSession">Create Session</button>
+    <input id="sessionId" placeholder="session id" size="36"/>
+    <input id="token" placeholder="bearer token (optional)" size="28"/>
+    <button id="connect">Connect SSE</button>
+  </div>
+  <div class="card">
+    <div id="log"></div>
+  </div>
+  <div class="card row">
+    <textarea id="prompt" placeholder="Type prompt"></textarea>
+    <button id="send">Send</button>
+  </div>
+  <p class="muted">SSE events stream in real-time. Permission requests can be approved via API endpoint.</p>
+</div>
+<script>
+const log = document.getElementById('log');
+const tokenInput = document.getElementById('token');
+function authHeaders(){ const t=tokenInput.value.trim(); return t?{'Authorization':'Bearer '+t}:{}};
+function add(line, cls=''){ const d=document.createElement('div'); d.textContent=line; if(cls)d.className=cls; log.appendChild(d); log.scrollTop=log.scrollHeight; }
+let es;
+document.getElementById('newSession').onclick = async ()=>{
+  const r = await fetch('/v1/sessions',{method:'POST',headers:authHeaders()});
+  const j = await r.json();
+  document.getElementById('sessionId').value = j.session_id || '';
+  add('session: '+(j.session_id||'n/a'));
+};
+document.getElementById('connect').onclick = ()=>{
+  const sid = document.getElementById('sessionId').value.trim();
+  if(!sid){add('missing session id','danger');return;}
+  if(es){es.close();}
+  es = new EventSource('/v1/sessions/'+sid+'/events');
+  es.onmessage = (e)=>add(e.data);
+  es.onerror = ()=>add('sse disconnected','danger');
+  ['assistant_text_delta','terminal','permission_request','error','tool_use_start','tool_use_result'].forEach(t=>{
+    es.addEventListener(t, e=>add('['+t+'] '+e.data));
+  });
+};
+document.getElementById('send').onclick = async ()=>{
+  const sid = document.getElementById('sessionId').value.trim();
+  const prompt = document.getElementById('prompt').value.trim();
+  if(!sid || !prompt){add('missing session or prompt','danger');return;}
+  const r = await fetch('/v1/sessions/'+sid+'/messages',{method:'POST',headers:{'Content-Type':'application/json',...authHeaders()},body:JSON.stringify({prompt})});
+  add('send status '+r.status);
+};
+</script>
+</body>
+</html>

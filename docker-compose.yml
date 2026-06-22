@@ -1,0 +1,39 @@
+
+services:
+  nandocodego:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: nandocodego:latest
+    container_name: nandocodego
+    volumes:
+      # Mount XDG config, data, cache, and state directories.
+      - ${HOME}/.config/nandocodego:/home/nandocodego/.config/nandocodego
+      - ${HOME}/.local/share/nandocodego:/home/nandocodego/.local/share/nandocodego
+      - ${HOME}/.cache/nandocodego:/home/nandocodego/.cache/nandocodego
+      - ${HOME}/.local/state/nandocodego:/home/nandocodego/.local/state/nandocodego
+    environment:
+      - XDG_CONFIG_HOME=/home/nandocodego/.config
+      - XDG_DATA_HOME=/home/nandocodego/.local/share
+      - XDG_CACHE_HOME=/home/nandocodego/.cache
+      - XDG_STATE_HOME=/home/nandocodego/.local/state
+      - NANDOCODEGO_HOST=0.0.0.0
+      - NANDOCODEGO_PORT=8080
+      # If Ollama runs on the host, pass
+      # --ollama-url http://host.docker.internal:11434 in command.
+      # Uncomment to enable debug logging
+      # - NANDOCODEGO_DEBUG=1
+    ports:
+      - "8080:8080"
+    # Override the Dockerfile default command once the app implements a web/server command.
+    # Example:
+    # command: ["serve", "--host", "0.0.0.0", "--port", "8080"]
+    # For now, useful alternatives are:
+    # command: ["doctor"]
+    # command: ["--model", "qwen3", "--ollama-url", "http://host.docker.internal:11434"]
+    stdin_open: true
+    tty: true
+    # On Linux, this lets the container resolve host.docker.internal.
+    # Keep this commented unless you need to reach Ollama running on the host.
+    # extra_hosts:
+    #   - "host.docker.internal:host-gateway"
