@@ -9,9 +9,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/FernasFragas/nandocodego/internal/agent"
-	"github.com/FernasFragas/nandocodego/internal/mentions"
-	"github.com/FernasFragas/nandocodego/internal/tools"
+	"github.com/FernasFragas/Nandocode/internal/agent"
+	"github.com/FernasFragas/Nandocode/internal/mentions"
+	"github.com/FernasFragas/Nandocode/internal/tools"
 )
 
 func TestCollectPrintOutputAndTextWrite(t *testing.T) {

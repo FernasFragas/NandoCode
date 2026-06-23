@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/FernasFragas/nandocodego/internal/semantic"
+	"github.com/FernasFragas/Nandocode/internal/semantic"
 )
 
 type FakeEmbedder struct {

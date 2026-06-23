@@ -64,7 +64,7 @@ Remaining Phase 0/1 interface debt:
 
 Implemented:
 
-- `go.mod` with module path `github.com/FernasFragas/nandocodego`.
+- `go.mod` with module path `github.com/FernasFragas/Nandocode`.
 - `go 1.26.2`.
 - Cobra CLI package.
 - `cmd/nandocodego/main.go`.
@@ -552,7 +552,7 @@ Current status:
 Phase 1 is fully aligned when:
 
 - [x] Phase 0 verification passes before and after Phase 1 hardening.
-- [x] `go.mod` exists with module path `github.com/FernasFragas/nandocodego` and `go 1.26.2`.
+- [x] `go.mod` exists with module path `github.com/FernasFragas/Nandocode` and `go 1.26.2`.
 - [x] `go.sum` exists.
 - [x] `LICENSE` exists or Phase log is corrected to say it does not.
 - [x] `cmd/nandocodego/main.go` delegates to `cli.Run` and handles OS interrupt/SIGTERM through context.

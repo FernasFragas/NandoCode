@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/FernasFragas/nandocodego/internal/agent"
+	"github.com/FernasFragas/Nandocode/internal/agent"
 )
 
 type fakeRunner struct {

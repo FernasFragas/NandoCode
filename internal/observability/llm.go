@@ -4,7 +4,7 @@ import (
 	"context"
 	"time"
 
-	"github.com/FernasFragas/nandocodego/internal/llm"
+	"github.com/FernasFragas/Nandocode/internal/llm"
 )
 
 type observedLLMClient struct {

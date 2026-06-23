@@ -9,9 +9,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/FernasFragas/nandocodego/internal/llm/ollama"
-	"github.com/FernasFragas/nandocodego/internal/tools"
-	"github.com/FernasFragas/nandocodego/internal/tools/builtin"
+	"github.com/FernasFragas/Nandocode/internal/llm/ollama"
+	"github.com/FernasFragas/Nandocode/internal/tools"
+	"github.com/FernasFragas/Nandocode/internal/tools/builtin"
 )
 
 func TestAgentIntegrationWithRealOllama(t *testing.T) {

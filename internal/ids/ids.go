@@ -5,7 +5,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/FernasFragas/nandocodego/internal/types"
+	"github.com/FernasFragas/Nandocode/internal/types"
 )
 
 var ctr uint32

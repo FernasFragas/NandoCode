@@ -24,7 +24,7 @@ The point is not to hide the engineer behind the tools. It is to show what one e
 
 **Current Version:** v0.0.0-dev (Phase 29 complete; Phase 25 remote/bridge mode next)
 
-This project is under active development. See [Implementation Plan](.codex/go-ollama-plan-AGENTS.md), [Phase Log](docs/PHASE-LOG.md), and [Project Status and Engineer Onboarding](docs/PROJECT-STATUS-AND-ONBOARDING.md) for roadmap and current-status details.
+This project is under active development. For current roadmap order, read [Next Phases Implementation Plan](docs/NEXT-PHASES-IMPLEMENTATION-PLAN.md) first, then [Project Status and Engineer Onboarding](docs/PROJECT-STATUS-AND-ONBOARDING.md) and [Phase Log](docs/PHASE-LOG.md). The original [.codex implementation plan](.codex/go-ollama-plan-AGENTS.md) is historical reference material, not the current launch-status source.
 
 ### Completed Phases
 
@@ -55,8 +55,8 @@ This project is under active development. See [Implementation Plan](.codex/go-ol
 ### From Source
 
 ```bash
-git clone https://github.com/FernasFragas/nandocodego.git
-cd nandocodego
+git clone https://github.com/FernasFragas/Nandocode.git
+cd Nandocode
 make build
 sudo make install  # Optional: installs to /usr/local/bin
 ```
@@ -64,7 +64,7 @@ sudo make install  # Optional: installs to /usr/local/bin
 ### Using Go Install
 
 ```bash
-go install github.com/FernasFragas/nandocodego/cmd/nandocodego@latest
+go install github.com/FernasFragas/Nandocode/cmd/nandocodego@latest
 ```
 
 ### Using Docker
@@ -213,9 +213,11 @@ See [SECURITY.md](SECURITY.md) for:
 ## Documentation
 
 - [Security Policy](SECURITY.md) - Comprehensive security documentation
-- [Implementation Plan](.codex/go-ollama-plan-AGENTS.md) - Detailed architecture and phased delivery plan
-- [Phase Log](docs/PHASE-LOG.md) - Implementation progress tracker
+- [Next Phases Implementation Plan](docs/NEXT-PHASES-IMPLEMENTATION-PLAN.md) - Authoritative roadmap order, active work routing, and pre-start checklist
 - [Project Status and Engineer Onboarding](docs/PROJECT-STATUS-AND-ONBOARDING.md) - Current progress, gaps, local setup, Docker notes, and multi-model guidance
+- [Remaining Phases Task Review](docs/REMAINING-PHASES-TASK-REVIEW.md) - Reviewed task detail, blockers, and evidence requirements for active gates
+- [Phase Log](docs/PHASE-LOG.md) - Historical implementation record and acceptance evidence
+- [Historical Implementation Plan](.codex/go-ollama-plan-AGENTS.md) - Original phase architecture; superseded for current roadmap order by the Next Phases plan
 - [Docker Usage](README.Docker.md) - Docker and container deployment guide
 
 ## Architecture
@@ -248,7 +250,7 @@ See [SECURITY.md](SECURITY.md) for:
 - ⏳ **Phase 25:** Remote / Bridge Mode
 - ⏳ **Phases 17-18:** Distribution, hardening, evals, docs, and release approval
 
-See the [Implementation Plan](.codex/go-ollama-plan-AGENTS.md), [Phase Log](docs/PHASE-LOG.md), and [Project Status and Engineer Onboarding](docs/PROJECT-STATUS-AND-ONBOARDING.md) for detailed implementation progress.
+See the [Next Phases Implementation Plan](docs/NEXT-PHASES-IMPLEMENTATION-PLAN.md), [Project Status and Engineer Onboarding](docs/PROJECT-STATUS-AND-ONBOARDING.md), and [Phase Log](docs/PHASE-LOG.md) for detailed implementation progress and current launch-readiness routing.
 
 ## Development
 
@@ -326,11 +328,11 @@ MIT License - see [LICENSE](LICENSE) for details.
 
 ## Contributing
 
-This project is currently in active pre-v0.1 development. Contributions should follow the current roadmap and phase plans in `docs/`.
+This project is currently in active pre-v0.1 development. Contributions should follow the current roadmap in `docs/NEXT-PHASES-IMPLEMENTATION-PLAN.md` and the detailed phase or validation plan it routes to.
 
 Please see:
 - [SECURITY.md](SECURITY.md) for security guidelines
-- [Implementation Plan](.codex/go-ollama-plan-AGENTS.md) for architecture details
+- [Project Status and Engineer Onboarding](docs/PROJECT-STATUS-AND-ONBOARDING.md) for current status and source-of-truth routing
 
 ## Acknowledgments
 

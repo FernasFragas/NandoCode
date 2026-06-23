@@ -9,20 +9,22 @@ import (
 	"testing"
 	"time"
 
-	"github.com/FernasFragas/nandocodego/internal/agent"
-	"github.com/FernasFragas/nandocodego/internal/analysis"
-	"github.com/FernasFragas/nandocodego/internal/bootstrap"
-	"github.com/FernasFragas/nandocodego/internal/contextpack"
-	"github.com/FernasFragas/nandocodego/internal/credentials"
-	"github.com/FernasFragas/nandocodego/internal/llm"
-	"github.com/FernasFragas/nandocodego/internal/llm/modelresolver"
-	"github.com/FernasFragas/nandocodego/internal/llm/modelruntime"
-	"github.com/FernasFragas/nandocodego/internal/mentions"
-	"github.com/FernasFragas/nandocodego/internal/observability"
-	"github.com/FernasFragas/nandocodego/internal/permissions"
-	"github.com/FernasFragas/nandocodego/internal/state"
-	"github.com/FernasFragas/nandocodego/internal/tools"
-	"github.com/FernasFragas/nandocodego/internal/tui/picker"
+	"github.com/FernasFragas/Nandocode/internal/agent"
+	"github.com/FernasFragas/Nandocode/internal/analysis"
+	"github.com/FernasFragas/Nandocode/internal/bootstrap"
+	"github.com/FernasFragas/Nandocode/internal/contextpack"
+	"github.com/FernasFragas/Nandocode/internal/credentials"
+	"github.com/FernasFragas/Nandocode/internal/llm"
+	"github.com/FernasFragas/Nandocode/internal/llm/modelresolver"
+	"github.com/FernasFragas/Nandocode/internal/llm/modelruntime"
+	"github.com/FernasFragas/Nandocode/internal/mentions"
+	"github.com/FernasFragas/Nandocode/internal/observability"
+	"github.com/FernasFragas/Nandocode/internal/permissions"
+	"github.com/FernasFragas/Nandocode/internal/retrievalroute"
+	"github.com/FernasFragas/Nandocode/internal/semantic"
+	"github.com/FernasFragas/Nandocode/internal/state"
+	"github.com/FernasFragas/Nandocode/internal/tools"
+	"github.com/FernasFragas/Nandocode/internal/tui/picker"
 	tea "github.com/charmbracelet/bubbletea"
 )
 
@@ -990,6 +992,35 @@ func TestRenderToolPanel_SafeToolIDTruncation(t *testing.T) {
 	}
 }
 
+func TestToolPanelClickTogglesCollapsedState(t *testing.T) {
+	model := newTestModel(t)
+	model.viewport.Height = 10
+	model.transcript = append(model.transcript, TranscriptItem{
+		Kind:     TranscriptTool,
+		ToolID:   "tool-123456",
+		ToolName: "Bash",
+		Content:  strings.Repeat("long output ", 20),
+	})
+	model.refreshViewportContent(true)
+
+	if ok := model.toggleToolPanelAtViewportLine(0); !ok {
+		t.Fatal("expected click on first viewport line to toggle tool panel")
+	}
+	if !model.transcript[0].Collapsed {
+		t.Fatal("expected tool panel collapsed after click")
+	}
+	out := model.renderToolPanel(model.transcript[0])
+	if !strings.Contains(out, "collapsed") {
+		t.Fatalf("expected collapsed render, got %q", out)
+	}
+	if ok := model.toggleToolPanelAtViewportLine(0); !ok {
+		t.Fatal("expected second click to toggle tool panel")
+	}
+	if model.transcript[0].Collapsed {
+		t.Fatal("expected tool panel expanded after second click")
+	}
+}
+
 func TestHandleAgentEvent_ToolUseProgressWithShortID(t *testing.T) {
 	model := newTestModel(t)
 
@@ -1081,6 +1112,17 @@ func TestPermissionModalEscDeniesPrompt(t *testing.T) {
 	model.Update(msg)
 	if model.store.Get().PermissionPrompt != nil {
 		t.Fatal("expected permission prompt to be cleared after esc deny")
+	}
+}
+
+func TestStalePermissionResolutionDoesNotClearNewPrompt(t *testing.T) {
+	model := newTestModel(t)
+	model.Update(permissionPromptMsg{Request: permissionRequest{ID: "old", ToolName: "Bash", Target: "ls"}})
+	model.Update(permissionPromptMsg{Request: permissionRequest{ID: "new", ToolName: "FileWrite", Target: "README.md"}})
+	model.Update(permissionResolvedMsg{ID: "old", Decision: decisionDeny})
+	prompt := model.store.Get().PermissionPrompt
+	if prompt == nil || prompt.ID != "new" {
+		t.Fatalf("expected newer prompt to remain active, got %#v", prompt)
 	}
 }
 
@@ -1601,11 +1643,74 @@ func TestRenderActiveTaskAndTipLines(t *testing.T) {
 
 	model.store.Set(func(app state.App) state.App {
 		app.ActiveRun = true
+		app.ActiveTools["tool-1"] = state.ToolUse{
+			ID:        "tool-1",
+			Name:      "Bash",
+			StartedAt: time.Now().Add(-2 * time.Second),
+		}
+		app.QueuedPrompts = []string{"next"}
 		return app
 	})
+	activeActivity := model.renderActiveTaskLine(model.store.Get())
+	if !strings.Contains(activeActivity, "Activity:") ||
+		!strings.Contains(activeActivity, "tool Bash running") ||
+		!strings.Contains(activeActivity, "queue prompts=1") {
+		t.Fatalf("expected hierarchical activity details, got %q", activeActivity)
+	}
 	activeTip := model.renderTipLine(model.store.Get())
 	if !strings.Contains(activeTip, "/bg") || !strings.Contains(activeTip, "/btw") {
 		t.Fatalf("expected run tip line, got %q", activeTip)
+	}
+}
+
+func TestNormalModeEditingCommandsMutateInput(t *testing.T) {
+	model := newTestModel(t)
+	model.input.SetValue("alpha beta gamma")
+	model.input.SetCursor(0)
+	model.vim.EnterNormal()
+
+	model.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("w")})
+	if got := model.input.LineInfo().CharOffset; got != len("alpha ") {
+		t.Fatalf("expected w to move to next word, got cursor %d", got)
+	}
+
+	model.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("d")})
+	model.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("w")})
+	if got := model.input.Value(); got != "alpha gamma" {
+		t.Fatalf("expected dw to delete word, got %q", got)
+	}
+
+	model.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("0")})
+	model.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("x")})
+	if got := model.input.Value(); got != "lpha gamma" {
+		t.Fatalf("expected x to delete char, got %q", got)
+	}
+}
+
+func TestNormalModeLineYankPasteAndFindRepeat(t *testing.T) {
+	model := newTestModel(t)
+	model.input.SetValue("one\ntwo\nthree")
+	model.input.CursorUp()
+	model.input.CursorUp()
+	model.vim.EnterNormal()
+
+	model.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("y")})
+	model.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("y")})
+	model.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("p")})
+	if got := model.input.Value(); got != "one\none\ntwo\nthree" {
+		t.Fatalf("expected yy/p to duplicate line, got %q", got)
+	}
+
+	model.input.SetValue("abc abc")
+	model.input.SetCursor(0)
+	model.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("f")})
+	model.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("c")})
+	if got := model.input.LineInfo().CharOffset; got != 2 {
+		t.Fatalf("expected fc to move to first c, got %d", got)
+	}
+	model.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune(";")})
+	if got := model.input.LineInfo().CharOffset; got != 6 {
+		t.Fatalf("expected ; to repeat find, got %d", got)
 	}
 }
 
@@ -1971,6 +2076,60 @@ func TestPromptSubmissionFileStatusMentionUsesLatestOnlyHistory(t *testing.T) {
 	}
 	if !foundStatusNotice {
 		t.Fatalf("expected status/latest-only notice, got %#v", model.transcript)
+	}
+}
+
+func TestPromptSubmissionSemanticRetrievalUsesStatusAndConfig(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(dir, "internal"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "internal", "server.go"), []byte("package internal\nfunc Serve(){}\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	initial := bootstrap.DefaultInitial(dir)
+	initial.DefaultModel = "test-model"
+	appState := state.DefaultApp(bootstrap.New(initial).Snapshot())
+	store := state.NewStore(appState, nil)
+	runner := &recordingRunner{}
+	model, err := New(store, runner, nil, nil, nil, nil, nil, "", "", "", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	cfg := semantic.DefaultConfig()
+	cfg.QueryKeepAlive = "7s"
+	cfg.LightTopKRecords = 2
+	svc := &indexProgressServiceStub{
+		status: semantic.Status{Exists: true, Compatible: true, RecordCount: 10, FileCount: 1},
+		retrieveRes: semantic.RetrieveResult{
+			Used:            true,
+			RenderedContext: "<semantic_context model=\"qwen3-embedding:8b\"><file path=\"internal/server.go\" /></semantic_context>",
+			Records:         []semantic.SearchHit{{}},
+			Files:           []semantic.RetrievedFile{{Path: "internal/server.go"}},
+			ContextBytes:    96,
+		},
+	}
+	model.SetSemanticService(svc, cfg)
+
+	model.input.SetValue("review @internal/server.go and find related callers")
+	_, cmd := model.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	if cmd == nil {
+		t.Fatal("expected run command")
+	}
+	cmd()
+
+	if len(svc.retrieveReqs) != 1 {
+		t.Fatalf("retrieve calls=%d want 1", len(svc.retrieveReqs))
+	}
+	if svc.retrieveReqs[0].Config.QueryKeepAlive != "7s" || svc.retrieveReqs[0].MaxRecords != 2 {
+		t.Fatalf("retrieve request did not carry config/limits: %+v", svc.retrieveReqs[0])
+	}
+	if runner.input.RouteAction != string(retrievalroute.ActionSemanticLight) ||
+		runner.input.RouteReason != string(retrievalroute.ReasonRunRelatedContext) {
+		t.Fatalf("route metadata action=%q reason=%q", runner.input.RouteAction, runner.input.RouteReason)
+	}
+	if !strings.Contains(runner.input.Messages[0].Content, "<semantic_context") {
+		t.Fatalf("expanded prompt missing semantic context:\n%s", runner.input.Messages[0].Content)
 	}
 }
 

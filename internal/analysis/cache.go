@@ -9,7 +9,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/FernasFragas/nandocodego/internal/paths"
+	"github.com/FernasFragas/Nandocode/internal/paths"
 )
 
 type SummaryCacheEntry struct {

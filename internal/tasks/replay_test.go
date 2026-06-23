@@ -6,10 +6,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/FernasFragas/nandocodego/internal/agent"
-	"github.com/FernasFragas/nandocodego/internal/llm"
-	"github.com/FernasFragas/nandocodego/internal/tools"
-	"github.com/FernasFragas/nandocodego/internal/types"
+	"github.com/FernasFragas/Nandocode/internal/agent"
+	"github.com/FernasFragas/Nandocode/internal/llm"
+	"github.com/FernasFragas/Nandocode/internal/tools"
+	"github.com/FernasFragas/Nandocode/internal/types"
 )
 
 func TestReplayMessagesFromOutput(t *testing.T) {

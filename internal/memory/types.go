@@ -3,7 +3,7 @@ package memory
 import (
 	"time"
 
-	"github.com/FernasFragas/nandocodego/internal/llm"
+	"github.com/FernasFragas/Nandocode/internal/llm"
 )
 
 // Type is the memory taxonomy type.

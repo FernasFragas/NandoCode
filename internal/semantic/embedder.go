@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/FernasFragas/nandocodego/internal/llm"
+	"github.com/FernasFragas/Nandocode/internal/llm"
 )
 
 // LLMEmbedder adapts the shared llm.Client to the semantic Embedder contract.

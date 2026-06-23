@@ -6,7 +6,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/FernasFragas/nandocodego/internal/paths"
+	"github.com/FernasFragas/Nandocode/internal/paths"
 )
 
 // ScopeRoot resolves the memory project scope root.

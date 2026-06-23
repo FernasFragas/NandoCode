@@ -6,8 +6,8 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/FernasFragas/nandocodego/internal/skills"
-	"github.com/FernasFragas/nandocodego/internal/tools"
+	"github.com/FernasFragas/Nandocode/internal/skills"
+	"github.com/FernasFragas/Nandocode/internal/tools"
 )
 
 type Loader interface {

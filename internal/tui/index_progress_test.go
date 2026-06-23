@@ -9,7 +9,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/FernasFragas/nandocodego/internal/semantic"
+	"github.com/FernasFragas/Nandocode/internal/semantic"
 	tea "github.com/charmbracelet/bubbletea"
 )
 
@@ -44,8 +44,11 @@ type indexProgressServiceStub struct {
 	buildEvents   []semantic.Event
 	refreshEvents []semantic.Event
 
-	buildReqs   []semantic.BuildRequest
-	refreshReqs []semantic.RefreshRequest
+	buildReqs    []semantic.BuildRequest
+	refreshReqs  []semantic.RefreshRequest
+	retrieveReqs []semantic.RetrieveRequest
+	retrieveRes  semantic.RetrieveResult
+	retrieveErr  error
 }
 
 func (s *indexProgressServiceStub) Status(context.Context, string) (semantic.Status, error) {
@@ -76,8 +79,12 @@ func (s *indexProgressServiceStub) Clear(context.Context, string) error {
 	return s.clearErr
 }
 
-func (s *indexProgressServiceStub) Retrieve(context.Context, semantic.RetrieveRequest) (semantic.RetrieveResult, error) {
-	return semantic.RetrieveResult{}, semantic.ErrIndexMissing
+func (s *indexProgressServiceStub) Retrieve(_ context.Context, req semantic.RetrieveRequest) (semantic.RetrieveResult, error) {
+	s.retrieveReqs = append(s.retrieveReqs, req)
+	if s.retrieveErr != nil {
+		return semantic.RetrieveResult{}, s.retrieveErr
+	}
+	return s.retrieveRes, nil
 }
 
 func submitSlash(t *testing.T, m *Model, raw string) tea.Cmd {

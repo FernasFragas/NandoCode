@@ -3,7 +3,7 @@ package bash
 import (
 	"testing"
 
-	"github.com/FernasFragas/nandocodego/internal/tools"
+	"github.com/FernasFragas/Nandocode/internal/tools"
 )
 
 func TestBashPermissionMatrix(t *testing.T) {

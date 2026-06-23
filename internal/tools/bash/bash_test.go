@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/FernasFragas/nandocodego/internal/tools"
+	"github.com/FernasFragas/Nandocode/internal/tools"
 )
 
 func TestBashExecution(t *testing.T) {

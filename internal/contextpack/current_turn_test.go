@@ -7,8 +7,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/FernasFragas/nandocodego/internal/agent"
-	"github.com/FernasFragas/nandocodego/internal/tools"
+	"github.com/FernasFragas/Nandocode/internal/agent"
+	"github.com/FernasFragas/Nandocode/internal/tools"
 )
 
 func TestPackCurrentTurnPromptSmallFilePassThrough(t *testing.T) {

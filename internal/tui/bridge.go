@@ -3,7 +3,7 @@ package tui
 import (
 	"context"
 
-	"github.com/FernasFragas/nandocodego/internal/agent"
+	"github.com/FernasFragas/Nandocode/internal/agent"
 	tea "github.com/charmbracelet/bubbletea"
 )
 

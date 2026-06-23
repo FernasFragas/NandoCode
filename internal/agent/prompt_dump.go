@@ -9,30 +9,30 @@ import (
 	"sync"
 	"time"
 
-	"github.com/FernasFragas/nandocodego/internal/bootstrap"
-	"github.com/FernasFragas/nandocodego/internal/ids"
-	"github.com/FernasFragas/nandocodego/internal/llm"
+	"github.com/FernasFragas/Nandocode/internal/bootstrap"
+	"github.com/FernasFragas/Nandocode/internal/ids"
+	"github.com/FernasFragas/Nandocode/internal/llm"
 )
 
 type PromptDump struct {
-	CreatedAt        time.Time         `json:"created_at"`
-	Model            string            `json:"model"`
-	DumpMode         string            `json:"dump_mode"`
-	Intent           string            `json:"intent,omitempty"`
-	AttachmentPolicy string            `json:"attachment_policy,omitempty"`
-	HistoryPolicy    string            `json:"history_policy,omitempty"`
-	MemoryPolicy     string            `json:"memory_policy,omitempty"`
-	RetryPolicy      string            `json:"retry_policy,omitempty"`
-	IncludedFileBodies int             `json:"included_file_bodies,omitempty"`
-	DirectoryTreeAttached bool         `json:"directory_tree_attached,omitempty"`
-	Options          map[string]any    `json:"options"`
-	MessageCount     int               `json:"message_count"`
-	ToolCount        int               `json:"tool_count"`
-	ToolNames        []string          `json:"tool_names"`
-	Messages         []PromptMessage   `json:"messages"`
-	EstimatedTokens  int               `json:"estimated_tokens"`
-	PromptPackReport *PromptPackReport `json:"prompt_pack_report,omitempty"`
-	EvidencePack     *EvidencePackReport `json:"evidence_pack,omitempty"`
+	CreatedAt             time.Time           `json:"created_at"`
+	Model                 string              `json:"model"`
+	DumpMode              string              `json:"dump_mode"`
+	Intent                string              `json:"intent,omitempty"`
+	AttachmentPolicy      string              `json:"attachment_policy,omitempty"`
+	HistoryPolicy         string              `json:"history_policy,omitempty"`
+	MemoryPolicy          string              `json:"memory_policy,omitempty"`
+	RetryPolicy           string              `json:"retry_policy,omitempty"`
+	IncludedFileBodies    int                 `json:"included_file_bodies,omitempty"`
+	DirectoryTreeAttached bool                `json:"directory_tree_attached,omitempty"`
+	Options               map[string]any      `json:"options"`
+	MessageCount          int                 `json:"message_count"`
+	ToolCount             int                 `json:"tool_count"`
+	ToolNames             []string            `json:"tool_names"`
+	Messages              []PromptMessage     `json:"messages"`
+	EstimatedTokens       int                 `json:"estimated_tokens"`
+	PromptPackReport      *PromptPackReport   `json:"prompt_pack_report,omitempty"`
+	EvidencePack          *EvidencePackReport `json:"evidence_pack,omitempty"`
 }
 
 type PromptMessage struct {
@@ -102,17 +102,17 @@ func recordPromptDump(req *llm.ChatRequest, pack *PromptPackReport, promptIntent
 	}
 
 	dump := PromptDump{
-		CreatedAt:       time.Now().UTC(),
-		Model:           req.Model,
-		DumpMode:        mode,
-		Intent:          promptIntent,
+		CreatedAt:        time.Now().UTC(),
+		Model:            req.Model,
+		DumpMode:         mode,
+		Intent:           promptIntent,
 		AttachmentPolicy: attachmentPolicy,
-		HistoryPolicy:   historyPolicy,
-		Options:         copyOptions(req.Options),
-		MessageCount:    len(req.Messages),
-		ToolCount:       len(req.Tools),
-		ToolNames:       toolNames(req.Tools),
-		EstimatedTokens: estimatePromptTokens(req.Messages),
+		HistoryPolicy:    historyPolicy,
+		Options:          copyOptions(req.Options),
+		MessageCount:     len(req.Messages),
+		ToolCount:        len(req.Tools),
+		ToolNames:        toolNames(req.Tools),
+		EstimatedTokens:  estimatePromptTokens(req.Messages),
 	}
 	if pack != nil {
 		cp := *pack

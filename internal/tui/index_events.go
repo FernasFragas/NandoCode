@@ -1,7 +1,7 @@
 package tui
 
 import (
-	"github.com/FernasFragas/nandocodego/internal/semantic"
+	"github.com/FernasFragas/Nandocode/internal/semantic"
 	tea "github.com/charmbracelet/bubbletea"
 )
 

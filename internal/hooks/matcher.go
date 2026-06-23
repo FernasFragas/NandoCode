@@ -5,7 +5,7 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/FernasFragas/nandocodego/internal/permissions"
+	"github.com/FernasFragas/Nandocode/internal/permissions"
 )
 
 func matchesHook(h Hook, env Envelope) bool {

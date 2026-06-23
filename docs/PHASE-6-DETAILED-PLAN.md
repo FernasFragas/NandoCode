@@ -54,7 +54,7 @@ Phase 6 implications:
 
 Implemented:
 
-- Module path is `github.com/FernasFragas/nandocodego`.
+- Module path is `github.com/FernasFragas/Nandocode`.
 - Signal-aware CLI entrypoint exists.
 - `internal/paths` exposes config, data, cache, state, sessions, memory, and skills paths.
 - `internal/logging` exists.

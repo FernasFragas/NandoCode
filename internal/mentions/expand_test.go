@@ -8,7 +8,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/FernasFragas/nandocodego/internal/tools"
+	"github.com/FernasFragas/Nandocode/internal/tools"
 )
 
 func TestExpandPromptNoMentions(t *testing.T) {

@@ -4,10 +4,10 @@ import (
 	"context"
 	"testing"
 
-	"github.com/FernasFragas/nandocodego/internal/agent"
-	"github.com/FernasFragas/nandocodego/internal/llm"
-	"github.com/FernasFragas/nandocodego/internal/permissions"
-	"github.com/FernasFragas/nandocodego/internal/tools"
+	"github.com/FernasFragas/Nandocode/internal/agent"
+	"github.com/FernasFragas/Nandocode/internal/llm"
+	"github.com/FernasFragas/Nandocode/internal/permissions"
+	"github.com/FernasFragas/Nandocode/internal/tools"
 )
 
 type fakeAgentRunner struct {

@@ -107,6 +107,9 @@ func Decide(input Input, cfg Config) Decision {
 	if input.PromptIntent == "file_status" {
 		return skipDecision(ActionExplicitContextOnly, ReasonSkipExplicitContext, "Reading mentioned file...", "file_status", ToolModeDefault)
 	}
+	if idxDecision, ok := indexUnavailableDecision(input, mode, hasExplicitContext, prompt); ok {
+		return idxDecision
+	}
 
 	if mode == "explicit" {
 		if hasExplicitContext && isRelatedCodePrompt(prompt) && input.SemanticEnabled {
@@ -134,6 +137,32 @@ func Decide(input Input, cfg Config) Decision {
 	}
 
 	return semanticDecision(ActionSemanticFull, ReasonRunWorkspaceDiscovery, cfg.Full, false, "full", "workspace_discovery")
+}
+
+func indexUnavailableDecision(input Input, mode string, hasExplicitContext bool, prompt string) (Decision, bool) {
+	if !input.SemanticEnabled || !input.IndexKnown || (input.HasIndex && input.IndexCompatible) {
+		return Decision{}, false
+	}
+	wouldUseSemantic := input.ForceDeep ||
+		mode == "explicit" ||
+		isWorkspaceDiscoveryPrompt(prompt) ||
+		(hasExplicitContext && isRelatedCodePrompt(prompt))
+	if !wouldUseSemantic {
+		return Decision{}, false
+	}
+	reason := ReasonSkipIndexMissing
+	if input.HasIndex && !input.IndexCompatible {
+		reason = ReasonSkipDimensionsMismatch
+	}
+	action := ActionSkipAllRetrieval
+	label := "Semantic index unavailable..."
+	profile := "semantic_index_unavailable"
+	if hasExplicitContext {
+		action = ActionExplicitContextOnly
+		label = "Reading mentioned file..."
+		profile = "explicit_context"
+	}
+	return skipDecision(action, reason, label, profile, ToolModeDefault), true
 }
 
 func normalizeConfig(cfg Config) Config {

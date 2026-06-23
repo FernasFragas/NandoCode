@@ -3,8 +3,8 @@ package server
 import (
 	"time"
 
-	"github.com/FernasFragas/nandocodego/internal/agent"
-	"github.com/FernasFragas/nandocodego/internal/llm"
+	"github.com/FernasFragas/Nandocode/internal/agent"
+	"github.com/FernasFragas/Nandocode/internal/llm"
 )
 
 type SessionState string

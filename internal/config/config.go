@@ -3,8 +3,8 @@ package config
 import (
 	"time"
 
-	"github.com/FernasFragas/nandocodego/internal/permissions"
-	"github.com/FernasFragas/nandocodego/internal/semantic"
+	"github.com/FernasFragas/Nandocode/internal/permissions"
+	"github.com/FernasFragas/Nandocode/internal/semantic"
 )
 
 type Config struct {

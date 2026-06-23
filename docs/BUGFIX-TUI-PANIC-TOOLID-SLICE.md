@@ -13,13 +13,13 @@ Running `nandocodego` and asking the agent to analyse a file or the project cras
 ```
 runtime error: slice bounds out of range [:8] with length 6
 ...
-github.com/FernasFragas/nandocodego/internal/tui.(*Model).renderToolPanel
+github.com/FernasFragas/Nandocode/internal/tui.(*Model).renderToolPanel
         internal/tui/app.go:1132
-github.com/FernasFragas/nandocodego/internal/tui.(*Model).renderTranscript
+github.com/FernasFragas/Nandocode/internal/tui.(*Model).renderTranscript
         internal/tui/app.go:1010
-github.com/FernasFragas/nandocodego/internal/tui.(*Model).refreshViewportContent
+github.com/FernasFragas/Nandocode/internal/tui.(*Model).refreshViewportContent
         internal/tui/app.go:972
-github.com/FernasFragas/nandocodego/internal/tui.(*Model).handleAgentEvent
+github.com/FernasFragas/Nandocode/internal/tui.(*Model).handleAgentEvent
         internal/tui/app.go:688
 ```
 

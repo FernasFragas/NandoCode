@@ -8,10 +8,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/FernasFragas/nandocodego/internal/config"
-	"github.com/FernasFragas/nandocodego/internal/llm/ollama"
-	"github.com/FernasFragas/nandocodego/internal/paths"
-	"github.com/FernasFragas/nandocodego/internal/semantic"
+	"github.com/FernasFragas/Nandocode/internal/config"
+	"github.com/FernasFragas/Nandocode/internal/llm/ollama"
+	"github.com/FernasFragas/Nandocode/internal/paths"
+	"github.com/FernasFragas/Nandocode/internal/semantic"
 	"github.com/spf13/cobra"
 )
 

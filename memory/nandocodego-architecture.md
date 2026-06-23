@@ -42,4 +42,4 @@ Memory (MD + LLM recall) | Hooks (snapshot) | MCP clients
 
 ## Module Path
 
-`github.com/FernasFragas/nandocodego`
+`github.com/FernasFragas/Nandocode`

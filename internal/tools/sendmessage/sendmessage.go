@@ -11,10 +11,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/FernasFragas/nandocodego/internal/paths"
-	"github.com/FernasFragas/nandocodego/internal/tasks"
-	"github.com/FernasFragas/nandocodego/internal/tools"
-	"github.com/FernasFragas/nandocodego/internal/types"
+	"github.com/FernasFragas/Nandocode/internal/paths"
+	"github.com/FernasFragas/Nandocode/internal/tasks"
+	"github.com/FernasFragas/Nandocode/internal/tools"
+	"github.com/FernasFragas/Nandocode/internal/types"
 )
 
 var taskIDPattern = regexp.MustCompile(`^a-[0-9a-f]{12}$`)

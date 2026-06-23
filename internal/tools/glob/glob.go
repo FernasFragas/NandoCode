@@ -12,7 +12,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/FernasFragas/nandocodego/internal/tools"
+	"github.com/FernasFragas/Nandocode/internal/tools"
 )
 
 const maxFiles = 1000

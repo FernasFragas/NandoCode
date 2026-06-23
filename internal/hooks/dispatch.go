@@ -5,7 +5,7 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/FernasFragas/nandocodego/internal/llm"
+	"github.com/FernasFragas/Nandocode/internal/llm"
 	"golang.org/x/sync/errgroup"
 )
 

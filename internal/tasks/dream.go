@@ -6,8 +6,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/FernasFragas/nandocodego/internal/llm"
-	"github.com/FernasFragas/nandocodego/internal/types"
+	"github.com/FernasFragas/Nandocode/internal/llm"
+	"github.com/FernasFragas/Nandocode/internal/types"
 )
 
 type DreamTaskState struct {

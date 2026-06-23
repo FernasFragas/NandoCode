@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/FernasFragas/nandocodego/internal/mcp/auth"
+	"github.com/FernasFragas/Nandocode/internal/mcp/auth"
 )
 
 type ToolDescriptor struct {

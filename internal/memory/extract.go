@@ -8,7 +8,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/FernasFragas/nandocodego/internal/llm"
+	"github.com/FernasFragas/Nandocode/internal/llm"
 )
 
 type extractResponse struct {

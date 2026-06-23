@@ -3,8 +3,8 @@ package contextpack
 import (
 	"strings"
 
-	"github.com/FernasFragas/nandocodego/internal/agent"
-	"github.com/FernasFragas/nandocodego/internal/tools"
+	"github.com/FernasFragas/Nandocode/internal/agent"
+	"github.com/FernasFragas/Nandocode/internal/tools"
 )
 
 const conservativeCharsPerToken = 4

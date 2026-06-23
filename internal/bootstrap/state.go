@@ -6,9 +6,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/FernasFragas/nandocodego/internal/llm"
-	"github.com/FernasFragas/nandocodego/internal/paths"
-	"github.com/FernasFragas/nandocodego/internal/permissions"
+	"github.com/FernasFragas/Nandocode/internal/llm"
+	"github.com/FernasFragas/Nandocode/internal/paths"
+	"github.com/FernasFragas/Nandocode/internal/permissions"
 )
 
 // Initial contains initialization parameters for bootstrap state.

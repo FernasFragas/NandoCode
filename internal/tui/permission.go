@@ -6,7 +6,7 @@ import (
 	"sync"
 	"sync/atomic"
 
-	"github.com/FernasFragas/nandocodego/internal/permissions"
+	"github.com/FernasFragas/Nandocode/internal/permissions"
 	tea "github.com/charmbracelet/bubbletea"
 )
 

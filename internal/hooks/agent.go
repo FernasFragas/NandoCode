@@ -5,7 +5,7 @@ import (
 	"encoding/json"
 	"strings"
 
-	"github.com/FernasFragas/nandocodego/internal/llm"
+	"github.com/FernasFragas/Nandocode/internal/llm"
 )
 
 func runAgentHook(ctx context.Context, client llm.Client, h Hook, env Envelope, cfg Config) Result {

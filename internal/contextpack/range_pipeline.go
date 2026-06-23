@@ -11,9 +11,9 @@ import (
 	"unicode"
 	"unicode/utf8"
 
-	"github.com/FernasFragas/nandocodego/internal/agent"
-	"github.com/FernasFragas/nandocodego/internal/mentions"
-	"github.com/FernasFragas/nandocodego/internal/tools/fileread"
+	"github.com/FernasFragas/Nandocode/internal/agent"
+	"github.com/FernasFragas/Nandocode/internal/mentions"
+	"github.com/FernasFragas/Nandocode/internal/tools/fileread"
 )
 
 const (

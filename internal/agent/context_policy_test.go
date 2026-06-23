@@ -3,7 +3,7 @@ package agent
 import (
 	"testing"
 
-	"github.com/FernasFragas/nandocodego/internal/llm"
+	"github.com/FernasFragas/Nandocode/internal/llm"
 )
 
 func TestEffectiveNumCtxModes(t *testing.T) {

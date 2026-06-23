@@ -4,7 +4,7 @@ import (
 	"context"
 	"testing"
 
-	"github.com/FernasFragas/nandocodego/internal/tools"
+	"github.com/FernasFragas/Nandocode/internal/tools"
 )
 
 func TestInputDefaultsSubagentFalse(t *testing.T) {

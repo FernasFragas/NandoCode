@@ -12,13 +12,13 @@ import (
 	"testing"
 	"time"
 
-	"github.com/FernasFragas/nandocodego/internal/agent"
-	"github.com/FernasFragas/nandocodego/internal/bootstrap"
-	"github.com/FernasFragas/nandocodego/internal/credentials"
-	"github.com/FernasFragas/nandocodego/internal/llm"
-	"github.com/FernasFragas/nandocodego/internal/llm/modelresolver"
-	"github.com/FernasFragas/nandocodego/internal/llm/modelruntime"
-	"github.com/FernasFragas/nandocodego/internal/state"
+	"github.com/FernasFragas/Nandocode/internal/agent"
+	"github.com/FernasFragas/Nandocode/internal/bootstrap"
+	"github.com/FernasFragas/Nandocode/internal/credentials"
+	"github.com/FernasFragas/Nandocode/internal/llm"
+	"github.com/FernasFragas/Nandocode/internal/llm/modelresolver"
+	"github.com/FernasFragas/Nandocode/internal/llm/modelruntime"
+	"github.com/FernasFragas/Nandocode/internal/state"
 )
 
 type fakeClient struct{}
@@ -164,6 +164,34 @@ func TestHealthAndModels(t *testing.T) {
 	}
 	if !strings.Contains(w.Body.String(), "qwen3") {
 		t.Fatalf("models body=%s", w.Body.String())
+	}
+}
+
+func TestRoutesServeRichEmbeddedUI(t *testing.T) {
+	s := testServer(t)
+	w := httptest.NewRecorder()
+	s.routes().ServeHTTP(w, httptest.NewRequest(http.MethodGet, "/", nil))
+	if w.Code != http.StatusOK {
+		t.Fatalf("status=%d body=%s", w.Code, w.Body.String())
+	}
+	body := w.Body.String()
+	for _, want := range []string{
+		`id="model-picker"`,
+		`id="modal-overlay"`,
+		`currentReader = r.body.getReader()`,
+		`eventPayload(msg)`,
+	} {
+		if !strings.Contains(body, want) {
+			t.Fatalf("served UI missing %q", want)
+		}
+	}
+	for _, old := range []string{
+		"new EventSource",
+		"Connect SSE",
+	} {
+		if strings.Contains(body, old) {
+			t.Fatalf("served UI still contains old manual SSE marker %q", old)
+		}
 	}
 }
 

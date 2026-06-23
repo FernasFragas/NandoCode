@@ -2,9 +2,9 @@
 
 **Date reviewed:** 2026-05-24  
 **Implementation audit:** 2026-05-28  
-**Status:** Partially implemented; next agent must first reconcile the served embedded UI with the richer root UI, then fix browser event payload mapping before adding P1 panels.  
+**Status:** P0 browser gap implemented as of 2026-06-23; the served embedded UI is reconciled with the richer root UI and event payload mapping now normalizes `SessionEvent.data`. P1 management panels remain future work.
 **Scope:** Upgrade the existing Phase 21 browser page into a usable local web UI.  
-**Module path:** `github.com/FernasFragas/nandocodego`  
+**Module path:** `github.com/FernasFragas/Nandocode`
 
 This plan is grounded in the current repository. It intentionally builds on the
 implemented `nandocodego server` HTTP/SSE surface instead of introducing a new
@@ -23,11 +23,11 @@ assumptions:
 - Do not add root `--server` flags. The current entry point is the
   `nandocodego server` subcommand.
 - Do not create `assets/web/*` unless the implementation also updates the
-  existing embed path and tests. `internal/server/server.go` currently embeds
+  existing embed path and tests. `internal/server/server.go` embeds
   `internal/server/web/index.html` because `//go:embed web/index.html` is
-  resolved relative to the `internal/server` package. The richer product UI is
-  currently in the repository root `web/index.html` and is not the file served
-  by `nandocodego server`.
+  resolved relative to the `internal/server` package. As of 2026-06-23,
+  `web/index.html` and `internal/server/web/index.html` are intentionally
+  synchronized so the richer product UI is the served UI.
 - Do not expose the slash command registry directly over HTTP. Current server
   message POSTs are user prompts, not command dispatch.
 - Do not claim model switching, file tree browsing, memory panels, skills
@@ -62,8 +62,8 @@ Use these facts as the starting point for implementation:
 | Default bind | `127.0.0.1:8080` |
 | Server package | `internal/server` |
 | Embedded UI | `internal/server/web/index.html`, embedded by `//go:embed web/index.html` in `internal/server/server.go` |
-| Rich UI draft | Root `web/index.html`; currently not served by `nandocodego server` |
-| Transport | Served minimal UI still uses native `EventSource`; root rich UI uses fetch-stream SSE plus HTTP writes |
+| Rich UI draft | Root `web/index.html`, synchronized with the embedded served UI |
+| Transport | Served rich UI uses fetch-stream SSE plus HTTP writes |
 | Auth | Bearer token middleware when `--token` is set |
 | Non-loopback safety | Non-loopback bind is rejected unless `--token` is set |
 | Rate/session limits | `internal/server/ratelimit.go` |
@@ -119,11 +119,9 @@ first_token_received
 ```
 
 Important browser auth constraint: native `EventSource` cannot send custom
-`Authorization` headers. The served minimal UI currently uses `EventSource`, so
-protected SSE does not work there. The root rich UI uses `fetch(...)` and parses
-the SSE stream manually so the optional bearer token can be sent as a header.
-Keep the fetch-stream approach unless a later auth design replaces it
-deliberately.
+`Authorization` headers. The served rich UI uses `fetch(...)` and parses the
+SSE stream manually so the optional bearer token can be sent as a header. Keep
+the fetch-stream approach unless a later auth design replaces it deliberately.
 
 ## Implementation Audit
 
@@ -132,30 +130,28 @@ Current code has progressed beyond the original plan baseline:
 | Area | Status | Evidence / notes |
 | --- | --- | --- |
 | HTTP/SSE server baseline | Implemented | `internal/server` exposes sessions, message POST, SSE events, model list, permissions, replay, auth, rate limiting, and embedded UI. |
-| Served browser UI | Minimal only | `internal/server/web/index.html` is the embedded UI and still shows the older manual session/EventSource page. |
-| Root rich browser shell | Implemented but unserved | Root `web/index.html` has header, sidebar, main chat area, status bar, modal shell, model picker, mentions panel, and fetch-stream SSE, but is not embedded by the server. |
-| Session lifecycle UI | Implemented only in unserved root UI | Root UI creates a session on load and reconnects the SSE stream with exponential backoff; served UI requires manual session creation and manual SSE connect. |
-| Chat input | Implemented in both UIs with different fidelity | Served UI posts prompts without `message_id`; root UI posts prompts with `message_id`. |
-| Permission modal UI | Implemented only in unserved root UI and blocked by event payload mismatch | Root UI posts `allow`, `deny`, and `always_allow` to the existing permission endpoint, but reads request fields from the wrong object. Served UI has no permission modal. |
-| Model picker | Backend implemented; browser picker unserved | Backend `POST /v1/sessions/{id}/model` exists. Root browser picker exists but is not served. |
-| Mention helper | Backend implemented; browser helper unserved; backend safety caveat remains | Backend `GET /v1/sessions/{id}/tree` exists. Root UI autocomplete/panel exists but is not served. Backend currently uses manual `filepath.WalkDir`; refactor to `tools.ResolvePath` and `dirwalk.Walk` before treating this as complete. |
-| Status/tasks/diagnostics from events | Partially implemented only in unserved root UI | Root UI has status fields, but some event shape assumptions are wrong and transcript search is still missing. |
+| Served browser UI | Rich P0 UI served | `internal/server/web/index.html` now contains the rich shell and no native `EventSource` manual-connect flow. |
+| Root rich browser shell | Served and mirrored | Root `web/index.html` and embedded `internal/server/web/index.html` are synchronized. |
+| Session lifecycle UI | Implemented in served UI | Served UI creates a session on load and reconnects the SSE stream with exponential backoff. |
+| Chat input | Implemented in served UI | Served UI posts prompts with `message_id` for duplicate-safe submission. |
+| Permission modal UI | Implemented in served UI | Served UI posts `allow`, `deny`, and `always_allow` to the existing permission endpoint and reads request fields through normalized event payloads. |
+| Model picker | Implemented in served UI | Backend `POST /v1/sessions/{id}/model` exists and the served picker calls it. |
+| Mention helper | Implemented in served UI; backend safety caveat remains | Backend `GET /v1/sessions/{id}/tree` exists and the served UI inserts plain `@path` mentions. Backend currently uses manual `filepath.WalkDir`; refactor to `tools.ResolvePath` and `dirwalk.Walk` before treating backend traversal as fully hardened. |
+| Status/tasks/diagnostics from events | Partially implemented in served UI | Served UI has status fields and normalizes event payloads; transcript search and P1 management panels remain future work. |
 | Security headers | Implemented, tests still needed | CSP, frame denial, nosniff, referrer policy, permissions policy, and no-store API headers are set in `securityHeaders`. |
 | P1 management panels | Not implemented | Memory, Skills, Hooks, Permissions table, Tasks endpoint/panel, Trace/Cost endpoints, and Prompt Inspector remain future work. |
 
-Critical correctness gap:
+Resolved P0 correctness gap:
 
-- The server is not serving the richer browser UI described by most of this
-  plan. Either move the root `web/index.html` into `internal/server/web/index.html`
-  or update the embed layout deliberately with route/tests. Do this before
-  judging browser UX slices as complete.
-- Server SSE frames encode a `SessionEvent` envelope as JSON:
+- The server now serves the richer browser UI described by this plan. Route
+  coverage in `internal/server/handler_test.go` checks stable rich-UI markers,
+  fetch-stream SSE, event payload normalization, and absence of the old manual
+  `EventSource` markers.
+- Server SSE frames still encode a `SessionEvent` envelope as JSON:
   `{"id":"...","type":"assistant_text_delta","session_id":"...","data":{...}}`.
-  Root browser event handling switches on `msg.type` correctly, but many
-  renderers read payload fields from the top level (`msg.delta`,
-  `msg.tool_call_id`, `msg.request_id`, `msg.usage`). They must read from
-  `msg.data` instead.
-- Expected mappings include:
+  Browser event handling now switches on `msg.type` and uses a normalized
+  payload helper before rendering.
+- Expected mappings are:
   - `assistant_text_delta`: `msg.data.content`
   - `assistant_thinking_delta`: `msg.data.thinking`
   - `tool_use_start`: `msg.data.id`, `msg.data.name`, `msg.data.input`
@@ -179,14 +175,14 @@ Critical correctness gap:
 
 | ID | Requirement | Current status | Implementation notes |
 | --- | --- | --- | --- |
-| P0-1 | Auto-create a session on page load | Implemented in root UI, not served | `POST /v1/sessions`; keep session id in memory, not as source-of-truth localStorage |
-| P0-2 | Chat input and transcript | Partially implemented | Served UI has basic send/log only. Root UI has richer transcript but must be served and must read event payloads from `msg.data`. |
-| P0-3 | Streaming assistant output | Partially implemented | Render `assistant_text_delta` from `msg.data.content`; finalize on `terminal` from `msg.data` |
-| P0-4 | Thinking and tool panels | Partially implemented in root UI, not served | Render `assistant_thinking_delta`, `tool_use_*`, `hook_notice`, `retry_notice`, `llm_idle_warning`, `stage_timing` from `msg.data` |
-| P0-5 | Permission modal | Implemented in root UI, not served; needs event payload fix | Render `permission_request` from `msg.data`; POST `allow`, `deny`, or `always_allow` |
-| P0-6 | Model picker | Backend implemented; UI unserved | Lists `/v1/models`; updates `/v1/sessions/{id}/model` |
-| P0-7 | Mention helper | Endpoint implemented; UI unserved; backend should be refactored for plan-level safety | Tree endpoint exists; refactor to `tools.ResolvePath` + `dirwalk.Walk`; insert plain `@path` text |
-| P0-8 | Status bar | Partially implemented in root UI, not served | Use session view, run events, terminal usage, prompt pack report, and task lifecycle events from `msg.data` |
+| P0-1 | Auto-create a session on page load | Implemented in served UI | `POST /v1/sessions`; session id kept in memory. |
+| P0-2 | Chat input and transcript | Implemented in served UI | Served UI posts `message_id` and renders normalized event payloads. |
+| P0-3 | Streaming assistant output | Implemented in served UI | Renders `assistant_text_delta` from normalized payload content and finalizes on `terminal`. |
+| P0-4 | Thinking and tool panels | Implemented in served UI | Renders thinking, tool events, notices, stage timing, prompt-pack reports, semantic events, and terminal usage from normalized payloads. |
+| P0-5 | Permission modal | Implemented in served UI | Renders `permission_request` from normalized payloads; posts `allow`, `deny`, or `always_allow`. |
+| P0-6 | Model picker | Implemented in served UI | Lists `/v1/models`; updates `/v1/sessions/{id}/model`. |
+| P0-7 | Mention helper | Implemented in served UI; backend hardening remains | Tree endpoint exists; served UI inserts plain `@path` text. Refactor backend traversal to `tools.ResolvePath` + `dirwalk.Walk` before declaring traversal fully hardened. |
+| P0-8 | Status bar | Implemented in served UI | Uses session view, run events, terminal usage, prompt-pack report, task lifecycle, and semantic events. |
 
 ### P1: Should Have
 
@@ -317,8 +313,8 @@ Recommended next implementation order:
 
 ### Slice UI-0: Serve the Rich Browser UI
 
-**Status:** Not complete; required before UI-1 through UI-6 can be considered
-served product functionality.
+**Status:** Complete as of 2026-06-23. UI-1 through UI-6 now describe served
+product functionality, not an unserved root draft.
 
 **Goal:** Make the richer product UI the actual page served by
 `nandocodego server`.
@@ -332,8 +328,8 @@ Files:
 
 Tasks:
 
-- Decide whether the canonical UI file lives under `internal/server/web/` or
-  whether `server.go` should embed another directory.
+- Keep the canonical served UI under `internal/server/web/` and synchronize the
+  root `web/index.html` mirror when editing browser UI.
 - Ensure `GET /` serves the rich browser shell, not the old manual
   EventSource/debug page.
 - Preserve the fetch-stream SSE implementation so bearer-token auth can work.
@@ -349,7 +345,7 @@ Acceptance:
 - The served page uses fetch-stream SSE, not native `EventSource`.
 - `go test ./internal/server ./internal/cli` passes.
 
-Agent prompt:
+Completed implementation prompt:
 
 ```text
 Fix Slice UI-0 from docs/WEB-UI-UX-PRODUCT-PLAN.md. The rich UI currently lives
@@ -361,7 +357,7 @@ this cannot drift again. Run go test ./internal/server ./internal/cli.
 
 ### Slice UI-1: Browser Shell and Session Lifecycle
 
-**Status:** Implemented in root `web/index.html`, but not currently served.
+**Status:** Implemented in the served browser UI.
 
 **Goal:** Replace the current raw event log page with a stable app shell that
 creates a session and connects to SSE.
@@ -447,8 +443,7 @@ usage accordingly. Run go test ./internal/server.
 
 ### Slice UI-3: Permission Modal
 
-**Status:** Implemented in root UI shape, but not served; blocked by same
-`msg.data` payload fix.
+**Status:** Implemented in the served browser UI.
 
 **Goal:** Browser users can resolve tool permission requests.
 
@@ -486,8 +481,8 @@ change the permission resolver semantics. Run go test ./internal/server.
 
 ### Slice UI-4: Model Picker
 
-**Status:** Backend implemented; browser picker exists in root UI but is not
-currently served.
+**Status:** Implemented in the served browser UI; endpoint validation coverage
+should continue to be maintained.
 
 **Goal:** Users can see available local models and switch the session model.
 
@@ -516,20 +511,19 @@ Acceptance:
 - Invalid model and active-run cases return clear errors.
 - `go test ./internal/server` passes.
 
-Agent prompt:
+Follow-up audit prompt:
 
 ```text
-Audit Slice UI-4 from docs/WEB-UI-UX-PRODUCT-PLAN.md after UI-0. The
-session-scoped model endpoint exists and the rich UI has a header picker, but
-the picker must be served before this slice is complete. Verify tests cover
+Audit Slice UI-4 from docs/WEB-UI-UX-PRODUCT-PLAN.md. The session-scoped model
+endpoint exists and the served rich UI has a header picker. Verify tests cover
 valid, missing, unknown, and active-run cases; fix only gaps. Do not add model
 pull UI in this slice. Run go test ./internal/server.
 ```
 
 ### Slice UI-5: Mentions and Safe File Tree
 
-**Status:** Endpoint implemented; root UI helper exists but is not served;
-backend safety implementation must be refactored before this is complete.
+**Status:** Served UI helper implemented; backend safety implementation must be
+refactored before this slice is fully complete.
 
 **Goal:** Users can insert `@path` mentions from a safe browser picker.
 
@@ -562,16 +556,16 @@ Agent prompt:
 
 ```text
 Fix Slice UI-5 from docs/WEB-UI-UX-PRODUCT-PLAN.md. The tree endpoint exists and
-the rich UI has mentions support, but UI-0 must make it served. Refactor the
-backend to use tools.ResolvePath and dirwalk.Walk instead of raw
-filepath.WalkDir. Keep plain @path insertion behavior and update traversal/cap
-tests. Run go test ./internal/server.
+the served rich UI has mentions support. Refactor the backend to use
+tools.ResolvePath and dirwalk.Walk instead of raw filepath.WalkDir. Keep plain
+@path insertion behavior and update traversal/cap tests. Run go test
+./internal/server.
 ```
 
 ### Slice UI-6: Status, Tasks, and Diagnostics From Existing Events
 
-**Status:** Partially implemented in root UI, but not served; event payload
-shape must be corrected and transcript search is missing.
+**Status:** Partially implemented in the served UI; event payload shape is
+normalized and transcript search is still missing.
 
 **Goal:** Make the UI useful for long runs without adding management endpoints.
 

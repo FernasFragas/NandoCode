@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/FernasFragas/nandocodego/internal/types"
+	"github.com/FernasFragas/Nandocode/internal/types"
 )
 
 func TestTaskStateToSummaryStatuses(t *testing.T) {

@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/FernasFragas/nandocodego/internal/llm"
+	"github.com/FernasFragas/Nandocode/internal/llm"
 )
 
 // BenchmarkConcurrentFileRead models 5 independent read-like calls where concurrent

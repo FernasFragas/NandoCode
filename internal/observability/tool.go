@@ -4,8 +4,8 @@ import (
 	"encoding/json"
 	"time"
 
-	"github.com/FernasFragas/nandocodego/internal/permissions"
-	"github.com/FernasFragas/nandocodego/internal/tools"
+	"github.com/FernasFragas/Nandocode/internal/permissions"
+	"github.com/FernasFragas/Nandocode/internal/tools"
 )
 
 type observedTool struct {

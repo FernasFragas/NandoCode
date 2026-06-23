@@ -3,7 +3,7 @@ package permissions
 import (
 	"context"
 
-	"github.com/FernasFragas/nandocodego/internal/tools"
+	"github.com/FernasFragas/Nandocode/internal/tools"
 )
 
 // HookDecisionFunc is called early in resolution to allow pre-checks to override decisions.

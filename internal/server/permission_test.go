@@ -5,9 +5,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/FernasFragas/nandocodego/internal/bootstrap"
-	"github.com/FernasFragas/nandocodego/internal/permissions"
-	"github.com/FernasFragas/nandocodego/internal/state"
+	"github.com/FernasFragas/Nandocode/internal/bootstrap"
+	"github.com/FernasFragas/Nandocode/internal/permissions"
+	"github.com/FernasFragas/Nandocode/internal/state"
 )
 
 func TestHTTPPermissionBrokerResolve(t *testing.T) {

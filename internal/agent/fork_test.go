@@ -4,7 +4,7 @@ import (
 	"context"
 	"testing"
 
-	"github.com/FernasFragas/nandocodego/internal/llm"
+	"github.com/FernasFragas/Nandocode/internal/llm"
 )
 
 func TestRunForkUsesPromptAndMessages(t *testing.T) {

@@ -7,8 +7,8 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/FernasFragas/nandocodego/internal/semantic"
-	"github.com/FernasFragas/nandocodego/internal/semantic/testutil"
+	"github.com/FernasFragas/Nandocode/internal/semantic"
+	"github.com/FernasFragas/Nandocode/internal/semantic/testutil"
 )
 
 func TestLocalStoreReplaceAndLoad(t *testing.T) {

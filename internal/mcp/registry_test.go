@@ -5,7 +5,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/FernasFragas/nandocodego/internal/tools"
+	"github.com/FernasFragas/Nandocode/internal/tools"
 )
 
 func TestOverlayRegistryLookupBuiltIn(t *testing.T) {

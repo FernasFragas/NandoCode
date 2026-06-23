@@ -438,6 +438,9 @@ func (s *LocalService) Retrieve(ctx context.Context, req RetrieveRequest) (Retri
 		return RetrieveResult{}, fmt.Errorf("semantic service not initialized")
 	}
 	cfg := DefaultConfig()
+	if req.Config != (Config{}) {
+		cfg, _ = NormalizeConfig(req.Config)
+	}
 
 	manifestStart := time.Now()
 	manifest, err := s.store.LoadManifest(retrieveCtx, root)

@@ -6,7 +6,7 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/FernasFragas/nandocodego/internal/tools"
+	"github.com/FernasFragas/Nandocode/internal/tools"
 )
 
 func TestMCPToolName(t *testing.T) {

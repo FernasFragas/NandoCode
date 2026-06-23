@@ -73,10 +73,11 @@ These plans are already implemented or substantially delivered and should not be
 - **Phase 23 - OpenAI-Compatible LLM Adapter:** removed from the active v0.1 plan.
 - **Phase 25 - Remote / Bridge Mode:** required for v0.1. Implement after Phase 21, Phase 24, Ollama Cloud API key support, and Phase 28/29.
 
-## Documentation Drift To Clean Up
+## Documentation Drift And Routing Notes
 
-- `docs/PROJECT-STATUS-AND-ONBOARDING.md` contains older status tables from earlier project history. Use its current roadmap section and `docs/PHASE-LOG.md` as the ordering source of truth.
+- Current roadmap routing is centralized in `docs/NEXT-PHASES-IMPLEMENTATION-PLAN.md`, with `docs/PROJECT-STATUS-AND-ONBOARDING.md` as the implementation snapshot and `docs/PHASE-LOG.md` as historical evidence.
+- `docs/PROJECT-STATUS-AND-ONBOARDING.md` still contains older status tables for context. Use its current roadmap/routing sections and the Next Phases plan for ordering.
 - Docker/web docs should stay aligned with the implemented `nandocodego server` command, port 8080 defaults, and `--bind` / `--port` flags.
 - `SECURITY.md` still has `security@example.invalid` as a placeholder contact.
 - Some docs and examples prefer `qwen3`, while code defaults may still point at older model defaults. Engineers should pass `--model` explicitly until config defaults are reconciled.
-- `.codex/agent-context/ARCHITECTURE.md` and parts of `.codex/agent-context/testing-standards.md` reference unrelated stack details and should not be treated as authoritative for this repo.
+- `.codex/agent-context/ARCHITECTURE.md` and parts of `.codex/agent-context/testing-standards.md` are explicitly marked stale/non-authoritative for this repo.

@@ -3,7 +3,7 @@ package agent
 import (
 	"strings"
 
-	"github.com/FernasFragas/nandocodego/internal/llm"
+	"github.com/FernasFragas/Nandocode/internal/llm"
 )
 
 const (

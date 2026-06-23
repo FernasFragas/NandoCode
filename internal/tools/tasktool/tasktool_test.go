@@ -6,11 +6,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/FernasFragas/nandocodego/internal/bootstrap"
-	"github.com/FernasFragas/nandocodego/internal/state"
-	"github.com/FernasFragas/nandocodego/internal/tasks"
-	"github.com/FernasFragas/nandocodego/internal/tools"
-	"github.com/FernasFragas/nandocodego/internal/types"
+	"github.com/FernasFragas/Nandocode/internal/bootstrap"
+	"github.com/FernasFragas/Nandocode/internal/state"
+	"github.com/FernasFragas/Nandocode/internal/tasks"
+	"github.com/FernasFragas/Nandocode/internal/tools"
+	"github.com/FernasFragas/Nandocode/internal/types"
 )
 
 func newSup(t *testing.T) *tasks.Supervisor {

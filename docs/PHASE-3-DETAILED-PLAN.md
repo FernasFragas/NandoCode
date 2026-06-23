@@ -50,7 +50,7 @@ Observed baseline issue, resolved during implementation:
 
 Implemented:
 
-- `go.mod` and `go.sum` exist with module path `github.com/FernasFragas/nandocodego`.
+- `go.mod` and `go.sum` exist with module path `github.com/FernasFragas/Nandocode`.
 - `Makefile` includes build, test, race, lint, install, clean, check, and Docker-related targets.
 - Cobra CLI exists in `internal/cli`.
 - `cmd/nandocodego/main.go` calls `cli.Execute()`.

@@ -3,7 +3,7 @@ package permissions
 import (
 	"testing"
 
-	"github.com/FernasFragas/nandocodego/internal/tools"
+	"github.com/FernasFragas/Nandocode/internal/tools"
 )
 
 func TestModeNormalize(t *testing.T) {

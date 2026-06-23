@@ -4,7 +4,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/FernasFragas/nandocodego/internal/state"
+	"github.com/FernasFragas/Nandocode/internal/state"
 )
 
 func TestBindingStackPushPopAndTop(t *testing.T) {

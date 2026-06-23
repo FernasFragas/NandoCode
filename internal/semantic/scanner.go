@@ -11,7 +11,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/FernasFragas/nandocodego/internal/tools/dirwalk"
+	"github.com/FernasFragas/Nandocode/internal/tools/dirwalk"
 )
 
 type ScanOptions struct {

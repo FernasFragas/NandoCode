@@ -4,8 +4,8 @@ package agent
 import (
 	"time"
 
-	"github.com/FernasFragas/nandocodego/internal/llm"
-	"github.com/FernasFragas/nandocodego/internal/tools"
+	"github.com/FernasFragas/Nandocode/internal/llm"
+	"github.com/FernasFragas/Nandocode/internal/tools"
 )
 
 // Event is a sealed interface for agent events.

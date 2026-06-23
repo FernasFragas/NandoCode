@@ -7,7 +7,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/FernasFragas/nandocodego/internal/permissions"
+	"github.com/FernasFragas/Nandocode/internal/permissions"
 )
 
 type permissionDecision string

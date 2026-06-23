@@ -7,7 +7,7 @@ import (
 	"os"
 	"strings"
 
-	"github.com/FernasFragas/nandocodego/internal/llm"
+	"github.com/FernasFragas/Nandocode/internal/llm"
 )
 
 type replayRecord struct {
@@ -52,4 +52,3 @@ func ReplayMessagesFromOutput(path string, max int) ([]llm.Message, error) {
 	}
 	return out, nil
 }
-

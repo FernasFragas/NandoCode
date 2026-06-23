@@ -4,7 +4,7 @@ import (
 	"context"
 	"time"
 
-	"github.com/FernasFragas/nandocodego/internal/agent"
+	"github.com/FernasFragas/Nandocode/internal/agent"
 )
 
 // Runner matches the agent runner interface used by hooks and TUI.
@@ -42,6 +42,15 @@ func (o *observedRunner) Run(ctx context.Context, in agent.Input) <-chan agent.E
 		RouteAction:    in.RouteAction,
 		RouteReason:    in.RouteReason,
 		RouteProfile:   in.RouteProfile,
+	}
+	if in.EvidencePack != nil {
+		trace.EvidencePacked = in.EvidencePack.Packed
+		trace.EvidenceBudget = in.EvidencePack.BudgetTokens
+		trace.EvidenceFiles = in.EvidencePack.FilesReferenced
+		trace.EvidenceExcerpted = in.EvidencePack.FilesExcerpted
+		trace.EvidenceOmitted = in.EvidencePack.FilesOmitted
+		trace.EvidenceRawBytes = in.EvidencePack.RawBytesIncluded
+		trace.EvidenceRawBytesOmitted = in.EvidencePack.RawBytesOmitted
 	}
 	firstEventRecorded := false
 	firstAssistantRecorded := false
@@ -124,6 +133,11 @@ func (o *observedRunner) Run(ctx context.Context, in agent.Input) <-chan agent.E
 				if e.Stage != "" && e.Duration > 0 {
 					trace.StageLatencies[e.Stage] = e.Duration
 				}
+			case agent.PromptPackReport:
+				trace.PromptPackInputBudget = e.InputBudgetTokens
+				trace.PromptPackIncluded = e.IncludedMessages
+				trace.PromptPackSkipped = e.SkippedMessages
+				trace.PromptPackDroppedBlocks = e.DroppedMentionBlocks
 			case agent.Terminal:
 				terminalEvent = true
 				dur := time.Since(start)

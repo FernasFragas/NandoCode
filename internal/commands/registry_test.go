@@ -8,18 +8,18 @@ import (
 	"testing"
 	"time"
 
-	"github.com/FernasFragas/nandocodego/internal/agent"
-	"github.com/FernasFragas/nandocodego/internal/analysis"
-	"github.com/FernasFragas/nandocodego/internal/bootstrap"
-	"github.com/FernasFragas/nandocodego/internal/credentials"
-	"github.com/FernasFragas/nandocodego/internal/hooks"
-	"github.com/FernasFragas/nandocodego/internal/llm"
-	"github.com/FernasFragas/nandocodego/internal/llm/modelresolver"
-	"github.com/FernasFragas/nandocodego/internal/llm/modelruntime"
-	"github.com/FernasFragas/nandocodego/internal/observability"
-	"github.com/FernasFragas/nandocodego/internal/skills"
-	"github.com/FernasFragas/nandocodego/internal/state"
-	"github.com/FernasFragas/nandocodego/internal/types"
+	"github.com/FernasFragas/Nandocode/internal/agent"
+	"github.com/FernasFragas/Nandocode/internal/analysis"
+	"github.com/FernasFragas/Nandocode/internal/bootstrap"
+	"github.com/FernasFragas/Nandocode/internal/credentials"
+	"github.com/FernasFragas/Nandocode/internal/hooks"
+	"github.com/FernasFragas/Nandocode/internal/llm"
+	"github.com/FernasFragas/Nandocode/internal/llm/modelresolver"
+	"github.com/FernasFragas/Nandocode/internal/llm/modelruntime"
+	"github.com/FernasFragas/Nandocode/internal/observability"
+	"github.com/FernasFragas/Nandocode/internal/skills"
+	"github.com/FernasFragas/Nandocode/internal/state"
+	"github.com/FernasFragas/Nandocode/internal/types"
 )
 
 type fakeLLM struct {
@@ -374,15 +374,26 @@ func TestTraceLastUsesMeterWhenAvailable(t *testing.T) {
 		RetryKinds: map[string]int64{
 			"incomplete_assistant_response": 1,
 		},
-		MentionMode:            "tree",
-		MentionDirs:            2,
-		MentionFilesDiscovered: 18,
-		MentionFileBodies:      3,
-		ContextMode:            "large",
-		ToolMode:               "none",
-		RouteAction:            "skip_all_retrieval",
-		RouteReason:            "skip_general_prompt",
-		RouteProfile:           "general_prompt",
+		MentionMode:             "tree",
+		MentionDirs:             2,
+		MentionFilesDiscovered:  18,
+		MentionFileBodies:       3,
+		ContextMode:             "large",
+		ToolMode:                "none",
+		RouteAction:             "skip_all_retrieval",
+		RouteReason:             "skip_general_prompt",
+		RouteProfile:            "general_prompt",
+		PromptPackInputBudget:   8192,
+		PromptPackIncluded:      3,
+		PromptPackSkipped:       2,
+		PromptPackDroppedBlocks: 1,
+		EvidencePacked:          true,
+		EvidenceBudget:          4096,
+		EvidenceFiles:           4,
+		EvidenceRawBytes:        2048,
+		EvidenceRawBytesOmitted: 1024,
+		EvidenceExcerpted:       1,
+		EvidenceOmitted:         1,
 		StageLatencies: map[string]time.Duration{
 			"semantic_retrieve": 1200 * time.Millisecond,
 			"mention_expand":    800 * time.Millisecond,
@@ -413,6 +424,16 @@ func TestTraceLastUsesMeterWhenAvailable(t *testing.T) {
 	}
 	if !strings.Contains(out.Content, "Diagnosis:            semantic retrieval was the main recorded cost (1.2s, 80% of terminal); retries=1") {
 		t.Fatalf("unexpected trace output: %s", out.Content)
+	}
+	if !strings.Contains(out.Content, "Prompt pack budget:   8192") ||
+		!strings.Contains(out.Content, "Prompt pack skipped:  2") ||
+		!strings.Contains(out.Content, "Mention blocks drop:  1") {
+		t.Fatalf("unexpected trace prompt-pack output: %s", out.Content)
+	}
+	if !strings.Contains(out.Content, "Evidence packed:      true") ||
+		!strings.Contains(out.Content, "Evidence omitted raw: 1024") ||
+		!strings.Contains(out.Content, "Evidence omitted:     1") {
+		t.Fatalf("unexpected trace evidence output: %s", out.Content)
 	}
 	if !strings.Contains(out.Content, "Slowest stages:") || !strings.Contains(out.Content, "semantic_retrieve: 1.2s") || !strings.Contains(out.Content, "mention_expand: 800ms") {
 		t.Fatalf("unexpected trace output: %s", out.Content)
@@ -507,6 +528,9 @@ func TestPromptLastShowsListingPolicies(t *testing.T) {
 		"Retry policy:         anchored_original_request",
 		"File bodies:          0",
 		"Directory tree:       true",
+		"Options:",
+		"num_ctx:",
+		"num_predict:",
 	}
 	for _, s := range want {
 		if !strings.Contains(out.Content, s) {

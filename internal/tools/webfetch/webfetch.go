@@ -15,7 +15,7 @@ import (
 
 	"golang.org/x/net/html"
 
-	"github.com/FernasFragas/nandocodego/internal/tools"
+	"github.com/FernasFragas/Nandocode/internal/tools"
 )
 
 const (

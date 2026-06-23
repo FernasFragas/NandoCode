@@ -5,9 +5,9 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/FernasFragas/nandocodego/internal/credentials"
-	"github.com/FernasFragas/nandocodego/internal/llm"
-	"github.com/FernasFragas/nandocodego/internal/llm/modelresolver"
+	"github.com/FernasFragas/Nandocode/internal/credentials"
+	"github.com/FernasFragas/Nandocode/internal/llm"
+	"github.com/FernasFragas/Nandocode/internal/llm/modelresolver"
 )
 
 type fakeClient struct {

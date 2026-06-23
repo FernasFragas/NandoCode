@@ -25,6 +25,28 @@ func (e fixedDimensionEmbedder) Embed(_ context.Context, req EmbedRequest) (Embe
 	return EmbedResult{Vectors: out, Dimensions: e.dimensions}, nil
 }
 
+type recordingEmbedder struct {
+	fixedDimensionEmbedder
+	mu        sync.Mutex
+	keepAlive []string
+}
+
+func (e *recordingEmbedder) Embed(ctx context.Context, req EmbedRequest) (EmbedResult, error) {
+	e.mu.Lock()
+	e.keepAlive = append(e.keepAlive, req.KeepAlive)
+	e.mu.Unlock()
+	return e.fixedDimensionEmbedder.Embed(ctx, req)
+}
+
+func (e *recordingEmbedder) lastKeepAlive() string {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	if len(e.keepAlive) == 0 {
+		return ""
+	}
+	return e.keepAlive[len(e.keepAlive)-1]
+}
+
 func TestBuildAdoptsActualEmbeddingDimensions(t *testing.T) {
 	t.Parallel()
 	root := buildFixtureWorkspace(t)
@@ -473,6 +495,35 @@ func TestRetrieveObserverReportsSubstagesAndCacheHit(t *testing.T) {
 		t.Fatalf("second retrieve vectors cache_hit=%v want true", ok && evt.CacheHit)
 	}
 	assertRetrieveStageSeen(t, second, RetrieveStageTotal)
+}
+
+func TestRetrieveUsesRequestConfigForQueryKeepAlive(t *testing.T) {
+	t.Parallel()
+	root := buildFixtureWorkspace(t)
+	store := NewLocalStore(t.TempDir())
+	embedder := &recordingEmbedder{fixedDimensionEmbedder: fixedDimensionEmbedder{dimensions: 64}}
+	svc := NewLocalService(store, embedder)
+	cfg := DefaultConfig()
+	cfg.BatchSize = 2
+	if _, err := svc.Build(context.Background(), BuildRequest{
+		Root:   root,
+		Config: cfg,
+	}); err != nil {
+		t.Fatalf("Build() error = %v", err)
+	}
+
+	retrieveCfg := DefaultConfig()
+	retrieveCfg.QueryKeepAlive = "7s"
+	if _, err := svc.Retrieve(context.Background(), RetrieveRequest{
+		Root:   root,
+		Query:  "fix authentication bug",
+		Config: retrieveCfg,
+	}); err != nil {
+		t.Fatalf("Retrieve() error = %v", err)
+	}
+	if got := embedder.lastKeepAlive(); got != "7s" {
+		t.Fatalf("query keep_alive=%q want 7s", got)
+	}
 }
 
 type countingStore struct {

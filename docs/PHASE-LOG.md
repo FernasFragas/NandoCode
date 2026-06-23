@@ -2,6 +2,44 @@
 
 This document tracks the completion of each implementation phase, recording key decisions, files created, checks run, and open questions.
 
+## Status Routing Notice
+
+This file is the implementation history and acceptance-evidence log. It is not the source of truth for current roadmap order because older entries retain their original "Next Steps" wording.
+
+For current launch-readiness routing, read `docs/NEXT-PHASES-IMPLEMENTATION-PLAN.md` first, then `docs/PROJECT-STATUS-AND-ONBOARDING.md` and `docs/REMAINING-PHASES-TASK-REVIEW.md`. Use this log to verify what shipped, what checks ran, and which manual gates still need evidence.
+
+## Launch-Readiness Follow-Ups Completion (2026-06-23)
+
+**Date:** 2026-06-23
+**Status:** Implemented and validated in automated/local checks
+**Scope:** Context and large-project reliability evidence, TUI follow-ups, browser UI gap, and docs drift cleanup.
+
+### Completed
+
+- `/trace last` now exposes prompt-pack and evidence-pack counters, including included/skipped messages, dropped mention blocks, packed files, excerpted/omitted files, and omitted raw bytes.
+- `/prompt last` now prints request options such as `num_ctx` and `num_predict` before prompt-pack details.
+- Semantic retrieval now receives the active semantic config for query embedding keep-alive and scoring, instead of falling back to defaults.
+- TUI and server semantic routing now consult semantic index status before deciding to embed. Known missing or incompatible indexes skip semantic retrieval visibly instead of failing late.
+- TUI follow-ups landed for permission modal stale-resolution handling, click-to-collapse/expand tool panels, compact activity hierarchy, deeper Vim normal-mode editing/yank/paste/find behavior, queued `/btw` status, and read-only `/btw` toolset enforcement.
+- The richer browser UI is now the served embedded UI. `web/index.html` and `internal/server/web/index.html` are synchronized, use fetch-stream SSE instead of native `EventSource`, and normalize `SessionEvent.data` payloads before rendering assistant deltas, tools, permissions, prompt-pack reports, semantic events, and terminal usage.
+- Docs routing and stale context notes were corrected across README/status docs and the user manual.
+
+### Checks Run
+
+- `GOCACHE=/private/tmp/nandocodego-gocache go test ./internal/tui ./internal/server ./internal/commands ./internal/semantic ./internal/retrievalroute ./internal/analysis ./internal/agent ./internal/contextpack`
+- `cmp -s web/index.html internal/server/web/index.html`
+- `awk '/<script>/{flag=1;next}/<\/script>/{flag=0}flag' internal/server/web/index.html > /private/tmp/nandocodego-web-ui.js`
+- `node --check /private/tmp/nandocodego-web-ui.js`
+- `git diff --check`
+- `GOCACHE=/private/tmp/nandocodego-gocache go test ./...` passed outside the sandbox after the sandboxed run failed only on local listener binding in `httptest`/Unix-socket tests.
+- `tools/run-load-suite.sh`
+- Live local server smoke outside the sandbox: started `go run ./cmd/nandocodego server --bind 127.0.0.1 --port 18083`, fetched `/`, verified rich UI markers plus absence of old `EventSource`, and created a session with `POST /v1/sessions`.
+
+### Remaining Manual Evidence
+
+- Capture one live TUI REPL run with an actual model for `/trace last`, `/prompt last`, permission modal interactions, click-expanded tool panels, Vim editing, and `/btw` queue behavior.
+- Capture one live browser session against `nandocodego server` with a model-backed run, permission request, model switch, mention insertion, and SSE reconnect/replay.
+
 ## Go Response-Time Refactor Completion (2026-05-28)
 
 **Date:** 2026-05-28  
@@ -1055,7 +1093,7 @@ Create repository scaffolding and build a minimal working `nandocodego` binary t
 ### Files Created
 
 1. **`go.mod` / `go.sum`** - Go module initialization
-   - Module path: `github.com/FernasFragas/nandocodego`
+   - Module path: `github.com/FernasFragas/Nandocode`
    - Go version: `1.23.0`
    - Direct dependencies: `github.com/spf13/cobra v1.10.2`
 
@@ -1240,7 +1278,7 @@ Reviewed against `.codex/go-ollama-plan-AGENTS.md` after Phase 3 cleanup.
 
 Confirmed implemented:
 
-- `go.mod` exists with module path `github.com/FernasFragas/nandocodego` and `go 1.26.2`.
+- `go.mod` exists with module path `github.com/FernasFragas/Nandocode` and `go 1.26.2`.
 - `cmd/nandocodego/main.go` exists and invokes the CLI.
 - `internal/version`, `internal/paths`, `internal/logging`, and `internal/cli` exist.
 - `nandocodego --version` and `nandocodego doctor` work.
@@ -2193,7 +2231,7 @@ The goal is to make future TUI, REPL, memory, hooks, MCP, and task phases compos
 ```
 goos: darwin
 goarch: arm64
-pkg: github.com/FernasFragas/nandocodego/internal/state
+pkg: github.com/FernasFragas/Nandocode/internal/state
 BenchmarkStoreSetFiveSubscribers-15    	471782334	        50.82 ns/op
 ```
 

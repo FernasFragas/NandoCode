@@ -8,7 +8,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/FernasFragas/nandocodego/internal/llm"
+	"github.com/FernasFragas/Nandocode/internal/llm"
 )
 
 var (

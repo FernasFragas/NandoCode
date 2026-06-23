@@ -8,17 +8,17 @@ import (
 	"strings"
 	"time"
 
-	"github.com/FernasFragas/nandocodego/internal/paths"
+	"github.com/FernasFragas/Nandocode/internal/paths"
 )
 
 type EvidenceLedger struct {
-	RunID      string          `json:"run_id"`
-	CreatedAt  time.Time       `json:"created_at"`
-	UpdatedAt  time.Time       `json:"updated_at"`
-	Files      []string        `json:"files,omitempty"`
-	Chunks     []FileChunkRef  `json:"chunks,omitempty"`
-	Summaries  []SummaryRecord `json:"summaries,omitempty"`
-	Conclusions []string       `json:"conclusions,omitempty"`
+	RunID       string          `json:"run_id"`
+	CreatedAt   time.Time       `json:"created_at"`
+	UpdatedAt   time.Time       `json:"updated_at"`
+	Files       []string        `json:"files,omitempty"`
+	Chunks      []FileChunkRef  `json:"chunks,omitempty"`
+	Summaries   []SummaryRecord `json:"summaries,omitempty"`
+	Conclusions []string        `json:"conclusions,omitempty"`
 }
 
 type FileChunkRef struct {

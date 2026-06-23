@@ -26,6 +26,12 @@ Do not implement a phase from this file alone. This document intentionally avoid
 - **Architecture reference:** `book/` files, especially the chapter listed for the active phase.
 - **Actual implementation reality:** current source code and tests. If docs and source disagree, inspect source and update docs rather than guessing.
 
+Non-authoritative references:
+
+- `README.md` is a user-facing overview. It should route here for current roadmap details rather than duplicating launch status.
+- `.codex/go-ollama-plan-AGENTS.md` and `.codex/go-ollama-plan-HUMANS.md` are historical plans. Use them for architecture context only after checking this file and the project-status document.
+- `.codex/agent-context/ARCHITECTURE.md` is deprecated for this repository. `.codex/agent-context/testing-standards.md` is generic guidance only where it agrees with current Go tests and the Makefile.
+
 ## Current Implementation Snapshot
 
 Latest recorded implementation review checked the current `docs/`, `book/`, and `internal/` implementation. Automated checks run during that review:

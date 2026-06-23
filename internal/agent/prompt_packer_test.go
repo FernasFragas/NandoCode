@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/FernasFragas/nandocodego/internal/llm"
+	"github.com/FernasFragas/Nandocode/internal/llm"
 )
 
 func TestPackPromptHistory_NoTrimWhenWithinBudget(t *testing.T) {

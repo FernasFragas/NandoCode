@@ -6,7 +6,7 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/FernasFragas/nandocodego/internal/types"
+	"github.com/FernasFragas/Nandocode/internal/types"
 )
 
 func TestNewUnique(t *testing.T) {

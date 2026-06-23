@@ -12,19 +12,19 @@ import (
 	"strings"
 	"time"
 
-	"github.com/FernasFragas/nandocodego/internal/agent"
-	"github.com/FernasFragas/nandocodego/internal/analysis"
-	"github.com/FernasFragas/nandocodego/internal/config"
-	"github.com/FernasFragas/nandocodego/internal/hooks"
-	"github.com/FernasFragas/nandocodego/internal/llm"
-	"github.com/FernasFragas/nandocodego/internal/llm/modelruntime"
-	"github.com/FernasFragas/nandocodego/internal/memory"
-	"github.com/FernasFragas/nandocodego/internal/observability"
-	"github.com/FernasFragas/nandocodego/internal/paths"
-	"github.com/FernasFragas/nandocodego/internal/permissions"
-	"github.com/FernasFragas/nandocodego/internal/skills"
-	"github.com/FernasFragas/nandocodego/internal/state"
-	"github.com/FernasFragas/nandocodego/internal/types"
+	"github.com/FernasFragas/Nandocode/internal/agent"
+	"github.com/FernasFragas/Nandocode/internal/analysis"
+	"github.com/FernasFragas/Nandocode/internal/config"
+	"github.com/FernasFragas/Nandocode/internal/hooks"
+	"github.com/FernasFragas/Nandocode/internal/llm"
+	"github.com/FernasFragas/Nandocode/internal/llm/modelruntime"
+	"github.com/FernasFragas/Nandocode/internal/memory"
+	"github.com/FernasFragas/Nandocode/internal/observability"
+	"github.com/FernasFragas/Nandocode/internal/paths"
+	"github.com/FernasFragas/Nandocode/internal/permissions"
+	"github.com/FernasFragas/Nandocode/internal/skills"
+	"github.com/FernasFragas/Nandocode/internal/state"
+	"github.com/FernasFragas/Nandocode/internal/types"
 )
 
 type OutputKind string
@@ -956,6 +956,25 @@ func handleTrace(_ context.Context, args []string, hctx HandlerContext) Output {
 	if v := strings.TrimSpace(trace.RouteReason); v != "" {
 		lines = append(lines, fmt.Sprintf("  Route reason:         %s", v))
 	}
+	if trace.PromptPackInputBudget > 0 || trace.PromptPackIncluded > 0 || trace.PromptPackSkipped > 0 || trace.PromptPackDroppedBlocks > 0 {
+		lines = append(lines,
+			fmt.Sprintf("  Prompt pack budget:   %d", trace.PromptPackInputBudget),
+			fmt.Sprintf("  Prompt pack kept:     %d", trace.PromptPackIncluded),
+			fmt.Sprintf("  Prompt pack skipped:  %d", trace.PromptPackSkipped),
+			fmt.Sprintf("  Mention blocks drop:  %d", trace.PromptPackDroppedBlocks),
+		)
+	}
+	if trace.EvidencePacked || trace.EvidenceFiles > 0 || trace.EvidenceOmitted > 0 {
+		lines = append(lines,
+			fmt.Sprintf("  Evidence packed:      %t", trace.EvidencePacked),
+			fmt.Sprintf("  Evidence budget:      %d", trace.EvidenceBudget),
+			fmt.Sprintf("  Evidence files:       %d", trace.EvidenceFiles),
+			fmt.Sprintf("  Evidence raw bytes:   %d", trace.EvidenceRawBytes),
+			fmt.Sprintf("  Evidence omitted raw: %d", trace.EvidenceRawBytesOmitted),
+			fmt.Sprintf("  Evidence excerpted:   %d", trace.EvidenceExcerpted),
+			fmt.Sprintf("  Evidence omitted:     %d", trace.EvidenceOmitted),
+		)
+	}
 	lines = append(lines, fmt.Sprintf("  Slow-stage threshold:   %s (source: %s)", threshold, fallbackDisplay(thresholdSource, "default")))
 	lines = append(lines, fmt.Sprintf("  Diagnosis:            %s", traceDiagnosis(trace, threshold)))
 	slowestStages := traceSlowestStages(trace.StageLatencies, 3)
@@ -1101,6 +1120,17 @@ func handlePrompt(_ context.Context, args []string, _ HandlerContext) Output {
 			fmt.Sprintf("  Messages:             %d", dump.MessageCount),
 			fmt.Sprintf("  Estimated tokens:     %d", dump.EstimatedTokens),
 			fmt.Sprintf("  Tools:                %d", dump.ToolCount),
+		}
+		if len(dump.Options) > 0 {
+			keys := make([]string, 0, len(dump.Options))
+			for key := range dump.Options {
+				keys = append(keys, key)
+			}
+			sort.Strings(keys)
+			lines = append(lines, "  Options:")
+			for _, key := range keys {
+				lines = append(lines, fmt.Sprintf("    %s: %v", key, dump.Options[key]))
+			}
 		}
 		if dump.PromptPackReport != nil {
 			rep := dump.PromptPackReport

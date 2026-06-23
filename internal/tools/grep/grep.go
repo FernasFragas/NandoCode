@@ -13,15 +13,15 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/FernasFragas/nandocodego/internal/tools"
+	"github.com/FernasFragas/Nandocode/internal/tools"
 )
 
 const (
-	defaultHeadLimit  = 250
-	maxContextLines   = 5
-	maxFileSizeBytes  = 10 * 1024 * 1024 // 10 MB
-	binaryCheckBytes  = 512
-	defaultMaxResult  = 50_000
+	defaultHeadLimit = 250
+	maxContextLines  = 5
+	maxFileSizeBytes = 10 * 1024 * 1024 // 10 MB
+	binaryCheckBytes = 512
+	defaultMaxResult = 50_000
 )
 
 var defaultExcludes = []string{".git", "node_modules", ".svn", "vendor", "dist"}

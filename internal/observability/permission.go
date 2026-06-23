@@ -3,7 +3,7 @@ package observability
 import (
 	"context"
 
-	"github.com/FernasFragas/nandocodego/internal/permissions"
+	"github.com/FernasFragas/Nandocode/internal/permissions"
 )
 
 // PermissionObserver returns a resolver observer that records permission outcomes.

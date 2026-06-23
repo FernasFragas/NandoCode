@@ -595,7 +595,7 @@ package config
 
 import (
     "time"
-    "github.com/FernasFragas/nandocodego/internal/permissions"
+    "github.com/FernasFragas/Nandocode/internal/permissions"
 )
 
 type Config struct {

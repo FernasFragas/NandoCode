@@ -5,8 +5,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/FernasFragas/nandocodego/internal/agent"
-	"github.com/FernasFragas/nandocodego/internal/permissions"
+	"github.com/FernasFragas/Nandocode/internal/agent"
+	"github.com/FernasFragas/Nandocode/internal/permissions"
 )
 
 // Snapshot is an immutable view of the in-memory metrics.
@@ -53,30 +53,41 @@ type Snapshot struct {
 
 // RunTrace stores high-level timings and outcomes for the latest completed run.
 type RunTrace struct {
-	RunStartedAt           time.Time
-	FirstEventLatency      time.Duration
-	FirstAssistantLatency  time.Duration
-	FirstThinkingLatency   time.Duration
-	FirstToolStartLatency  time.Duration
-	FirstRetryLatency      time.Duration
-	CompactionStartLatency time.Duration
-	CompactionEndLatency   time.Duration
-	TerminalLatency        time.Duration
-	TerminalReason         string
-	DoneReason             string
-	RetryCount             int64
-	RetryKinds             map[string]int64
-	StageLatencies         map[string]time.Duration
-	MentionMode            string
-	MentionDirs            int
-	MentionFilesDiscovered int
-	MentionFileBodies      int
-	MentionListingIntent   bool
-	ContextMode            string
-	ToolMode               string
-	RouteAction            string
-	RouteReason            string
-	RouteProfile           string
+	RunStartedAt            time.Time
+	FirstEventLatency       time.Duration
+	FirstAssistantLatency   time.Duration
+	FirstThinkingLatency    time.Duration
+	FirstToolStartLatency   time.Duration
+	FirstRetryLatency       time.Duration
+	CompactionStartLatency  time.Duration
+	CompactionEndLatency    time.Duration
+	TerminalLatency         time.Duration
+	TerminalReason          string
+	DoneReason              string
+	RetryCount              int64
+	RetryKinds              map[string]int64
+	StageLatencies          map[string]time.Duration
+	MentionMode             string
+	MentionDirs             int
+	MentionFilesDiscovered  int
+	MentionFileBodies       int
+	MentionListingIntent    bool
+	ContextMode             string
+	ToolMode                string
+	RouteAction             string
+	RouteReason             string
+	RouteProfile            string
+	PromptPackInputBudget   int
+	PromptPackIncluded      int
+	PromptPackSkipped       int
+	PromptPackDroppedBlocks int
+	EvidencePacked          bool
+	EvidenceBudget          int
+	EvidenceFiles           int
+	EvidenceExcerpted       int
+	EvidenceOmitted         int
+	EvidenceRawBytes        int
+	EvidenceRawBytesOmitted int
 }
 
 // Meter stores in-memory observability counters and timings.

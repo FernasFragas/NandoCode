@@ -352,7 +352,7 @@ Returns:
   "started_at": "2026-05-07T10:00:00Z",
   "pid": 12345,
   "output_tail": [
-    {"ts": "2026-05-07T10:00:01Z", "stream": "stdout", "text": "ok  \tgithub.com/FernasFragas/nandocodego/internal/agent"}
+    {"ts": "2026-05-07T10:00:01Z", "stream": "stdout", "text": "ok  \tgithub.com/FernasFragas/Nandocode/internal/agent"}
   ]
 }
 ```
@@ -521,8 +521,8 @@ import (
     "io"
     "sync"
 
-    "github.com/FernasFragas/nandocodego/internal/state"
-    "github.com/FernasFragas/nandocodego/internal/types"
+    "github.com/FernasFragas/Nandocode/internal/state"
+    "github.com/FernasFragas/Nandocode/internal/types"
 )
 
 // RunFunc is a function that performs work for a task.
@@ -563,7 +563,7 @@ import (
     "sync/atomic"
     "time"
 
-    "github.com/FernasFragas/nandocodego/internal/types"
+    "github.com/FernasFragas/Nandocode/internal/types"
 )
 
 var counter uint32

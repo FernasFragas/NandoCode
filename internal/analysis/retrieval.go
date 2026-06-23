@@ -5,7 +5,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/FernasFragas/nandocodego/internal/tui/fileindex"
+	"github.com/FernasFragas/Nandocode/internal/tui/fileindex"
 )
 
 type FrecencyScorer interface {

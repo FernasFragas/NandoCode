@@ -456,6 +456,8 @@
   let intentionalClose = false;
   let tokenUsage = { prompt_tokens: 0, eval_tokens: 0, total: 0 };
   let taskCount = 0;
+  let taskStates = {};
+  let stageTimings = {};
   let pendingPermission = null;
   let modelsList = [];
   let currentModel = 'Loading…';
@@ -494,7 +496,28 @@
 
   // Helpers
   function escapeHtml(str) {
+    str = String(str ?? '');
     return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  }
+
+  function eventPayload(msg) {
+    if (!msg) return {};
+    if (msg.data && typeof msg.data === 'object') return msg.data;
+    return msg;
+  }
+
+  function formatPayload(value) {
+    if (value === null || value === undefined || value === '') return '';
+    if (typeof value === 'string') return value;
+    try {
+      return JSON.stringify(value, null, 2);
+    } catch (e) {
+      return String(value);
+    }
+  }
+
+  function toolElementId(id) {
+    return 'tool-' + String(id || 'unknown').replace(/[^A-Za-z0-9_-]/g, '_');
   }
 
   function renderMarkdown(text) {
@@ -585,28 +608,53 @@
   function updateUsage(usage) {
     if (!usage) return;
     tokenUsage = usage;
-    const total = usage.total || 0;
-    const prompt = usage.prompt_tokens || 0;
-    const eval_ = usage.eval_tokens || 0;
-    tokenUsageEl.textContent = 'Tokens: ' + total + ' (prompt ' + prompt + ', eval ' + eval_ + ')';
+    const prompt = Number(usage.PromptEvalCount ?? usage.prompt_eval_count ?? usage.prompt_tokens ?? 0);
+    const eval_ = Number(usage.EvalCount ?? usage.eval_count ?? usage.eval_tokens ?? 0);
+    const total = Number(usage.total ?? usage.total_tokens ?? (prompt + eval_));
+    const turns = Number(usage.Turns ?? usage.turns ?? 0);
+    const toolCalls = Number(usage.ToolCalls ?? usage.tool_calls ?? 0);
+    let text = 'Tokens: ' + total + ' (prompt ' + prompt + ', eval ' + eval_ + ')';
+    if (turns || toolCalls) text += ' · turns ' + turns + ', tools ' + toolCalls;
+    tokenUsageEl.textContent = text;
   }
 
   function updatePromptPack(report) {
     if (!report) { packInfoEl.textContent = ''; return; }
-    const summary = report.summary || report.packed || JSON.stringify(report);
-    packInfoEl.textContent = 'Pack: ' + summary;
+    const included = report.estimated_included ?? report.EstimatedIncluded;
+    const skipped = report.estimated_skipped ?? report.EstimatedSkipped;
+    if (included !== undefined || skipped !== undefined) {
+      packInfoEl.textContent = 'Pack: included ' + (included ?? 0) + ', skipped ' + (skipped ?? 0);
+      return;
+    }
+    const summary = report.summary || report.packed || formatPayload(report);
+    packInfoEl.textContent = summary ? 'Pack: ' + summary : '';
   }
 
   function addStageTiming(msg) {
-    if (!msg || !msg.stages) { stageInfoEl.textContent = ''; return; }
-    const text = msg.stages.map(s => (s.name || s.stage || '') + ' ' + (s.ms || s.duration || '') + 'ms').join(' | ');
+    if (!msg) { stageInfoEl.textContent = ''; return; }
+    if (Array.isArray(msg.stages)) {
+      msg.stages.forEach(s => {
+        const name = s.name || s.stage;
+        if (name) stageTimings[name] = s.ms ?? s.duration_ms ?? s.duration ?? '';
+      });
+    } else if (msg.stage) {
+      stageTimings[msg.stage] = msg.duration_ms ?? msg.ms ?? msg.duration ?? '';
+    }
+    const text = Object.entries(stageTimings)
+      .slice(-4)
+      .map(([stage, ms]) => stage + (ms !== '' ? ' ' + ms + 'ms' : ''))
+      .join(' | ');
     stageInfoEl.textContent = text ? 'Stages: ' + text : '';
   }
 
   function updateTaskCount(msg) {
-    if (msg && typeof msg.count === 'number') taskCount = msg.count;
-    else if (msg && typeof msg.delta === 'number') taskCount += msg.delta;
-    taskCountEl.textContent = 'Tasks: ' + taskCount;
+    if (msg && msg.task_id) {
+      taskStates[msg.task_id] = msg.status || 'unknown';
+    }
+    const states = Object.values(taskStates);
+    const active = states.filter(s => s === 'pending' || s === 'running').length;
+    taskCount = active;
+    taskCountEl.textContent = 'Tasks: ' + active + (states.length ? ' / ' + states.length : '');
   }
 
   // Turn rendering
@@ -671,17 +719,19 @@
 
   function startToolCard(msg) {
     if (!currentTurnEl) startTurn();
+    const id = msg.id || msg.tool_call_id;
     const card = document.createElement('div');
     card.className = 'tool-card';
-    card.id = 'tool-' + msg.tool_call_id;
+    card.id = toolElementId(id);
+    card.dataset.toolId = id || '';
     const inputPreview = msg.input !== undefined ? JSON.stringify(msg.input, null, 2) : '';
-    card.innerHTML = '<div class="tool-header"><span class="spinner">⏳</span> <strong>' + escapeHtml(msg.tool_name || '') + '</strong></div><div class="tool-input"><pre>' + escapeHtml(inputPreview) + '</pre></div>';
+    card.innerHTML = '<div class="tool-header"><span class="spinner">⏳</span> <strong>' + escapeHtml(msg.name || msg.tool_name || '') + '</strong></div><div class="tool-input"><pre>' + escapeHtml(inputPreview) + '</pre></div>';
     currentTurnEl.appendChild(card);
     scrollToBottom();
   }
 
   function updateToolCard(msg) {
-    const card = document.getElementById('tool-' + msg.tool_call_id);
+    const card = document.getElementById(toolElementId(msg.id || msg.tool_call_id));
     if (!card) return;
     let status = card.querySelector('.tool-status');
     if (!status) {
@@ -689,18 +739,19 @@
       status.className = 'tool-status';
       card.appendChild(status);
     }
-    status.textContent = msg.status || 'Running…';
+    status.textContent = msg.status || formatPayload(msg.data) || 'Running…';
   }
 
   function finishToolCard(msg) {
-    const card = document.getElementById('tool-' + msg.tool_call_id);
+    const card = document.getElementById(toolElementId(msg.id || msg.tool_call_id));
     if (!card) return;
     const header = card.querySelector('.tool-header');
     const spinner = header.querySelector('.spinner');
-    if (spinner) spinner.textContent = msg.error ? '❌' : '✅';
-    if (msg.error) card.classList.add('error');
+    const errorText = msg.error ? String(msg.error) : '';
+    if (spinner) spinner.textContent = errorText ? '❌' : '✅';
+    if (errorText) card.classList.add('error');
     const result = document.createElement('pre');
-    result.textContent = msg.error ? msg.error : JSON.stringify(msg.result, null, 2);
+    result.textContent = errorText || formatPayload(msg.result);
     card.appendChild(result);
   }
 
@@ -708,14 +759,14 @@
     const el = document.createElement('div');
     el.className = 'message notice';
     let text = '';
-    if (type === 'error') text = '⚠️ ' + (msg.message || JSON.stringify(msg));
-    else if (type === 'hook') text = '🔔 Hook: ' + (msg.hook || JSON.stringify(msg));
-    else if (type === 'retry') text = '🔁 Retry notice';
-    else if (type === 'idle') text = '⏳ LLM idle warning';
-    else if (type === 'stage') text = '⏱️ Stage timing updated';
+    if (type === 'error') text = '⚠️ ' + (msg.message || msg.error || msg.code || formatPayload(msg));
+    else if (type === 'hook') text = '🔔 Hook: ' + (msg.message || msg.hook || formatPayload(msg));
+    else if (type === 'retry') text = '🔁 Retry notice' + (msg.cause ? ': ' + msg.cause : '');
+    else if (type === 'idle') text = '⏳ LLM idle warning' + (msg.timeout_str ? ': ' + msg.timeout_str : '');
+    else if (type === 'stage') text = '⏱️ Stage: ' + (msg.stage || 'updated');
     else if (type === 'pack') text = '📦 Prompt pack report';
     else if (type === 'info') text = 'ℹ️ ' + (msg.message || '');
-    else text = JSON.stringify(msg);
+    else text = formatPayload(msg);
     el.textContent = text;
     transcript.appendChild(el);
     scrollToBottom();
@@ -724,6 +775,7 @@
   // Permission modal
   function showPermissionModal(msg) {
     pendingPermission = msg.request_id;
+    if (!pendingPermission) return;
     modalContent.innerHTML =
       '<h3>Permission Request</h3>' +
       '<div class="field"><strong>Tool:</strong> ' + escapeHtml(msg.tool_name || '') + '</div>' +
@@ -793,6 +845,7 @@
   function handleEvent(data) {
     let msg;
     try { msg = JSON.parse(data); } catch (e) { console.warn('Invalid JSON', data); return; }
+    const payload = eventPayload(msg);
     switch (msg.type) {
       case 'run_started':
         runActive = true;
@@ -806,51 +859,52 @@
         enableInput();
         endTurn();
         closeModalIfOpen();
-        if (msg.usage) updateUsage(msg.usage);
+        if (payload.usage) updateUsage(payload.usage);
         break;
       case 'assistant_text_delta':
-        appendAssistantText(msg.delta || msg.text || '');
+        appendAssistantText(payload.content || payload.delta || payload.text || '');
         break;
       case 'assistant_thinking_delta':
-        appendAssistantThinking(msg.delta || msg.text || '');
+        appendAssistantThinking(payload.thinking || payload.delta || payload.text || '');
         break;
       case 'tool_use_start':
-        startToolCard(msg);
+        startToolCard(payload);
         break;
       case 'tool_use_progress':
-        updateToolCard(msg);
+        updateToolCard(payload);
         break;
       case 'tool_use_result':
-        finishToolCard(msg);
+        finishToolCard(payload);
         break;
       case 'permission_request':
-        showPermissionModal(msg);
+        showPermissionModal(payload);
         break;
       case 'hook_notice':
-        addNotice('hook', msg);
+        addNotice('hook', payload);
         break;
       case 'retry_notice':
-        addNotice('retry', msg);
+        addNotice('retry', payload);
         break;
       case 'llm_idle_warning':
-        addNotice('idle', msg);
+        addNotice('idle', payload);
         break;
       case 'stage_timing':
-        addStageTiming(msg);
-        addNotice('stage', msg);
+      case 'semantic_stage_timing':
+        addStageTiming(payload);
+        addNotice('stage', payload);
         break;
       case 'prompt_pack_report':
-        updatePromptPack(msg);
-        addNotice('pack', msg);
+        updatePromptPack(payload);
+        addNotice('pack', payload);
         break;
       case 'error':
-        addNotice('error', msg);
+        addNotice('error', payload);
         closeModalIfOpen();
         break;
       case 'task_lifecycle':
-        updateTaskCount(msg);
+        updateTaskCount(payload);
         break;
-      case 'pong':
+      case 'heartbeat':
         break;
       default:
         break;
@@ -1267,7 +1321,10 @@
     tokenUsage = { prompt_tokens: 0, eval_tokens: 0, total: 0 };
     updateUsage(tokenUsage);
     taskCount = 0;
-    updateTaskCount({ count: 0 });
+    taskStates = {};
+    stageTimings = {};
+    updateTaskCount({});
+    addStageTiming({});
     modelBtn.textContent = 'Loading…';
     modelBtn.disabled = true;
     currentModel = 'Loading…';

@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/FernasFragas/nandocodego/internal/server"
+	"github.com/FernasFragas/Nandocode/internal/server"
 	"github.com/spf13/cobra"
 )
 

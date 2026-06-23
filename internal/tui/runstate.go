@@ -4,7 +4,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/FernasFragas/nandocodego/internal/state"
+	"github.com/FernasFragas/Nandocode/internal/state"
 )
 
 type RunPhase string

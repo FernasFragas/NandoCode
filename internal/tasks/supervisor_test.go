@@ -9,9 +9,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/FernasFragas/nandocodego/internal/bootstrap"
-	"github.com/FernasFragas/nandocodego/internal/state"
-	"github.com/FernasFragas/nandocodego/internal/types"
+	"github.com/FernasFragas/Nandocode/internal/bootstrap"
+	"github.com/FernasFragas/Nandocode/internal/state"
+	"github.com/FernasFragas/Nandocode/internal/types"
 )
 
 func TestSupervisorStartComplete(t *testing.T) {

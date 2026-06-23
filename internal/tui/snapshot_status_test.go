@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/FernasFragas/nandocodego/internal/state"
+	"github.com/FernasFragas/Nandocode/internal/state"
 	tea "github.com/charmbracelet/bubbletea"
 )
 

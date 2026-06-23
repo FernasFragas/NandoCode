@@ -2,15 +2,15 @@
 package builtin
 
 import (
-	"github.com/FernasFragas/nandocodego/internal/tools"
-	"github.com/FernasFragas/nandocodego/internal/tools/bash"
-	"github.com/FernasFragas/nandocodego/internal/tools/fileedit"
-	"github.com/FernasFragas/nandocodego/internal/tools/fileread"
-	"github.com/FernasFragas/nandocodego/internal/tools/filewrite"
-	"github.com/FernasFragas/nandocodego/internal/tools/glob"
-	"github.com/FernasFragas/nandocodego/internal/tools/grep"
-	"github.com/FernasFragas/nandocodego/internal/tools/todo"
-	"github.com/FernasFragas/nandocodego/internal/tools/webfetch"
+	"github.com/FernasFragas/Nandocode/internal/tools"
+	"github.com/FernasFragas/Nandocode/internal/tools/bash"
+	"github.com/FernasFragas/Nandocode/internal/tools/fileedit"
+	"github.com/FernasFragas/Nandocode/internal/tools/fileread"
+	"github.com/FernasFragas/Nandocode/internal/tools/filewrite"
+	"github.com/FernasFragas/Nandocode/internal/tools/glob"
+	"github.com/FernasFragas/Nandocode/internal/tools/grep"
+	"github.com/FernasFragas/Nandocode/internal/tools/todo"
+	"github.com/FernasFragas/Nandocode/internal/tools/webfetch"
 )
 
 // Register registers all built-in tools.

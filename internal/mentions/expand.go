@@ -8,8 +8,8 @@ import (
 	"unicode"
 	"unicode/utf8"
 
-	"github.com/FernasFragas/nandocodego/internal/tools"
-	"github.com/FernasFragas/nandocodego/internal/tools/dirwalk"
+	"github.com/FernasFragas/Nandocode/internal/tools"
+	"github.com/FernasFragas/Nandocode/internal/tools/dirwalk"
 )
 
 // ResolvedFile describes one @file mention resolved into prompt context.
@@ -79,7 +79,7 @@ type parsedMention struct {
 // ExpansionReport summarizes mention expansion decisions for callers that
 // need to reason about prompt-shape correctness.
 type ExpansionReport struct {
-	Intent            IntentReport
+	Intent             IntentReport
 	ListingIntent      bool
 	ModeByMention      map[string]MentionMode
 	IncludedFileBodies int

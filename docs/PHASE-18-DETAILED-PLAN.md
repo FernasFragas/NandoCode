@@ -527,7 +527,7 @@ package bash_test
 
 import (
     "testing"
-    "github.com/FernasFragas/nandocodego/internal/tools/bash"
+    "github.com/FernasFragas/Nandocode/internal/tools/bash"
 )
 
 func FuzzBashClassify(f *testing.F) {
@@ -563,7 +563,7 @@ package memory_test
 import (
     "strings"
     "testing"
-    "github.com/FernasFragas/nandocodego/internal/memory"
+    "github.com/FernasFragas/Nandocode/internal/memory"
 )
 
 func FuzzFrontmatter(f *testing.F) {
@@ -596,7 +596,7 @@ package agent_test
 
 import (
     "testing"
-    "github.com/FernasFragas/nandocodego/internal/agent"
+    "github.com/FernasFragas/Nandocode/internal/agent"
 )
 
 func FuzzPartition(f *testing.F) {
@@ -644,7 +644,7 @@ package permissions_test
 
 import (
     "testing"
-    "github.com/FernasFragas/nandocodego/internal/permissions"
+    "github.com/FernasFragas/Nandocode/internal/permissions"
 )
 
 func FuzzPermissionPattern(f *testing.F) {

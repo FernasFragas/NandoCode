@@ -8,9 +8,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/FernasFragas/nandocodego/internal/llm"
-	"github.com/FernasFragas/nandocodego/internal/mcp"
-	"github.com/FernasFragas/nandocodego/internal/skills"
+	"github.com/FernasFragas/Nandocode/internal/llm"
+	"github.com/FernasFragas/Nandocode/internal/mcp"
+	"github.com/FernasFragas/Nandocode/internal/skills"
 )
 
 func TestPrepareStartupParallelRunsIndependentStepsConcurrently(t *testing.T) {

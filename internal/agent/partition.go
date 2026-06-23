@@ -1,8 +1,8 @@
 package agent
 
 import (
-	"github.com/FernasFragas/nandocodego/internal/llm"
-	"github.com/FernasFragas/nandocodego/internal/tools"
+	"github.com/FernasFragas/Nandocode/internal/llm"
+	"github.com/FernasFragas/Nandocode/internal/tools"
 )
 
 // Batch is a group of tool calls that can execute concurrently.

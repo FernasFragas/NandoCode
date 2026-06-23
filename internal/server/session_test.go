@@ -9,14 +9,14 @@ import (
 	"testing"
 	"time"
 
-	"github.com/FernasFragas/nandocodego/internal/agent"
-	"github.com/FernasFragas/nandocodego/internal/bootstrap"
-	"github.com/FernasFragas/nandocodego/internal/llm"
-	"github.com/FernasFragas/nandocodego/internal/mentions"
-	"github.com/FernasFragas/nandocodego/internal/semantic"
-	"github.com/FernasFragas/nandocodego/internal/state"
-	"github.com/FernasFragas/nandocodego/internal/tasks"
-	"github.com/FernasFragas/nandocodego/internal/types"
+	"github.com/FernasFragas/Nandocode/internal/agent"
+	"github.com/FernasFragas/Nandocode/internal/bootstrap"
+	"github.com/FernasFragas/Nandocode/internal/llm"
+	"github.com/FernasFragas/Nandocode/internal/mentions"
+	"github.com/FernasFragas/Nandocode/internal/semantic"
+	"github.com/FernasFragas/Nandocode/internal/state"
+	"github.com/FernasFragas/Nandocode/internal/tasks"
+	"github.com/FernasFragas/Nandocode/internal/types"
 )
 
 type fakeRunner struct{}
@@ -216,6 +216,7 @@ func TestSessionRunInjectsSemanticContextAndEmitsEvent(t *testing.T) {
 	app := state.DefaultApp(bootstrap.New(init).Snapshot())
 	inputs := make(chan agent.Input, 1)
 	svc := &semanticStub{
+		status: semantic.Status{Exists: true, Compatible: true},
 		res: semantic.RetrieveResult{
 			Used:            true,
 			RenderedContext: "<semantic_context model=\"qwen3-embedding:8b\"></semantic_context>",
@@ -264,7 +265,10 @@ func TestSessionRunEmitsSemanticFallbackEvent(t *testing.T) {
 	init := bootstrap.DefaultInitial(t.TempDir())
 	app := state.DefaultApp(bootstrap.New(init).Snapshot())
 	inputs := make(chan agent.Input, 1)
-	svc := &semanticStub{retErr: semantic.ErrIndexMissing}
+	svc := &semanticStub{
+		status: semantic.Status{Exists: true, Compatible: true},
+		retErr: semantic.ErrIndexMissing,
+	}
 	s := newSession(context.Background(), "s6", app, capturingRunner{inputs: inputs})
 	s.semanticCfg = semantic.DefaultConfig()
 	s.semanticCfg.Enabled = true

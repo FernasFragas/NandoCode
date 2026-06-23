@@ -233,6 +233,7 @@ type BuildReport struct {
 type RetrieveRequest struct {
 	Root                 string
 	Query                string
+	Config               Config
 	ExplicitPaths        []string
 	CurrentTurnPaths     []string
 	Deadline             time.Duration

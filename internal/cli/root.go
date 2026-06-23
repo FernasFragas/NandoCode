@@ -9,8 +9,8 @@ import (
 	"log/slog"
 	"os"
 
-	"github.com/FernasFragas/nandocodego/internal/logging"
-	"github.com/FernasFragas/nandocodego/internal/version"
+	"github.com/FernasFragas/Nandocode/internal/logging"
+	"github.com/FernasFragas/Nandocode/internal/version"
 	"github.com/spf13/cobra"
 )
 

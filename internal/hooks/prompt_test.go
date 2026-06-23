@@ -5,7 +5,7 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/FernasFragas/nandocodego/internal/llm"
+	"github.com/FernasFragas/Nandocode/internal/llm"
 )
 
 type fakeHookClient struct {

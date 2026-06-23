@@ -9,8 +9,8 @@ import (
 	"os"
 	"strings"
 
-	"github.com/FernasFragas/nandocodego/internal/tools"
-	"github.com/FernasFragas/nandocodego/internal/tools/filewrite"
+	"github.com/FernasFragas/Nandocode/internal/tools"
+	"github.com/FernasFragas/Nandocode/internal/tools/filewrite"
 )
 
 // Input is the FileEdit tool input.

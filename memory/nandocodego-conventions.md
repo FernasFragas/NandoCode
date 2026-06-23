@@ -8,7 +8,7 @@ type: reference
 
 | Artifact | Convention | Example |
 |---|---|---|
-| Go module | `github.com/<user>/nandocodego` | `github.com/FernasFragas/nandocodego` |
+| Go module | `github.com/<user>/nandocodego` | `github.com/FernasFragas/Nandocode` |
 | Package dirs | lowercase, single word | `internal/agent`, `internal/tools` |
 | Tool implementations | `internal/tools/<toolname>/<toolname>.go` | `internal/tools/bash/bash.go` |
 | Tool type | `<Toolname>Tool` struct | `type BashTool struct` |

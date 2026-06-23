@@ -6,7 +6,7 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/FernasFragas/nandocodego/internal/llm"
+	"github.com/FernasFragas/Nandocode/internal/llm"
 )
 
 // CompactionConfig controls when and how compaction fires.

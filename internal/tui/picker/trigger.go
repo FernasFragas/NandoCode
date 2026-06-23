@@ -1,7 +1,7 @@
 package picker
 
 import (
-	"github.com/FernasFragas/nandocodego/internal/mentions"
+	"github.com/FernasFragas/Nandocode/internal/mentions"
 	"strings"
 	"unicode"
 )

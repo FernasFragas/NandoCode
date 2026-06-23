@@ -6,8 +6,8 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/FernasFragas/nandocodego/internal/config"
-	"github.com/FernasFragas/nandocodego/internal/paths"
+	"github.com/FernasFragas/Nandocode/internal/config"
+	"github.com/FernasFragas/Nandocode/internal/paths"
 	"github.com/spf13/cobra"
 )
 

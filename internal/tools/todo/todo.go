@@ -8,7 +8,7 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/FernasFragas/nandocodego/internal/tools"
+	"github.com/FernasFragas/Nandocode/internal/tools"
 )
 
 // TodoStatus is the status of a todo item.

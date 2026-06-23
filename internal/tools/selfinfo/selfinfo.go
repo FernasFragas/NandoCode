@@ -6,8 +6,8 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/FernasFragas/nandocodego/internal/llm"
-	"github.com/FernasFragas/nandocodego/internal/tools"
+	"github.com/FernasFragas/Nandocode/internal/llm"
+	"github.com/FernasFragas/Nandocode/internal/tools"
 )
 
 // Input is the GetConfig tool input.
@@ -34,8 +34,8 @@ func New(client llm.Client, getModel func() string, maxTurns int) *Tool {
 	}
 }
 
-func (t *Tool) Name() string              { return "GetConfig" }
-func (t *Tool) Aliases() []string         { return []string{"get_config", "self_info"} }
+func (t *Tool) Name() string                   { return "GetConfig" }
+func (t *Tool) Aliases() []string              { return []string{"get_config", "self_info"} }
 func (t *Tool) IsEnabled(_ tools.Context) bool { return true }
 func (t *Tool) IsReadOnly(_ any) bool          { return true }
 func (t *Tool) IsConcurrencySafe(_ any) bool   { return true }

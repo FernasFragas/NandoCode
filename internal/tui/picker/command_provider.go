@@ -4,7 +4,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/FernasFragas/nandocodego/internal/commands"
+	"github.com/FernasFragas/Nandocode/internal/commands"
 )
 
 // CommandProvider suggests slash commands.

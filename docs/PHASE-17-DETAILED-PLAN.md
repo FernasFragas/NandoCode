@@ -462,9 +462,9 @@ builds:
     ldflags:
       - -trimpath
       - -s -w
-      - -X github.com/FernasFragas/nandocodego/internal/version.Version={{.Version}}
-      - -X github.com/FernasFragas/nandocodego/internal/version.Commit={{.Commit}}
-      - -X github.com/FernasFragas/nandocodego/internal/version.BuildTime={{.Date}}
+      - -X github.com/FernasFragas/Nandocode/internal/version.Version={{.Version}}
+      - -X github.com/FernasFragas/Nandocode/internal/version.Commit={{.Commit}}
+      - -X github.com/FernasFragas/Nandocode/internal/version.BuildTime={{.Date}}
 
 archives:
   - id: nandocodego
@@ -498,7 +498,7 @@ release:
   prerelease: auto
   name_template: "{{ .ProjectName }} {{ .Tag }}"
   footer: |
-    **Full Changelog**: https://github.com/FernasFragas/nandocodego/blob/main/CHANGELOG.md
+    **Full Changelog**: https://github.com/FernasFragas/Nandocode/blob/main/CHANGELOG.md
 
 brews:
   - name: nandocodego
@@ -510,7 +510,7 @@ brews:
     commit_author:
       name: goreleaserbot
       email: bot@goreleaser.com
-    homepage: "https://github.com/FernasFragas/nandocodego"
+    homepage: "https://github.com/FernasFragas/Nandocode"
     description: "A local-first AI coding agent powered by Ollama"
     license: "MIT"
     test: |
@@ -525,7 +525,7 @@ scoops:
     commit_author:
       name: goreleaserbot
       email: bot@goreleaser.com
-    homepage: "https://github.com/FernasFragas/nandocodego"
+    homepage: "https://github.com/FernasFragas/Nandocode"
     description: "A local-first AI coding agent powered by Ollama"
     license: "MIT"
 ```

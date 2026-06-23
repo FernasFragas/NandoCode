@@ -7,7 +7,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/FernasFragas/nandocodego/internal/llm"
+	"github.com/FernasFragas/Nandocode/internal/llm"
 )
 
 type recallResponse struct {

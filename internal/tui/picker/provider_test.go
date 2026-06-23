@@ -7,8 +7,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/FernasFragas/nandocodego/internal/commands"
-	"github.com/FernasFragas/nandocodego/internal/tui/fileindex"
+	"github.com/FernasFragas/Nandocode/internal/commands"
+	"github.com/FernasFragas/Nandocode/internal/tui/fileindex"
 )
 
 func TestFileProviderRanksBasenamePrefixHigher(t *testing.T) {

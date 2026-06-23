@@ -5,7 +5,7 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/FernasFragas/nandocodego/internal/tools/dirwalk"
+	"github.com/FernasFragas/Nandocode/internal/tools/dirwalk"
 )
 
 const (

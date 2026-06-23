@@ -6,7 +6,7 @@ import (
 	"os"
 	"strings"
 
-	"github.com/FernasFragas/nandocodego/internal/mcp"
+	"github.com/FernasFragas/Nandocode/internal/mcp"
 )
 
 func LoadSnapshot(opts LoadOptions) Snapshot {

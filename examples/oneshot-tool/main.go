@@ -7,11 +7,11 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/FernasFragas/nandocodego/internal/tools"
-	"github.com/FernasFragas/nandocodego/internal/tools/bash"
-	"github.com/FernasFragas/nandocodego/internal/tools/builtin"
-	"github.com/FernasFragas/nandocodego/internal/tools/fileread"
-	"github.com/FernasFragas/nandocodego/internal/tools/filewrite"
+	"github.com/FernasFragas/Nandocode/internal/tools"
+	"github.com/FernasFragas/Nandocode/internal/tools/bash"
+	"github.com/FernasFragas/Nandocode/internal/tools/builtin"
+	"github.com/FernasFragas/Nandocode/internal/tools/fileread"
+	"github.com/FernasFragas/Nandocode/internal/tools/filewrite"
 )
 
 func main() {

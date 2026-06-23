@@ -10,17 +10,17 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/FernasFragas/nandocodego/internal/agent"
-	"github.com/FernasFragas/nandocodego/internal/analysis"
-	"github.com/FernasFragas/nandocodego/internal/contextpack"
-	"github.com/FernasFragas/nandocodego/internal/llm"
-	"github.com/FernasFragas/nandocodego/internal/llm/modelruntime"
-	"github.com/FernasFragas/nandocodego/internal/mentions"
-	"github.com/FernasFragas/nandocodego/internal/permissions"
-	"github.com/FernasFragas/nandocodego/internal/retrievalroute"
-	"github.com/FernasFragas/nandocodego/internal/semantic"
-	"github.com/FernasFragas/nandocodego/internal/state"
-	"github.com/FernasFragas/nandocodego/internal/tasks"
+	"github.com/FernasFragas/Nandocode/internal/agent"
+	"github.com/FernasFragas/Nandocode/internal/analysis"
+	"github.com/FernasFragas/Nandocode/internal/contextpack"
+	"github.com/FernasFragas/Nandocode/internal/llm"
+	"github.com/FernasFragas/Nandocode/internal/llm/modelruntime"
+	"github.com/FernasFragas/Nandocode/internal/mentions"
+	"github.com/FernasFragas/Nandocode/internal/permissions"
+	"github.com/FernasFragas/Nandocode/internal/retrievalroute"
+	"github.com/FernasFragas/Nandocode/internal/semantic"
+	"github.com/FernasFragas/Nandocode/internal/state"
+	"github.com/FernasFragas/Nandocode/internal/tasks"
 )
 
 type AgentRunner interface {
@@ -302,6 +302,7 @@ func (s *Session) runAgent(req MessageRequest, cfg agent.Config, app state.App, 
 		currentDirs = append(currentDirs, d.Path)
 	}
 	routeCfg := serverSemanticRouteConfig(s.semanticCfg, s.semanticSvc != nil)
+	indexKnown, hasIndex, indexCompatible := s.semanticRouteIndexStatus(app.ToolSettings.WorkingDir)
 	routeDecision := retrievalroute.Decide(retrievalroute.Input{
 		RawPrompt:            req.Prompt,
 		ShouldQuery:          true,
@@ -310,9 +311,9 @@ func (s *Session) runAgent(req MessageRequest, cfg agent.Config, app state.App, 
 		CurrentTurnDirs:      currentDirs,
 		AttachedFileCount:    len(packed.Files),
 		AttachedContextBytes: len(packed.Prompt),
-		IndexKnown:           false,
-		HasIndex:             false,
-		IndexCompatible:      false,
+		IndexKnown:           indexKnown,
+		HasIndex:             hasIndex,
+		IndexCompatible:      indexCompatible,
 		SemanticEnabled:      s.semanticSvc != nil && s.semanticCfg.Enabled,
 		SemanticMode:         routeCfg.Mode,
 		PromptIntent:         string(packed.ExpansionReport.Intent.Kind),
@@ -336,6 +337,7 @@ func (s *Session) runAgent(req MessageRequest, cfg agent.Config, app state.App, 
 		res, err := s.semanticSvc.Retrieve(s.ctx, semantic.RetrieveRequest{
 			Root:                 app.ToolSettings.WorkingDir,
 			Query:                req.Prompt,
+			Config:               s.semanticCfg,
 			ExplicitPaths:        explicit,
 			CurrentTurnPaths:     currentTurn,
 			Deadline:             routeDecision.Deadline,
@@ -527,4 +529,17 @@ func serverSemanticRouteConfig(cfg semantic.Config, hasService bool) retrievalro
 			Deadline:        time.Duration(cfg.DeepDeadlineMS) * time.Millisecond,
 		},
 	}
+}
+
+func (s *Session) semanticRouteIndexStatus(root string) (known, exists, compatible bool) {
+	if s == nil || s.semanticSvc == nil || !s.semanticCfg.Enabled {
+		return false, false, false
+	}
+	ctx, cancel := context.WithTimeout(s.ctx, 250*time.Millisecond)
+	defer cancel()
+	status, err := s.semanticSvc.Status(ctx, root)
+	if err != nil {
+		return false, false, false
+	}
+	return true, status.Exists, status.Compatible
 }

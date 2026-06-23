@@ -1,8 +1,24 @@
 # Project Status and Engineer Onboarding
 
-Date: 2026-06-22
+Date: 2026-06-23
 
 This document consolidates the implementation plans, phase logs, agent context files, Docker docs, README, and the book chapters into one current engineering view. It is meant to be the first status document an engineer reads before changing code.
+
+## Current Documentation Routing
+
+Use these documents in this order for launch-readiness work:
+
+1. `docs/NEXT-PHASES-IMPLEMENTATION-PLAN.md` is the authoritative roadmap order and first-read routing document for active v0.1 work.
+2. This document is the current implementation/onboarding snapshot and explains known caveats.
+3. `docs/REMAINING-PHASES-TASK-REVIEW.md` expands the active gates and remaining phases into reviewed tasks, blockers, and evidence requirements.
+4. `docs/PHASE-LOG.md` is the chronological implementation record and acceptance-evidence log. Do not infer current roadmap order from older entries.
+5. Detailed phase/workstream docs in `docs/` own implementation steps only when they are listed by the current routing documents above.
+
+Historical or non-authoritative material:
+
+- `.codex/go-ollama-plan-AGENTS.md` and `.codex/go-ollama-plan-HUMANS.md` are original architecture/phase plans. They are useful reference material, but their roadmap order is superseded by `docs/NEXT-PHASES-IMPLEMENTATION-PLAN.md`.
+- `.codex/agent-context/ARCHITECTURE.md` is deprecated for this repo. It references unrelated auth, sqlc, Kafka, and HTTP-service packages.
+- `.codex/agent-context/testing-standards.md` has reusable generic testing principles, but its repo-specific TypeScript/Kafka/SQLite/gomock/testify section is stale for `nandocodego`.
 
 ## Roadmap Ordering Note
 
@@ -15,7 +31,7 @@ As of 2026-06-22, Phase 17 (`docs/PHASE-17-DETAILED-PLAN.md`) and Phase 18 (`doc
 - Do not start Phase 17 until feature and runtime reliability work, including Phase 25, is implemented and accepted.
 - Do not plan any later v0.1.0 implementation phase after Phase 18. Issues discovered in Phase 18 must be fixed, moved back to the appropriate earlier phase before release, or documented as non-blocking known limitations.
 
-Some status details below were written earlier in the project history and may lag behind `docs/PHASE-LOG.md`. Use this ordering note plus the individual phase plans as the authoritative roadmap boundary.
+Some status details below were written earlier in the project history and may lag behind newer routing docs. Use `docs/NEXT-PHASES-IMPLEMENTATION-PLAN.md`, this document's current roadmap sections, and the listed detailed phase plans as the authoritative roadmap boundary.
 
 ## Current Roadmap To Follow
 
@@ -35,29 +51,32 @@ Completed plans that should not be reimplemented unless a regression is found: P
 ## Current Implementation Reality Snapshot
 
 - **Code-complete or substantially implemented:** Phases 0-16, Phase 19, Phase 20, Phase 21, Phase 22 core, Phase 24, Ollama Cloud API key support, Phase 26, Phase 27, Phase 28, Phase 29, and the response-time refactor.
-- **Implemented but still needing manual/live acceptance:** Phases 8-14, Workstream CL/PA evidence, and Phase 22 manual/deep-interaction follow-ups.
+- **Implemented but still needing manual/live acceptance:** Phases 8-14, Workstream CL/PA evidence, and live Phase 22/browser interaction evidence. The 2026-06-23 launch-readiness pass closed the known code gaps for prompt/trace diagnostics, semantic routing/index-status handling, TUI follow-ups, and the served browser P0 UI.
 - **Remaining planned implementation:** Phase 25, Phase 17, and Phase 18.
 - **Release boundary:** Phase 17 and Phase 18 are last. Any new v0.1 feature or runtime requirement belongs before Phase 17, not after Phase 18.
 
 ## Executive Summary
 
-`nandocodego` is now a local-first Go agent CLI with a Bubble Tea REPL, Ollama-backed LLM client, optional direct Ollama Cloud routing, agent loop, tool execution, permission prompts, state layer, memory, hooks, MCP, sub-agents, skills, slash-command/config UX, background tasks, concurrency/speculative execution, observability, content compaction, inline completion, directory mention expansion, incomplete-response recovery foundations, listing-prompt accuracy safeguards, semantic workspace indexing/retrieval, HTTP/SSE server mode, and coordinator-mode multi-agent coordination.
+`nandocodego` is now a local-first Go agent CLI with a Bubble Tea REPL, Ollama-backed LLM client, optional direct Ollama Cloud routing, agent loop, tool execution, permission prompts, state layer, memory, hooks, MCP, sub-agents, skills, slash-command/config UX, background tasks, concurrency/speculative execution, observability, content compaction, inline completion, directory mention expansion, incomplete-response recovery foundations, listing-prompt accuracy safeguards, semantic workspace indexing/retrieval, HTTP/SSE server mode with a served rich browser UI, and coordinator-mode multi-agent coordination.
 
 The project is not yet release-ready. The remaining work is less about rebuilding the core loop and more about closing live acceptance gates, implementing required v0.1 remote/bridge mode, then finishing distribution and final hardening.
 
 Current verification status:
 
 - The phase log records passing validation for the completed implementation slices, including `go test ./...`, dependency allowlist, network policy checks, targeted race tests, and semantic/TUI benchmarks where applicable.
-- In this sandbox, full `go test ./...` can fail for `internal/llm/ollama` listener-binding tests because loopback listener binding is restricted; this is recorded in `docs/PHASE-LOG.md`.
+- On 2026-06-23, the launch-readiness pass ran targeted tests for TUI, server, command diagnostics, semantic retrieval, retrieval routing, analysis, agent, and context packing; checked the served browser JavaScript with `node --check`; verified the root and embedded browser UI files are synchronized; passed `go test ./...` outside the sandbox; passed `tools/run-load-suite.sh`; and passed a live local server smoke that served the rich UI and created a session.
+- In this sandbox, full `go test ./...` can fail for `internal/llm/ollama`, `internal/tools/sendmessage`, and `internal/tools/webfetch` listener-binding tests because local listener binding is restricted; the same suite passed outside the sandbox on 2026-06-23.
 - Phase log records Phases 0 through 16 as implemented, plus post-Phase-16 runtime fixes, Phase 21, Phase 24, Ollama Cloud API key support, Phase 28, Phase 29, and the response-time refactor. Some manual exit gates still need live sign-off.
 
-Primary documentation drift:
+Primary documentation drift and routing corrections:
 
-- `README.md` has been updated to describe Phase 28, Phase 29, Ollama Cloud API key support, and the response-time refactor as complete.
+- `README.md` now routes current roadmap work through `docs/NEXT-PHASES-IMPLEMENTATION-PLAN.md` instead of treating the original `.codex` implementation plan as current.
 - `README.Docker.md` and `docker-compose.yml` previously described Ollama environment variables that the current CLI does not read; Docker guidance now points at `--ollama-url`.
-- `.codex/agent-context/ARCHITECTURE.md` and part of `testing-standards.md` contain stale context from another Go service and should not be used as source of truth for this repo.
+- `.codex/agent-context/ARCHITECTURE.md` and part of `testing-standards.md` now carry explicit staleness notices and should not be used as source of truth for this repo.
+- `docs/WEB-UI-UX-PRODUCT-PLAN.md` now records that the served embedded UI is the rich browser UI and that `SessionEvent.data` mapping is fixed. P1 management panels and backend tree traversal hardening remain separate follow-ups.
+- `USER_MANUAL.md` now reflects the current `/btw` behavior: isolated side run, read-only toolset, read-only permission mode, and queued execution behind an active main run.
 - The original phase plan folded telemetry into distribution/install. A review against the book and current code found that observability deserves its own phase before release packaging.
-- `docs/PHASE-LOG.md` contains historical "Next Steps" text with old Phase 8/11 numbering. Treat the current `.codex` roadmap and `docs/PHASE-8-DETAILED-PLAN.md` as authoritative for upcoming work.
+- `docs/PHASE-LOG.md` contains historical "Next Steps" text with old Phase 8/11 numbering. Treat `docs/NEXT-PHASES-IMPLEMENTATION-PLAN.md`, this document's current roadmap sections, and the listed detailed phase plans as authoritative for upcoming work.
 - A Chapter 12 review narrowed Phase 9 executable hook scope: command/prompt hooks are Phase 9 runtime scope, while project hooks, HTTP hooks, and agent hooks need later trust/runtime prerequisites before execution.
 
 ## Source Material Reviewed
@@ -260,12 +279,13 @@ Golden path for one prompt today:
 For a new engineer, read in this order:
 
 1. `README.md` for the product summary and commands.
-2. This document for current reality and caveats.
-3. `SECURITY.md` for trust boundaries and local-first limitations.
-4. `docs/PHASE-LOG.md` for implementation history.
-5. `.codex/go-ollama-plan-HUMANS.md` for product context.
-6. `.codex/go-ollama-plan-AGENTS.md` for detailed phase-by-phase architecture.
-7. Current source in this order:
+2. `docs/NEXT-PHASES-IMPLEMENTATION-PLAN.md` for current roadmap order and active-doc routing.
+3. This document for current reality and caveats.
+4. `docs/REMAINING-PHASES-TASK-REVIEW.md` for reviewed active work details.
+5. `docs/PHASE-LOG.md` for implementation history and acceptance evidence.
+6. `SECURITY.md` for trust boundaries and local-first limitations.
+7. `.codex/go-ollama-plan-HUMANS.md` and `.codex/go-ollama-plan-AGENTS.md` only as historical architecture context.
+8. Current source in this order:
    - `internal/cli/repl.go`
    - `internal/bootstrap/state.go`
    - `internal/state/app.go`
@@ -275,7 +295,7 @@ For a new engineer, read in this order:
    - `internal/tools/tool.go`
    - `internal/permissions/resolver.go`
    - `internal/tui/app.go`
-8. Book chapters for future-phase design:
+9. Book chapters for future-phase design:
    - `book/ch01-architecture.md`
    - `book/ch05-agent-loop.md`
    - `book/ch06-tools.md`
@@ -512,5 +532,5 @@ Observability is cross-chapter rather than isolated to one book chapter. The rel
 2. Keep Gate G0, CL/PA, and Phase 22 manual/live evidence as carry-forward validation work before release packaging.
 3. Track the non-blocking context-packing follow-ups from `docs/CONTEXT-PACKING-LARGE-FILE-REVIEW-2026-05-20.md`.
 4. Preserve correction notes for historical phase-numbering drift in `docs/PHASE-LOG.md`.
-5. Mark `.codex/agent-context/ARCHITECTURE.md` as stale or rewrite it for this repo.
-6. Remove or correct repo-specific stale testing guidance.
+5. Keep stale `.codex/agent-context` notices in place unless those files are rewritten for this repo.
+6. Keep repo-specific testing guidance aligned with current Go tests, the Makefile, and active validation plans.

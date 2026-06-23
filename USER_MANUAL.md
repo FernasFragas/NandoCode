@@ -47,7 +47,7 @@ ollama pull qwen3-embedding:8b
 ### Install from Go
 
 ```bash
-go install github.com/FernasFragas/nandocodego@latest
+go install github.com/FernasFragas/Nandocode/cmd/nandocodego@latest
 ```
 
 This installs the `nandocodego` binary into your Go binary directory, usually `~/go/bin`.
@@ -55,8 +55,8 @@ This installs the `nandocodego` binary into your Go binary directory, usually `~
 ### Build from Source
 
 ```bash
-git clone https://github.com/FernasFragas/nandocodego.git
-cd nandocodego
+git clone https://github.com/FernasFragas/Nandocode.git
+cd Nandocode
 make build
 ./bin/nandocodego version
 ```
@@ -937,7 +937,7 @@ Type slash commands in the REPL input box.
 Run-status notes:
 
 - The TUI status/footer shows waiting, streaming, thinking, running-tool, permission, retry, compaction, queue, background, and queued `/btw` states when available.
-- `/btw` uses read-only permission mode for the side run and does not append the side conversation to the main conversation history. The model-visible tool list is not yet reduced to read-only tools, so permission mode is the current enforcement boundary.
+- `/btw` uses the read-only toolset plus read-only permission mode for the side run and does not append the side conversation to the main conversation history.
 - If a main run is already active, `/btw` is queued and runs after that active run completes; it is not a concurrent side conversation yet.
 
 ### Model Commands

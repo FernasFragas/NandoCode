@@ -12,10 +12,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/FernasFragas/nandocodego/internal/mcp"
-	"github.com/FernasFragas/nandocodego/internal/observability"
-	"github.com/FernasFragas/nandocodego/internal/paths"
-	"github.com/FernasFragas/nandocodego/internal/version"
+	"github.com/FernasFragas/Nandocode/internal/mcp"
+	"github.com/FernasFragas/Nandocode/internal/observability"
+	"github.com/FernasFragas/Nandocode/internal/paths"
+	"github.com/FernasFragas/Nandocode/internal/version"
 	"github.com/spf13/cobra"
 )
 

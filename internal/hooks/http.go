@@ -9,7 +9,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/FernasFragas/nandocodego/internal/mcp"
+	"github.com/FernasFragas/Nandocode/internal/mcp"
 )
 
 func runHTTPHook(ctx context.Context, h Hook, env Envelope, cfg Config) Result {

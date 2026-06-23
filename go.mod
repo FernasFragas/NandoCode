@@ -1,4 +1,4 @@
-module github.com/FernasFragas/nandocodego
+module github.com/FernasFragas/Nandocode
 
 go 1.26.2
 

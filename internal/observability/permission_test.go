@@ -4,7 +4,7 @@ import (
 	"context"
 	"testing"
 
-	"github.com/FernasFragas/nandocodego/internal/permissions"
+	"github.com/FernasFragas/Nandocode/internal/permissions"
 )
 
 func TestPermissionObserverRecords(t *testing.T) {

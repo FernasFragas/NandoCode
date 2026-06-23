@@ -14,7 +14,7 @@ import (
 	"time"
 	"unicode"
 
-	"github.com/FernasFragas/nandocodego/internal/tools"
+	"github.com/FernasFragas/Nandocode/internal/tools"
 )
 
 // Input is the Bash tool input.

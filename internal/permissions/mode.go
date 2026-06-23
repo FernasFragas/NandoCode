@@ -2,7 +2,7 @@
 package permissions
 
 import (
-	"github.com/FernasFragas/nandocodego/internal/tools"
+	"github.com/FernasFragas/Nandocode/internal/tools"
 )
 
 // Mode represents a permission mode that determines how the resolver handles

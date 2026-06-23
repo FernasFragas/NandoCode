@@ -5,29 +5,31 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/FernasFragas/nandocodego/internal/tools"
+	"github.com/FernasFragas/Nandocode/internal/tools"
 )
 
 type coordinatorTestTool struct {
 	name string
 }
 
-func (t coordinatorTestTool) Name() string                                      { return t.name }
-func (t coordinatorTestTool) Description() string                               { return "test" }
-func (t coordinatorTestTool) JSONSchema() map[string]any                        { return tools.ObjectSchema(nil, nil) }
-func (t coordinatorTestTool) UnmarshalInput(raw json.RawMessage) (any, error)   { return struct{}{}, nil }
-func (t coordinatorTestTool) IsEnabled(ctx tools.Context) bool                  { return true }
-func (t coordinatorTestTool) IsReadOnly(input any) bool                         { return true }
-func (t coordinatorTestTool) IsConcurrencySafe(input any) bool                  { return true }
-func (t coordinatorTestTool) IsDestructive(input any) bool                      { return false }
+func (t coordinatorTestTool) Name() string                                    { return t.name }
+func (t coordinatorTestTool) Description() string                             { return "test" }
+func (t coordinatorTestTool) JSONSchema() map[string]any                      { return tools.ObjectSchema(nil, nil) }
+func (t coordinatorTestTool) UnmarshalInput(raw json.RawMessage) (any, error) { return struct{}{}, nil }
+func (t coordinatorTestTool) IsEnabled(ctx tools.Context) bool                { return true }
+func (t coordinatorTestTool) IsReadOnly(input any) bool                       { return true }
+func (t coordinatorTestTool) IsConcurrencySafe(input any) bool                { return true }
+func (t coordinatorTestTool) IsDestructive(input any) bool                    { return false }
 func (t coordinatorTestTool) CheckPermissions(ctx tools.Context, input any) tools.PermissionResult {
 	return tools.PermissionResult{Decision: tools.PermAllow, UpdatedInput: input}
 }
 func (t coordinatorTestTool) Call(ctx tools.Context, input any, progress chan<- tools.ProgressEvent) (tools.Result, error) {
 	return tools.Result{Display: "ok"}, nil
 }
-func (t coordinatorTestTool) Render(input any, result tools.Result) tools.RenderHints { return tools.RenderHints{} }
-func (t coordinatorTestTool) Aliases() []string                                       { return nil }
+func (t coordinatorTestTool) Render(input any, result tools.Result) tools.RenderHints {
+	return tools.RenderHints{}
+}
+func (t coordinatorTestTool) Aliases() []string { return nil }
 
 func TestIsCoordinatorMode(t *testing.T) {
 	t.Setenv("NANDOCODEGO_COORDINATOR", "1")

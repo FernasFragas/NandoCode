@@ -3,7 +3,7 @@ package testutil
 import (
 	"time"
 
-	"github.com/FernasFragas/nandocodego/internal/semantic"
+	"github.com/FernasFragas/Nandocode/internal/semantic"
 )
 
 func FixtureManifest(root string, model string, dimensions int, workspaceID string) semantic.Manifest {

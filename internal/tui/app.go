@@ -11,25 +11,26 @@ import (
 	"sort"
 	"strings"
 	"time"
+	"unicode"
 	"unicode/utf8"
 
-	"github.com/FernasFragas/nandocodego/internal/agent"
-	"github.com/FernasFragas/nandocodego/internal/analysis"
-	"github.com/FernasFragas/nandocodego/internal/commands"
-	"github.com/FernasFragas/nandocodego/internal/contextpack"
-	"github.com/FernasFragas/nandocodego/internal/credentials"
-	"github.com/FernasFragas/nandocodego/internal/hooks"
-	"github.com/FernasFragas/nandocodego/internal/llm"
-	"github.com/FernasFragas/nandocodego/internal/llm/modelruntime"
-	"github.com/FernasFragas/nandocodego/internal/mentions"
-	"github.com/FernasFragas/nandocodego/internal/observability"
-	"github.com/FernasFragas/nandocodego/internal/permissions"
-	"github.com/FernasFragas/nandocodego/internal/retrievalroute"
-	"github.com/FernasFragas/nandocodego/internal/semantic"
-	"github.com/FernasFragas/nandocodego/internal/skills"
-	"github.com/FernasFragas/nandocodego/internal/state"
-	"github.com/FernasFragas/nandocodego/internal/tui/fileindex"
-	"github.com/FernasFragas/nandocodego/internal/tui/picker"
+	"github.com/FernasFragas/Nandocode/internal/agent"
+	"github.com/FernasFragas/Nandocode/internal/analysis"
+	"github.com/FernasFragas/Nandocode/internal/commands"
+	"github.com/FernasFragas/Nandocode/internal/contextpack"
+	"github.com/FernasFragas/Nandocode/internal/credentials"
+	"github.com/FernasFragas/Nandocode/internal/hooks"
+	"github.com/FernasFragas/Nandocode/internal/llm"
+	"github.com/FernasFragas/Nandocode/internal/llm/modelruntime"
+	"github.com/FernasFragas/Nandocode/internal/mentions"
+	"github.com/FernasFragas/Nandocode/internal/observability"
+	"github.com/FernasFragas/Nandocode/internal/permissions"
+	"github.com/FernasFragas/Nandocode/internal/retrievalroute"
+	"github.com/FernasFragas/Nandocode/internal/semantic"
+	"github.com/FernasFragas/Nandocode/internal/skills"
+	"github.com/FernasFragas/Nandocode/internal/state"
+	"github.com/FernasFragas/Nandocode/internal/tui/fileindex"
+	"github.com/FernasFragas/Nandocode/internal/tui/picker"
 	"github.com/charmbracelet/bubbles/textarea"
 	"github.com/charmbracelet/bubbles/textinput"
 	"github.com/charmbracelet/bubbles/viewport"
@@ -100,6 +101,10 @@ type Model struct {
 	viewportRenderKey     transcriptCacheKey
 	viewportRenderValid   bool
 	markdownRenderWidth   int
+	vimYankRegister       string
+	vimFindMode           string
+	vimLastFind           rune
+	vimLastFindForward    bool
 }
 
 type cloudCredentialPromptState struct {
@@ -591,7 +596,9 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case permissionResolvedMsg:
 		m.broker.Resolve(msg.ID, permissionDecision(msg.Decision))
 		m.store.Set(func(app state.App) state.App {
-			app.PermissionPrompt = nil
+			if app.PermissionPrompt != nil && app.PermissionPrompt.ID == msg.ID {
+				app.PermissionPrompt = nil
+			}
 			return app
 		})
 
@@ -718,6 +725,14 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.refreshViewportContent(false)
 		if m.shouldRunTick(time.Now()) {
 			cmds = append(cmds, m.nextTickCmd())
+		}
+
+	case tea.MouseMsg:
+		if msg.Action == tea.MouseActionPress && msg.Button == tea.MouseButtonLeft {
+			if m.toggleToolPanelAtViewportLine(msg.Y) {
+				m.refreshViewportContent(false)
+				consumeWidgets = true
+			}
 		}
 	}
 
@@ -874,6 +889,14 @@ func (m *Model) handleKeyMsg(msg tea.KeyMsg) (tea.Cmd, bool) {
 				m.scrollToTranscriptIndex(m.searchMatches[m.searchPos])
 				return nil, true
 			}
+		case ";":
+			if m.repeatVimFind(false) {
+				return nil, true
+			}
+		case ",":
+			if m.repeatVimFind(true) {
+				return nil, true
+			}
 		case "i":
 			m.vim.EnterInsert()
 			m.input.Focus()
@@ -893,6 +916,9 @@ func (m *Model) handleKeyMsg(msg tea.KeyMsg) (tea.Cmd, bool) {
 			m.closePicker()
 			m.lastGChordAt = time.Time{}
 			m.chordInterceptor.Reset()
+			return nil, true
+		}
+		if m.handleVimNormalEditingKey(msg) {
 			return nil, true
 		}
 		return nil, false
@@ -1557,6 +1583,7 @@ func (m *Model) submitPrompt(input, displayInput string, preExpanded bool) tea.C
 		currentTurnDirs = append(currentTurnDirs, d.Path)
 	}
 	routeCfg := semanticRouteConfig(m.semanticConfig, m.semanticService != nil)
+	indexKnown, hasIndex, indexCompatible := m.semanticRouteIndexStatus(appState.ToolSettings.WorkingDir)
 	routeDecision := retrievalroute.Decide(retrievalroute.Input{
 		RawPrompt:            displayInput,
 		ShouldQuery:          true,
@@ -1565,9 +1592,9 @@ func (m *Model) submitPrompt(input, displayInput string, preExpanded bool) tea.C
 		CurrentTurnDirs:      currentTurnDirs,
 		AttachedFileCount:    len(expandedFiles),
 		AttachedContextBytes: len(expandedInput),
-		IndexKnown:           false,
-		HasIndex:             false,
-		IndexCompatible:      false,
+		IndexKnown:           indexKnown,
+		HasIndex:             hasIndex,
+		IndexCompatible:      indexCompatible,
 		SemanticEnabled:      m.semanticService != nil && m.semanticConfig.Enabled,
 		SemanticMode:         routeCfg.Mode,
 		ForceDeep:            m.semanticDeepNext,
@@ -1582,6 +1609,7 @@ func (m *Model) submitPrompt(input, displayInput string, preExpanded bool) tea.C
 		res, err := m.semanticService.Retrieve(context.Background(), semantic.RetrieveRequest{
 			Root:                 appState.ToolSettings.WorkingDir,
 			Query:                displayInput,
+			Config:               m.semanticConfig,
 			ExplicitPaths:        explicitPaths,
 			CurrentTurnPaths:     currentTurnPaths,
 			Deadline:             routeDecision.Deadline,
@@ -1761,7 +1789,8 @@ func (m *Model) submitPrompt(input, displayInput string, preExpanded bool) tea.C
 // handlePermissionKeyMsg handles keys when permission modal is open.
 func (m *Model) handlePermissionKeyMsg(msg tea.KeyMsg) tea.Cmd {
 	appState := m.store.Get()
-	if appState.PermissionPrompt == nil {
+	prompt := appState.PermissionPrompt
+	if prompt == nil {
 		return nil
 	}
 
@@ -1770,7 +1799,7 @@ func (m *Model) handlePermissionKeyMsg(msg tea.KeyMsg) tea.Cmd {
 		// Allow once
 		return func() tea.Msg {
 			return permissionResolvedMsg{
-				ID:       appState.PermissionPrompt.ID,
+				ID:       prompt.ID,
 				Decision: decisionAllow,
 			}
 		}
@@ -1779,14 +1808,14 @@ func (m *Model) handlePermissionKeyMsg(msg tea.KeyMsg) tea.Cmd {
 		// Deny
 		return func() tea.Msg {
 			return permissionResolvedMsg{
-				ID:       appState.PermissionPrompt.ID,
+				ID:       prompt.ID,
 				Decision: decisionDeny,
 			}
 		}
 	case "esc":
 		return func() tea.Msg {
 			return permissionResolvedMsg{
-				ID:       appState.PermissionPrompt.ID,
+				ID:       prompt.ID,
 				Decision: decisionDeny,
 			}
 		}
@@ -1794,8 +1823,11 @@ func (m *Model) handlePermissionKeyMsg(msg tea.KeyMsg) tea.Cmd {
 	case "A":
 		// Always allow - add rule and approve
 		m.store.Set(func(app state.App) state.App {
-			toolName := strings.TrimSpace(app.PermissionPrompt.ToolName)
-			target := strings.TrimSpace(app.PermissionPrompt.Target)
+			if app.PermissionPrompt == nil || app.PermissionPrompt.ID != prompt.ID {
+				return app
+			}
+			toolName := strings.TrimSpace(prompt.ToolName)
+			target := strings.TrimSpace(prompt.Target)
 			pattern := toolName + "(" + target + ")"
 			rule := permissions.Rule{
 				Pattern: pattern,
@@ -1808,7 +1840,7 @@ func (m *Model) handlePermissionKeyMsg(msg tea.KeyMsg) tea.Cmd {
 
 		return func() tea.Msg {
 			return permissionResolvedMsg{
-				ID:       appState.PermissionPrompt.ID,
+				ID:       prompt.ID,
 				Decision: decisionAlwaysAllow,
 			}
 		}
@@ -2045,6 +2077,423 @@ func (m *Model) isCursorAtLineEnd() bool {
 		return false
 	}
 	return cursor >= utf8.RuneCountInString(line)
+}
+
+func (m *Model) handleVimNormalEditingKey(msg tea.KeyMsg) bool {
+	if msg.Type != tea.KeyRunes || len(msg.Runes) != 1 {
+		return false
+	}
+	key := msg.Runes[0]
+	if m.vimFindMode != "" {
+		return m.applyVimFind(key, false)
+	}
+
+	switch st := m.vim.CommandState.(type) {
+	case CmdCount:
+		if unicode.IsDigit(key) {
+			m.vim.HandleNormalKey(key)
+			return true
+		}
+		if op, ok := opFromKey(key); ok {
+			if op == OpDelete || op == OpChange || op == OpYank {
+				m.vim.CommandState = CmdOperator{Op: op, Count: parseCount(st.Digits)}
+				return true
+			}
+		}
+		m.vim.resetCmd()
+	case CmdOperator:
+		if m.applyVimOperator(st.Op, st.Count, key) {
+			m.vim.resetCmd()
+			return true
+		}
+		m.vim.resetCmd()
+		return true
+	case CmdOperatorCount:
+		if unicode.IsDigit(key) {
+			m.vim.HandleNormalKey(key)
+			return true
+		}
+		if m.applyVimOperator(st.Op, parseCount(st.Digits), key) {
+			m.vim.resetCmd()
+			return true
+		}
+		m.vim.resetCmd()
+		return true
+	}
+
+	switch key {
+	case 'h':
+		m.moveInputCursor(-1)
+		return true
+	case 'l':
+		m.moveInputCursor(1)
+		return true
+	case '0':
+		m.input.SetCursor(0)
+		return true
+	case '$':
+		line, _, ok := m.currentInputLine()
+		if ok {
+			m.input.SetCursor(utf8.RuneCountInString(line))
+		}
+		return true
+	case 'w':
+		m.moveInputWord(1)
+		return true
+	case 'b':
+		m.moveInputWord(-1)
+		return true
+	case 'x':
+		m.deleteInputRune(0)
+		return true
+	case 'X':
+		m.deleteInputRune(-1)
+		return true
+	case 'p':
+		m.pasteVimRegister()
+		return true
+	case 'f', 'F':
+		m.vimFindMode = string(key)
+		return true
+	case 'd', 'c', 'y':
+		if op, ok := opFromKey(key); ok {
+			m.vim.CommandState = CmdOperator{Op: op, Count: 1}
+			return true
+		}
+	}
+	if unicode.IsDigit(key) && key != '0' {
+		m.vim.CommandState = CmdCount{Digits: string(key)}
+		return true
+	}
+	return false
+}
+
+func (m *Model) applyVimOperator(op Operator, count int, motion rune) bool {
+	if count <= 0 {
+		count = 1
+	}
+	switch op {
+	case OpDelete:
+		switch motion {
+		case 'd':
+			m.deleteInputLines(count)
+			return true
+		case 'w':
+			m.deleteInputWords(count, false)
+			return true
+		}
+	case OpChange:
+		switch motion {
+		case 'w':
+			m.deleteInputWords(count, false)
+			m.vim.EnterInsert()
+			m.input.Focus()
+			return true
+		case 'c':
+			m.deleteInputLines(count)
+			m.vim.EnterInsert()
+			m.input.Focus()
+			return true
+		}
+	case OpYank:
+		switch motion {
+		case 'y':
+			m.yankInputLines(count)
+			return true
+		case 'w':
+			m.deleteInputWords(count, true)
+			return true
+		}
+	}
+	return false
+}
+
+func (m *Model) moveInputCursor(delta int) {
+	line, cursor, ok := m.currentInputLine()
+	if !ok {
+		return
+	}
+	maxCol := utf8.RuneCountInString(line)
+	cursor += delta
+	if cursor < 0 {
+		cursor = 0
+	}
+	if cursor > maxCol {
+		cursor = maxCol
+	}
+	m.input.SetCursor(cursor)
+}
+
+func (m *Model) moveInputWord(dir int) {
+	line, cursor, ok := m.currentInputLine()
+	if !ok {
+		return
+	}
+	runes := []rune(line)
+	if len(runes) == 0 {
+		return
+	}
+	if dir >= 0 {
+		i := cursor
+		if i < len(runes) && !unicode.IsSpace(runes[i]) {
+			for i < len(runes) && !unicode.IsSpace(runes[i]) {
+				i++
+			}
+		}
+		for i < len(runes) && unicode.IsSpace(runes[i]) {
+			i++
+		}
+		if i > len(runes) {
+			i = len(runes)
+		}
+		m.input.SetCursor(i)
+		return
+	}
+	i := cursor - 1
+	if i < 0 {
+		m.input.SetCursor(0)
+		return
+	}
+	for i > 0 && unicode.IsSpace(runes[i]) {
+		i--
+	}
+	for i > 0 && !unicode.IsSpace(runes[i-1]) {
+		i--
+	}
+	m.input.SetCursor(i)
+}
+
+func (m *Model) deleteInputRune(offset int) {
+	line, cursor, ok := m.currentInputLine()
+	if !ok {
+		return
+	}
+	runes := []rune(line)
+	idx := cursor + offset
+	if idx < 0 || idx >= len(runes) {
+		return
+	}
+	deleted := string(runes[idx])
+	runes = append(runes[:idx], runes[idx+1:]...)
+	m.vimYankRegister = deleted
+	if cursor > len(runes) {
+		cursor = len(runes)
+	}
+	if offset < 0 {
+		cursor = idx
+	}
+	m.replaceCurrentLine(string(runes), cursor)
+}
+
+func (m *Model) deleteInputWords(count int, yankOnly bool) {
+	line, cursor, ok := m.currentInputLine()
+	if !ok {
+		return
+	}
+	runes := []rune(line)
+	if cursor >= len(runes) {
+		return
+	}
+	end := cursor
+	for i := 0; i < count && end < len(runes); i++ {
+		if unicode.IsSpace(runes[end]) {
+			for end < len(runes) && unicode.IsSpace(runes[end]) {
+				end++
+			}
+		} else {
+			for end < len(runes) && !unicode.IsSpace(runes[end]) {
+				end++
+			}
+			for end < len(runes) && unicode.IsSpace(runes[end]) {
+				end++
+			}
+		}
+	}
+	if end <= cursor {
+		return
+	}
+	m.vimYankRegister = string(runes[cursor:end])
+	if yankOnly {
+		return
+	}
+	runes = append(runes[:cursor], runes[end:]...)
+	m.replaceCurrentLine(string(runes), cursor)
+}
+
+func (m *Model) deleteInputLines(count int) {
+	lines := strings.Split(m.input.Value(), "\n")
+	if len(lines) == 0 {
+		return
+	}
+	lineIdx := clampInt(m.input.Line(), 0, len(lines)-1)
+	end := lineIdx + count
+	if end > len(lines) {
+		end = len(lines)
+	}
+	m.vimYankRegister = strings.Join(lines[lineIdx:end], "\n") + "\n"
+	lines = append(lines[:lineIdx], lines[end:]...)
+	if len(lines) == 0 {
+		lines = []string{""}
+	}
+	if lineIdx >= len(lines) {
+		lineIdx = len(lines) - 1
+	}
+	m.setInputLines(lines, lineIdx, 0)
+}
+
+func (m *Model) yankInputLines(count int) {
+	lines := strings.Split(m.input.Value(), "\n")
+	if len(lines) == 0 {
+		return
+	}
+	lineIdx := clampInt(m.input.Line(), 0, len(lines)-1)
+	end := lineIdx + count
+	if end > len(lines) {
+		end = len(lines)
+	}
+	m.vimYankRegister = strings.Join(lines[lineIdx:end], "\n") + "\n"
+}
+
+func (m *Model) pasteVimRegister() {
+	if m.vimYankRegister == "" {
+		return
+	}
+	lines := strings.Split(m.input.Value(), "\n")
+	lineIdx := clampInt(m.input.Line(), 0, len(lines)-1)
+	if strings.HasSuffix(m.vimYankRegister, "\n") {
+		insert := strings.Split(strings.TrimSuffix(m.vimYankRegister, "\n"), "\n")
+		next := append([]string{}, lines[:lineIdx+1]...)
+		next = append(next, insert...)
+		next = append(next, lines[lineIdx+1:]...)
+		m.setInputLines(next, lineIdx+1, 0)
+		return
+	}
+	line, cursor, ok := m.currentInputLine()
+	if !ok {
+		return
+	}
+	runes := []rune(line)
+	insertAt := cursor + 1
+	if insertAt > len(runes) {
+		insertAt = len(runes)
+	}
+	newLine := string(runes[:insertAt]) + m.vimYankRegister + string(runes[insertAt:])
+	m.replaceCurrentLine(newLine, insertAt+utf8.RuneCountInString(m.vimYankRegister))
+}
+
+func (m *Model) applyVimFind(target rune, reverse bool) bool {
+	mode := m.vimFindMode
+	m.vimFindMode = ""
+	forward := mode != "F"
+	if reverse {
+		forward = !forward
+	}
+	if m.findInputRune(target, forward) {
+		m.vimLastFind = target
+		m.vimLastFindForward = forward
+		return true
+	}
+	return true
+}
+
+func (m *Model) repeatVimFind(reverse bool) bool {
+	if m.vimLastFind == 0 {
+		return false
+	}
+	forward := m.vimLastFindForward
+	if reverse {
+		forward = !forward
+	}
+	return m.findInputRune(m.vimLastFind, forward)
+}
+
+func (m *Model) findInputRune(target rune, forward bool) bool {
+	line, cursor, ok := m.currentInputLine()
+	if !ok {
+		return false
+	}
+	runes := []rune(line)
+	if forward {
+		for i := cursor + 1; i < len(runes); i++ {
+			if runes[i] == target {
+				m.input.SetCursor(i)
+				return true
+			}
+		}
+		return false
+	}
+	start := cursor - 1
+	if start >= len(runes) {
+		start = len(runes) - 1
+	}
+	for i := start; i >= 0; i-- {
+		if runes[i] == target {
+			m.input.SetCursor(i)
+			return true
+		}
+	}
+	return false
+}
+
+func (m *Model) setInputLines(lines []string, targetLine, cursor int) {
+	if len(lines) == 0 {
+		lines = []string{""}
+	}
+	targetLine = clampInt(targetLine, 0, len(lines)-1)
+	m.input.SetValue(strings.Join(lines, "\n"))
+	for m.input.Line() > targetLine {
+		m.input.CursorUp()
+	}
+	for m.input.Line() < targetLine {
+		m.input.CursorDown()
+	}
+	if cursor < 0 {
+		cursor = 0
+	}
+	if cursor > utf8.RuneCountInString(lines[targetLine]) {
+		cursor = utf8.RuneCountInString(lines[targetLine])
+	}
+	m.input.SetCursor(cursor)
+}
+
+func (m *Model) toggleToolPanelAtViewportLine(y int) bool {
+	if y < 0 || y >= m.viewport.Height {
+		return false
+	}
+	targetLine := m.viewport.YOffset + y
+	line := 0
+	start, end := m.transcriptWindowBounds()
+	for i := start; i < end; i++ {
+		h := estimateTranscriptItemLines(m.transcript[i])
+		if m.heightCache != nil {
+			if cached, ok := m.heightCache[i]; ok && cached > 0 {
+				h = cached
+			}
+		}
+		if targetLine >= line && targetLine < line+h {
+			if m.transcript[i].Kind != TranscriptTool {
+				return false
+			}
+			m.transcript[i].Collapsed = !m.transcript[i].Collapsed
+			if m.heightCache != nil {
+				m.heightCache[i] = estimateTranscriptItemLines(m.transcript[i])
+			}
+			m.invalidateTranscriptRenderCache()
+			return true
+		}
+		line += h
+	}
+	return false
+}
+
+func clampInt(v, lo, hi int) int {
+	if v < lo {
+		return lo
+	}
+	if v > hi {
+		return hi
+	}
+	return v
 }
 
 func directoryExpansionSummary(_ []mentions.ResolvedFile, dirs []mentions.ResolvedDirectory) string {
@@ -2348,6 +2797,19 @@ func semanticRouteConfig(cfg semantic.Config, hasService bool) retrievalroute.Co
 			Deadline:        time.Duration(cfg.DeepDeadlineMS) * time.Millisecond,
 		},
 	}
+}
+
+func (m *Model) semanticRouteIndexStatus(root string) (known, exists, compatible bool) {
+	if m == nil || m.semanticService == nil || !m.semanticConfig.Enabled {
+		return false, false, false
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 250*time.Millisecond)
+	defer cancel()
+	status, err := m.semanticService.Status(ctx, root)
+	if err != nil {
+		return false, false, false
+	}
+	return true, status.Exists, status.Compatible
 }
 
 func (m *Model) handleIndexCommand(args []string) tea.Cmd {
@@ -2843,6 +3305,9 @@ func (m *Model) transcriptVirtualLineBudget() int {
 func estimateTranscriptItemLines(item TranscriptItem) int {
 	switch item.Kind {
 	case TranscriptTool:
+		if item.Collapsed {
+			return 2
+		}
 		return 4
 	case TranscriptThinking:
 		if item.Collapsed {
@@ -3071,6 +3536,16 @@ func (m *Model) renderStatusBar(appState state.App) string {
 
 func (m *Model) renderActiveTaskLine(appState state.App) string {
 	if !appState.ActiveRun {
+		if strings.TrimSpace(m.pendingBTW) != "" || len(appState.QueuedPrompts) > 0 {
+			parts := []string{"Activity: idle"}
+			if len(appState.QueuedPrompts) > 0 {
+				parts = append(parts, fmt.Sprintf("queue=%d", len(appState.QueuedPrompts)))
+			}
+			if strings.TrimSpace(m.pendingBTW) != "" {
+				parts = append(parts, "btw=queued")
+			}
+			return m.styles.SemMuted.Render(strings.Join(parts, " | "))
+		}
 		return m.styles.SemMuted.Render("Activity: idle")
 	}
 	runState := m.snapshotRunUIState(appState, time.Now())
@@ -3078,11 +3553,52 @@ func (m *Model) renderActiveTaskLine(appState state.App) string {
 	if label == "" {
 		label = string(runState.Phase)
 	}
-	line := fmt.Sprintf("Activity: %s", label)
+	lines := []string{fmt.Sprintf("Activity: %s", label)}
 	if m.backgroundedRun {
-		line += " (background)"
+		lines[0] += " (background)"
 	}
-	return m.styles.SemInfo.Render(line)
+	if len(appState.ActiveTools) > 0 {
+		tools := make([]state.ToolUse, 0, len(appState.ActiveTools))
+		for _, tool := range appState.ActiveTools {
+			tools = append(tools, tool)
+		}
+		sort.Slice(tools, func(i, j int) bool {
+			if tools[i].Done != tools[j].Done {
+				return !tools[i].Done
+			}
+			return tools[i].ID < tools[j].ID
+		})
+		for _, tool := range tools {
+			status := "done"
+			if !tool.Done {
+				status = "running"
+			}
+			elapsed := ""
+			if !tool.StartedAt.IsZero() && !tool.Done {
+				elapsed = " " + formatElapsedCompact(time.Since(tool.StartedAt))
+			}
+			lines = append(lines, fmt.Sprintf("  tool %s %s%s", tool.Name, status, elapsed))
+			if len(lines) >= 4 {
+				break
+			}
+		}
+	}
+	runningTasks := 0
+	for _, task := range appState.Tasks {
+		if task.Status == "running" {
+			runningTasks++
+		}
+	}
+	if runningTasks > 0 {
+		lines = append(lines, fmt.Sprintf("  tasks running=%d", runningTasks))
+	}
+	if len(appState.QueuedPrompts) > 0 {
+		lines = append(lines, fmt.Sprintf("  queue prompts=%d", len(appState.QueuedPrompts)))
+	}
+	if strings.TrimSpace(m.pendingBTW) != "" {
+		lines = append(lines, "  btw queued")
+	}
+	return m.styles.SemInfo.Render(strings.Join(lines, "\n"))
 }
 
 func (m *Model) renderTipLine(appState state.App) string {
@@ -3175,7 +3691,11 @@ func hasRunningTool(tools map[string]state.ToolUse) bool {
 
 // renderToolPanel renders a tool panel.
 func (m *Model) renderToolPanel(item TranscriptItem) string {
-	content := fmt.Sprintf("🔧 %s (%s): %s", item.ToolName, shortID(item.ToolID, 8), item.Content)
+	content := item.Content
+	if item.Collapsed {
+		content = fmt.Sprintf("[collapsed %d chars - click to expand]", len(item.Content))
+	}
+	content = fmt.Sprintf("🔧 %s (%s): %s", item.ToolName, shortID(item.ToolID, 8), content)
 	if item.Error != "" {
 		return m.styles.StatusError.Render(content)
 	}

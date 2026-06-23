@@ -1,8 +1,8 @@
 package state
 
 import (
-	"github.com/FernasFragas/nandocodego/internal/bootstrap"
-	"github.com/FernasFragas/nandocodego/internal/permissions"
+	"github.com/FernasFragas/Nandocode/internal/bootstrap"
+	"github.com/FernasFragas/Nandocode/internal/permissions"
 )
 
 // OnChange is the production callback that mirrors selected app state fields into bootstrap.

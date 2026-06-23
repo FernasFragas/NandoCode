@@ -4,7 +4,7 @@ import (
 	"context"
 	"time"
 
-	"github.com/FernasFragas/nandocodego/internal/permissions"
+	"github.com/FernasFragas/Nandocode/internal/permissions"
 )
 
 // TUIBubbleEscalation forwards sub-agent permission prompts to the same prompt

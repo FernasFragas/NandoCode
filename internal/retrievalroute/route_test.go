@@ -59,6 +59,46 @@ func TestDecideBroadPromptUsesSemanticFull(t *testing.T) {
 	}
 }
 
+func TestDecideBroadPromptSkipsWhenKnownIndexMissing(t *testing.T) {
+	t.Parallel()
+	d := Decide(Input{
+		RawPrompt:       "fix the authentication bug",
+		ShouldQuery:     true,
+		IndexKnown:      true,
+		HasIndex:        false,
+		SemanticEnabled: true,
+		SemanticMode:    "auto",
+	}, Config{Mode: "auto"})
+	if d.AllowEmbedding || d.Action != ActionSkipAllRetrieval {
+		t.Fatalf("decision=%+v", d)
+	}
+	if d.Reason != ReasonSkipIndexMissing {
+		t.Fatalf("reason=%q", d.Reason)
+	}
+}
+
+func TestDecideRelatedPromptSkipsSemanticWhenKnownIndexIncompatible(t *testing.T) {
+	t.Parallel()
+	d := Decide(Input{
+		RawPrompt:         "@internal/server/session.go find related callers",
+		ShouldQuery:       true,
+		AttachmentPolicy:  "content",
+		AttachedFileCount: 1,
+		CurrentTurnPaths:  []string{"internal/server/session.go"},
+		IndexKnown:        true,
+		HasIndex:          true,
+		IndexCompatible:   false,
+		SemanticEnabled:   true,
+		SemanticMode:      "auto",
+	}, Config{Mode: "auto"})
+	if d.AllowEmbedding || d.Action != ActionExplicitContextOnly {
+		t.Fatalf("decision=%+v", d)
+	}
+	if d.Reason != ReasonSkipDimensionsMismatch {
+		t.Fatalf("reason=%q", d.Reason)
+	}
+}
+
 func TestDecideGeneralQuestionSkipsEmbedding(t *testing.T) {
 	t.Parallel()
 	d := Decide(Input{
