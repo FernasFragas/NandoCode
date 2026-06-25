@@ -23,9 +23,11 @@ func (t coordinatorTestTool) IsDestructive(input any) bool                    { 
 func (t coordinatorTestTool) CheckPermissions(ctx tools.Context, input any) tools.PermissionResult {
 	return tools.PermissionResult{Decision: tools.PermAllow, UpdatedInput: input}
 }
+
 func (t coordinatorTestTool) Call(ctx tools.Context, input any, progress chan<- tools.ProgressEvent) (tools.Result, error) {
 	return tools.Result{Display: "ok"}, nil
 }
+
 func (t coordinatorTestTool) Render(input any, result tools.Result) tools.RenderHints {
 	return tools.RenderHints{}
 }

@@ -163,7 +163,7 @@ func allRecordIndices(n int) []int {
 	return out
 }
 
-func relatedDirSet(explicit map[string]struct{}, currentTurn map[string]struct{}) map[string]struct{} {
+func relatedDirSet(explicit, currentTurn map[string]struct{}) map[string]struct{} {
 	out := make(map[string]struct{}, len(explicit)+len(currentTurn))
 	for p := range explicit {
 		if dir := normalizeRelPath(filepath.Dir(p)); dir != "." && dir != "" {

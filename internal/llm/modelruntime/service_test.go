@@ -30,9 +30,11 @@ func (f *fakeClient) ListModels(context.Context) ([]llm.ModelInfo, error) {
 	copy(out, f.models)
 	return out, nil
 }
+
 func (f *fakeClient) ShowModel(context.Context, string) (llm.ModelDetails, error) {
 	return llm.ModelDetails{}, nil
 }
+
 func (f *fakeClient) PullModel(_ context.Context, name string, _ chan<- llm.PullProgress) error {
 	f.pulledModel = name
 	return nil
@@ -43,7 +45,7 @@ type memStore struct {
 }
 
 func (m *memStore) Get(_, _ string) (string, error) { return m.v, nil }
-func (m *memStore) Set(_, _ string, s string) error { m.v = s; return nil }
+func (m *memStore) Set(_, _, s string) error        { m.v = s; return nil }
 func (m *memStore) Delete(_, _ string) error        { m.v = ""; return nil }
 
 func TestSwitchLocalModel(t *testing.T) {

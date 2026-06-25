@@ -46,17 +46,21 @@ func (t *testLLMClient) Chat(context.Context, *llm.ChatRequest) (<-chan llm.Stre
 	close(ch)
 	return ch, nil
 }
+
 func (t *testLLMClient) Embed(context.Context, string, []string) ([][]float32, error) {
 	return nil, nil
 }
+
 func (t *testLLMClient) ListModels(context.Context) ([]llm.ModelInfo, error) {
 	out := make([]llm.ModelInfo, len(t.models))
 	copy(out, t.models)
 	return out, nil
 }
+
 func (t *testLLMClient) ShowModel(context.Context, string) (llm.ModelDetails, error) {
 	return llm.ModelDetails{}, nil
 }
+
 func (t *testLLMClient) PullModel(context.Context, string, chan<- llm.PullProgress) error {
 	return nil
 }
@@ -66,7 +70,7 @@ type testCredStore struct {
 }
 
 func (t *testCredStore) Get(_, _ string) (string, error) { return t.v, nil }
-func (t *testCredStore) Set(_, _ string, s string) error { t.v = s; return nil }
+func (t *testCredStore) Set(_, _, s string) error        { t.v = s; return nil }
 func (t *testCredStore) Delete(_, _ string) error        { t.v = ""; return nil }
 
 func installTestModelRuntime(model *Model, localModels, cloudModels []string) {
@@ -466,7 +470,7 @@ func TestTranscriptWindowKeepsFullHistoryWhenScrolledUp(t *testing.T) {
 	model.viewport.SetContent(strings.Repeat("row\n", 300))
 	model.viewport.Height = 10
 	model.viewport.GotoBottom()
-	model.viewport.LineUp(20)
+	model.viewport.ScrollUp(20)
 	if model.viewport.AtBottom() {
 		t.Fatal("test setup failed: viewport should be scrolled up")
 	}
@@ -484,7 +488,7 @@ func TestRefreshViewportContentStickyScrollGuard(t *testing.T) {
 	model.viewport.SetContent(model.renderTranscript())
 	model.viewport.Height = 10
 	model.viewport.GotoBottom()
-	model.viewport.LineUp(15)
+	model.viewport.ScrollUp(15)
 	before := model.viewport.YOffset
 	if model.viewport.AtBottom() {
 		t.Fatal("test setup failed: viewport should be scrolled up")

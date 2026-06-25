@@ -47,6 +47,7 @@ func (c *replayFakeClient) Chat(ctx context.Context, req *llm.ChatRequest) (<-ch
 	close(ch)
 	return ch, nil
 }
+
 func (c *replayFakeClient) Embed(ctx context.Context, model string, input []string) ([][]float32, error) {
 	return nil, nil
 }
@@ -54,6 +55,7 @@ func (c *replayFakeClient) ListModels(ctx context.Context) ([]llm.ModelInfo, err
 func (c *replayFakeClient) ShowModel(ctx context.Context, name string) (llm.ModelDetails, error) {
 	return llm.ModelDetails{}, nil
 }
+
 func (c *replayFakeClient) PullModel(ctx context.Context, name string, progress chan<- llm.PullProgress) error {
 	return nil
 }

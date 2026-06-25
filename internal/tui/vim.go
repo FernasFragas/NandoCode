@@ -14,10 +14,10 @@ const (
 type Operator string
 
 const (
-	OpDelete Operator = "d"
-	OpChange Operator = "c"
-	OpYank   Operator = "y"
-	OpIndent Operator = ">"
+	OpDelete  Operator = "d"
+	OpChange  Operator = "c"
+	OpYank    Operator = "y"
+	OpIndent  Operator = ">"
 	OpOutdent Operator = "<"
 )
 
@@ -31,12 +31,15 @@ const (
 // CommandState is the parser state for Normal-mode key sequences.
 type CommandState interface{ isCommandState() }
 
-type CmdIdle struct{}
-type CmdCount struct{ Digits string }
-type CmdOperator struct {
-	Op    Operator
-	Count int
-}
+type (
+	CmdIdle     struct{}
+	CmdCount    struct{ Digits string }
+	CmdOperator struct {
+		Op    Operator
+		Count int
+	}
+)
+
 type CmdOperatorCount struct {
 	Op     Operator
 	Count  int
@@ -51,17 +54,22 @@ type CmdOperatorTextObj struct {
 	Count int
 	Scope TextObjScope
 }
-type CmdFind struct{ Count int }
-type CmdGPrefix struct{ Count int }
-type CmdOperatorG struct {
-	Op    Operator
-	Count int
-}
-type CmdReplace struct{ Count int }
-type CmdIndent struct {
-	Dir   Operator
-	Count int
-}
+type (
+	CmdFind      struct{ Count int }
+	CmdGPrefix   struct{ Count int }
+	CmdOperatorG struct {
+		Op    Operator
+		Count int
+	}
+)
+
+type (
+	CmdReplace struct{ Count int }
+	CmdIndent  struct {
+		Dir   Operator
+		Count int
+	}
+)
 
 func (CmdIdle) isCommandState()            {}
 func (CmdCount) isCommandState()           {}
@@ -199,13 +207,13 @@ func (v *VimState) HandleNormalKey(key rune) {
 		case unicode.IsDigit(key):
 			v.CommandState = CmdOperatorCount{Op: st.Op, Count: st.Count, Digits: string(key)}
 		case key == 'f' || key == 'F' || key == 't' || key == 'T':
-			v.CommandState = CmdOperatorFind{Op: st.Op, Count: st.Count}
+			v.CommandState = CmdOperatorFind(st)
 		case key == 'i':
 			v.CommandState = CmdOperatorTextObj{Op: st.Op, Count: st.Count, Scope: TextObjInner}
 		case key == 'a':
 			v.CommandState = CmdOperatorTextObj{Op: st.Op, Count: st.Count, Scope: TextObjAround}
 		case key == 'g':
-			v.CommandState = CmdOperatorG{Op: st.Op, Count: st.Count}
+			v.CommandState = CmdOperatorG(st)
 		default:
 			v.CommandState = CmdIdle{}
 		}
@@ -231,4 +239,3 @@ func (v *VimState) HandleNormalKey(key rune) {
 		v.CommandState = CmdIdle{}
 	}
 }
-

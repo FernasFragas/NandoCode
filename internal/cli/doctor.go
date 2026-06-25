@@ -194,7 +194,7 @@ func checkDirectory(out io.Writer, name, path string) {
 
 	// Check if writable
 	testFile := fmt.Sprintf("%s/.nandocodego-test-%d", path, os.Getpid())
-	if err := os.WriteFile(testFile, []byte("test"), 0600); err != nil {
+	if err := os.WriteFile(testFile, []byte("test"), 0o600); err != nil {
 		fmt.Fprintf(out, "  %s: exists but not writable: %v\n", name, err)
 	} else {
 		os.Remove(testFile)

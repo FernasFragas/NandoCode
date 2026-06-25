@@ -98,4 +98,3 @@ func (c *ChordInterceptor) Reset() {
 	c.firstKey = ""
 	c.at = time.Time{}
 }
-

@@ -31,6 +31,7 @@ func (m *mockTool) UnmarshalInput(raw json.RawMessage) (any, error) { return nil
 func (m *mockTool) Call(ctx tools.Context, input any, progress chan<- tools.ProgressEvent) (tools.Result, error) {
 	return tools.Result{}, nil
 }
+
 func (m *mockTool) Render(input any, result tools.Result) tools.RenderHints {
 	return tools.RenderHints{}
 }

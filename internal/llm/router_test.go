@@ -20,10 +20,12 @@ func (s *stubClient) Chat(context.Context, *ChatRequest) (<-chan StreamEvent, er
 	s.chatCalls.Add(1)
 	return s.ch, nil
 }
+
 func (s *stubClient) Embed(context.Context, string, []string) ([][]float32, error) {
 	s.embedCalls.Add(1)
 	return [][]float32{{1, 2}}, nil
 }
+
 func (s *stubClient) EmbedWithOptions(_ context.Context, _ string, _ []string, opts *EmbedOptions) ([][]float32, error) {
 	s.embedWithOptionsCalls.Add(1)
 	s.lastEmbedWithOptions = opts
@@ -138,6 +140,7 @@ func (e *embedOnlyClient) Chat(context.Context, *ChatRequest) (<-chan StreamEven
 	e.chatCalls.Add(1)
 	return e.ch, nil
 }
+
 func (e *embedOnlyClient) Embed(context.Context, string, []string) ([][]float32, error) {
 	e.embedCalls.Add(1)
 	return [][]float32{{1, 2}}, nil

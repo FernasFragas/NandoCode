@@ -30,6 +30,7 @@ func (fakeClient) Embed(context.Context, string, []string) ([][]float32, error) 
 func (fakeClient) ListModels(context.Context) ([]llm.ModelInfo, error) {
 	return []llm.ModelInfo{{Name: "qwen3"}}, nil
 }
+
 func (fakeClient) ShowModel(context.Context, string) (llm.ModelDetails, error) {
 	return llm.ModelDetails{}, nil
 }
@@ -44,14 +45,17 @@ func (t *testLLMClient) Chat(context.Context, *llm.ChatRequest) (<-chan llm.Stre
 	close(ch)
 	return ch, nil
 }
+
 func (t *testLLMClient) Embed(context.Context, string, []string) ([][]float32, error) {
 	return nil, nil
 }
+
 func (t *testLLMClient) ListModels(context.Context) ([]llm.ModelInfo, error) {
 	out := make([]llm.ModelInfo, len(t.models))
 	copy(out, t.models)
 	return out, nil
 }
+
 func (t *testLLMClient) ShowModel(context.Context, string) (llm.ModelDetails, error) {
 	return llm.ModelDetails{}, nil
 }
@@ -62,7 +66,7 @@ type testCredStore struct {
 }
 
 func (t *testCredStore) Get(_, _ string) (string, error) { return t.v, nil }
-func (t *testCredStore) Set(_, _ string, s string) error { t.v = s; return nil }
+func (t *testCredStore) Set(_, _, s string) error        { t.v = s; return nil }
 func (t *testCredStore) Delete(_, _ string) error        { t.v = ""; return nil }
 
 type tinyRunner struct{}

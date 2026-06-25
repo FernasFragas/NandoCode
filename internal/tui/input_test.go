@@ -36,4 +36,3 @@ func TestInputPreprocessorBracketedPasteLifecycle(t *testing.T) {
 		t.Fatal("expected paste marker cleared after bracketed paste end")
 	}
 }
-

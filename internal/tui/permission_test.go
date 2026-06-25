@@ -42,7 +42,6 @@ func TestPermissionBrokerAllow(t *testing.T) {
 		Target:   "echo hello",
 		Reason:   "user approved",
 	})
-
 	if err != nil {
 		t.Errorf("Expected no error, got %v", err)
 	}
@@ -84,7 +83,6 @@ func TestPermissionBrokerDeny(t *testing.T) {
 		Target:   "rm -rf /",
 		Reason:   "dangerous",
 	})
-
 	if err != nil {
 		t.Errorf("Expected no error, got %v", err)
 	}
@@ -112,7 +110,6 @@ func TestPermissionBrokerCancelation(t *testing.T) {
 		Target:   "echo",
 		Reason:   "test",
 	})
-
 	if err != nil {
 		t.Errorf("Expected no error, got %v", err)
 	}

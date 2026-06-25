@@ -40,4 +40,3 @@ func (p *InputPreprocessor) Process(msg tea.KeyMsg) (tea.KeyMsg, bool) {
 		return msg, false
 	}
 }
-

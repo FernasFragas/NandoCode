@@ -99,7 +99,7 @@ test-e2e:
 lint:
 	@echo "Running golangci-lint..."
 	@if command -v golangci-lint >/dev/null 2>&1; then \
-		golangci-lint run; \
+		golangci-lint run ./...; \
 	else \
 		echo "⚠️  golangci-lint not found. Install: https://golangci-lint.run/usage/install/"; \
 		exit 1; \

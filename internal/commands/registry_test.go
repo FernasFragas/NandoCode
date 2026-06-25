@@ -36,6 +36,7 @@ func (f *fakeLLM) ListModels(context.Context) ([]llm.ModelInfo, error)          
 func (f *fakeLLM) ShowModel(context.Context, string) (llm.ModelDetails, error) {
 	return llm.ModelDetails{}, nil
 }
+
 func (f *fakeLLM) PullModel(context.Context, string, chan<- llm.PullProgress) error {
 	return nil
 }
@@ -45,7 +46,7 @@ type fakeCredStore struct {
 }
 
 func (f *fakeCredStore) Get(_, _ string) (string, error) { return f.v, nil }
-func (f *fakeCredStore) Set(_, _ string, s string) error { f.v = s; return nil }
+func (f *fakeCredStore) Set(_, _, s string) error        { f.v = s; return nil }
 func (f *fakeCredStore) Delete(_, _ string) error        { f.v = ""; return nil }
 
 type promptDumpLLM struct{}
@@ -57,6 +58,7 @@ func (p *promptDumpLLM) Chat(context.Context, *llm.ChatRequest) (<-chan llm.Stre
 	close(ch)
 	return ch, nil
 }
+
 func (p *promptDumpLLM) Embed(context.Context, string, []string) ([][]float32, error) {
 	return nil, nil
 }
@@ -64,6 +66,7 @@ func (p *promptDumpLLM) ListModels(context.Context) ([]llm.ModelInfo, error) { r
 func (p *promptDumpLLM) ShowModel(context.Context, string) (llm.ModelDetails, error) {
 	return llm.ModelDetails{}, nil
 }
+
 func (p *promptDumpLLM) PullModel(context.Context, string, chan<- llm.PullProgress) error {
 	return nil
 }

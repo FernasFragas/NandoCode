@@ -78,6 +78,7 @@ These plans are already implemented or substantially delivered and should not be
 - Current roadmap routing is centralized in `docs/NEXT-PHASES-IMPLEMENTATION-PLAN.md`, with `docs/PROJECT-STATUS-AND-ONBOARDING.md` as the implementation snapshot and `docs/PHASE-LOG.md` as historical evidence.
 - `docs/PROJECT-STATUS-AND-ONBOARDING.md` still contains older status tables for context. Use its current roadmap/routing sections and the Next Phases plan for ordering.
 - Docker/web docs should stay aligned with the implemented `nandocodego server` command, port 8080 defaults, and `--bind` / `--port` flags.
-- `SECURITY.md` still has `security@example.invalid` as a placeholder contact.
+- `SECURITY.md` no longer publishes a placeholder address, but a private
+  vulnerability-reporting channel still needs to be configured before release.
 - Some docs and examples prefer `qwen3`, while code defaults may still point at older model defaults. Engineers should pass `--model` explicitly until config defaults are reconciled.
 - `.codex/agent-context/ARCHITECTURE.md` and parts of `.codex/agent-context/testing-standards.md` are explicitly marked stale/non-authoritative for this repo.

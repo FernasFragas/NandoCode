@@ -79,4 +79,3 @@ func TestVimCommandStateTransitions(t *testing.T) {
 		t.Fatalf("expected CmdIdle after >>, got %T", v.CommandState)
 	}
 }
-

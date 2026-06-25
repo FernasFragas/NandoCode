@@ -27,7 +27,7 @@ func (s DreamTaskState) ToSummary() types.TaskSummary {
 	return out
 }
 
-func (s *Supervisor) SpawnDream(ctx context.Context, client llm.Client, model string, systemPrompt string) (string, error) {
+func (s *Supervisor) SpawnDream(ctx context.Context, client llm.Client, model, systemPrompt string) (string, error) {
 	if client == nil {
 		return "", fmt.Errorf("llm client is required")
 	}

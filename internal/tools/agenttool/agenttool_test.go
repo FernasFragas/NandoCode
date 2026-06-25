@@ -24,6 +24,7 @@ func (f *fakeLLM) Chat(ctx context.Context, req *llm.ChatRequest) (<-chan llm.St
 	close(ch)
 	return ch, nil
 }
+
 func (f *fakeLLM) Embed(ctx context.Context, model string, input []string) ([][]float32, error) {
 	return nil, nil
 }
@@ -31,6 +32,7 @@ func (f *fakeLLM) ListModels(ctx context.Context) ([]llm.ModelInfo, error) { ret
 func (f *fakeLLM) ShowModel(ctx context.Context, name string) (llm.ModelDetails, error) {
 	return llm.ModelDetails{}, nil
 }
+
 func (f *fakeLLM) PullModel(ctx context.Context, name string, progress chan<- llm.PullProgress) error {
 	return nil
 }

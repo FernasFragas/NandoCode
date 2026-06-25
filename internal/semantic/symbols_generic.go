@@ -69,7 +69,7 @@ func extractMarkdownSectionRecords(relPath string, body []byte, contentHash stri
 	return out
 }
 
-func chunkFallbackRecords(relPath string, language string, body []byte, contentHash string, maxChunkBytes int, overlapLines int) []Record {
+func chunkFallbackRecords(relPath, language string, body []byte, contentHash string, maxChunkBytes, overlapLines int) []Record {
 	if maxChunkBytes <= 0 {
 		maxChunkBytes = 2048
 	}

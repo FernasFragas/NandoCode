@@ -26,15 +26,19 @@ func (f *dreamFakeClient) Chat(ctx context.Context, req *llm.ChatRequest) (<-cha
 	}()
 	return ch, nil
 }
+
 func (f *dreamFakeClient) Embed(ctx context.Context, model string, input []string) ([][]float32, error) {
 	return nil, nil
 }
+
 func (f *dreamFakeClient) ListModels(ctx context.Context) ([]llm.ModelInfo, error) {
 	return nil, nil
 }
+
 func (f *dreamFakeClient) ShowModel(ctx context.Context, name string) (llm.ModelDetails, error) {
 	return llm.ModelDetails{}, nil
 }
+
 func (f *dreamFakeClient) PullModel(ctx context.Context, name string, progress chan<- llm.PullProgress) error {
 	return nil
 }

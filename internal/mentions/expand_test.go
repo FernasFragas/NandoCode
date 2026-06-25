@@ -786,7 +786,7 @@ func TestParseLineRangeToken(t *testing.T) {
 	}
 }
 
-func mustWriteFile(t *testing.T, path string, body string) {
+func mustWriteFile(t *testing.T, path, body string) {
 	t.Helper()
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 		t.Fatal(err)

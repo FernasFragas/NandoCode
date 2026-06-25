@@ -19,4 +19,3 @@ func buildListingScopedPrompt(userInput string, dirs []ResolvedDirectory) string
 	}
 	return b.String()
 }
-

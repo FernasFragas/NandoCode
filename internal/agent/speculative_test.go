@@ -47,6 +47,7 @@ func (s *slowTool) IsDestructive(input any) bool                    { return fal
 func (s *slowTool) CheckPermissions(ctx tools.Context, input any) tools.PermissionResult {
 	return tools.PermissionResult{Decision: tools.PermAllow, UpdatedInput: input}
 }
+
 func (s *slowTool) Call(ctx tools.Context, input any, progress chan<- tools.ProgressEvent) (tools.Result, error) {
 	s.startMu.Lock()
 	s.startTimes = append(s.startTimes, time.Now())
@@ -59,6 +60,7 @@ func (s *slowTool) Call(ctx tools.Context, input any, progress chan<- tools.Prog
 	time.Sleep(s.duration)
 	return tools.Result{Display: fmt.Sprintf("%s completed", s.name)}, nil
 }
+
 func (s *slowTool) Render(input any, result tools.Result) tools.RenderHints {
 	return tools.RenderHints{Title: s.name}
 }
@@ -84,6 +86,7 @@ func (c *countingTool) IsDestructive(input any) bool                    { return
 func (c *countingTool) CheckPermissions(ctx tools.Context, input any) tools.PermissionResult {
 	return tools.PermissionResult{Decision: tools.PermAllow, UpdatedInput: input}
 }
+
 func (c *countingTool) Call(ctx tools.Context, input any, progress chan<- tools.ProgressEvent) (tools.Result, error) {
 	c.mu.Lock()
 	c.inflight++
@@ -99,6 +102,7 @@ func (c *countingTool) Call(ctx tools.Context, input any, progress chan<- tools.
 	c.mu.Unlock()
 	return tools.Result{Display: "ok"}, nil
 }
+
 func (c *countingTool) Render(input any, result tools.Result) tools.RenderHints {
 	return tools.RenderHints{Title: c.name}
 }

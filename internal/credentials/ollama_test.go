@@ -14,7 +14,7 @@ type fakeStore struct {
 }
 
 func (f *fakeStore) Get(_, _ string) (string, error) { return f.getValue, f.getErr }
-func (f *fakeStore) Set(_, _ string, _ string) error {
+func (f *fakeStore) Set(_, _, _ string) error {
 	f.setCalls++
 	return f.setErr
 }

@@ -272,9 +272,7 @@ func buildEvidenceParts(input string, refs []mentionRef, expandedFiles []mention
 	for _, ref := range refs {
 		if ref.IsDir {
 			samples, localOmit := selectDirectoryEvidence(ctx, ref, input)
-			for _, o := range localOmit {
-				omitted = append(omitted, o)
-			}
+			omitted = append(omitted, localOmit...)
 			for _, s := range samples {
 				if remainingChars <= 0 {
 					omitted = append(omitted, agent.OmittedEvidence{Path: s.Path, Kind: "file", Reason: "budget", BytesOmitted: s.BytesTotal})

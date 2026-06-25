@@ -387,8 +387,7 @@ func runREPL(ctx context.Context, cmd *cobra.Command, opts replOptions) error {
 	if err := registry.Register(observability.WrapTool(agentTool, meter, bridge)); err != nil {
 		return fmt.Errorf("failed to register agent tool: %w", err)
 	}
-	sendMessageTool := sendmessage.New(taskSupervisor, nil)
-	sendMessageTool = sendmessage.New(taskSupervisor, nil, sendmessage.WithResumeFunc(func(tctx tools.Context, taskID string, msg tasks.PendingMessage) (string, error) {
+	sendMessageTool := sendmessage.New(taskSupervisor, nil, sendmessage.WithResumeFunc(func(tctx tools.Context, taskID string, msg tasks.PendingMessage) (string, error) {
 		st, ok := taskSupervisor.Get(taskID)
 		if !ok {
 			return "", fmt.Errorf("task %s not found", taskID)

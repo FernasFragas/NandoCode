@@ -23,7 +23,8 @@ type Runner struct {
 
 func NewRunner(next interface {
 	Run(context.Context, agent.Input) <-chan agent.Event
-}, client llm.Client, cfg Config) *Runner {
+}, client llm.Client, cfg Config,
+) *Runner {
 	if cfg.Model == "" {
 		cfg.Model = llm.DefaultModel
 	}

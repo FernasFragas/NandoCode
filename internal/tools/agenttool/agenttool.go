@@ -37,7 +37,7 @@ type Tool struct {
 	supervisor       *tasks.Supervisor
 }
 
-func New(client llm.Client, registry *tools.Registry, cfg agent.Config, sessionID string, getModel func() string, getProvider func() string) *Tool {
+func New(client llm.Client, registry *tools.Registry, cfg agent.Config, sessionID string, getModel, getProvider func() string) *Tool {
 	return &Tool{
 		client:        client,
 		registry:      registry,

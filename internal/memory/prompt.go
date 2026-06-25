@@ -5,8 +5,10 @@ import (
 	"strings"
 )
 
-const sectionHeader = "=== DYNAMIC MEMORY CONTEXT ==="
-const sectionFooter = "=== END DYNAMIC MEMORY CONTEXT ==="
+const (
+	sectionHeader = "=== DYNAMIC MEMORY CONTEXT ==="
+	sectionFooter = "=== END DYNAMIC MEMORY CONTEXT ==="
+)
 
 // BuildSection returns a dynamic memory prompt extension.
 func BuildSection(input SectionInput) string {

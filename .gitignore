@@ -1,19 +1,14 @@
 .DS_Store
 
- go.mod
-go.sum
-
-.docs/
-
-
-.codex/
 .idea/
+.vscode/
+.codex/
 
 .gocache/
 .tmp-config/
 .tmp-regression/
+dist/
 
 # Binary artifacts
-bin/nandocodego
-bin/chat-example
-nandocodego
+bin/
+/nandocodego

@@ -47,10 +47,12 @@ type CreateTool struct {
 	getProvider func() string
 }
 
-type ListTool struct{ sup *tasks.Supervisor }
-type GetTool struct{ sup *tasks.Supervisor }
-type OutputTool struct{ sup *tasks.Supervisor }
-type StopTool struct{ sup *tasks.Supervisor }
+type (
+	ListTool   struct{ sup *tasks.Supervisor }
+	GetTool    struct{ sup *tasks.Supervisor }
+	OutputTool struct{ sup *tasks.Supervisor }
+	StopTool   struct{ sup *tasks.Supervisor }
+)
 
 func NewAll(sup *tasks.Supervisor) []tools.Tool {
 	return []tools.Tool{
@@ -62,7 +64,7 @@ func NewAll(sup *tasks.Supervisor) []tools.Tool {
 	}
 }
 
-func NewWithAgent(sup *tasks.Supervisor, client llm.Client, registry *tools.Registry, cfg agent.Config, sessionID string, getModel func() string, getProvider func() string) []tools.Tool {
+func NewWithAgent(sup *tasks.Supervisor, client llm.Client, registry *tools.Registry, cfg agent.Config, sessionID string, getModel, getProvider func() string) []tools.Tool {
 	return []tools.Tool{
 		&CreateTool{sup: sup, client: client, registry: registry, config: cfg, session: sessionID, getModel: getModel, getProvider: getProvider},
 		&ListTool{sup: sup},
@@ -107,6 +109,7 @@ func (t *CreateTool) UnmarshalInput(raw json.RawMessage) (any, error) {
 	}
 	return in, nil
 }
+
 func (t *ListTool) UnmarshalInput(raw json.RawMessage) (any, error) {
 	var in ListInput
 	if len(raw) == 0 || string(raw) == "null" {
@@ -117,16 +120,19 @@ func (t *ListTool) UnmarshalInput(raw json.RawMessage) (any, error) {
 	}
 	return in, nil
 }
+
 func (t *GetTool) UnmarshalInput(raw json.RawMessage) (any, error) {
 	var in IDInput
 	err := json.Unmarshal(raw, &in)
 	return in, err
 }
+
 func (t *OutputTool) UnmarshalInput(raw json.RawMessage) (any, error) {
 	var in OutputInput
 	err := json.Unmarshal(raw, &in)
 	return in, err
 }
+
 func (t *StopTool) UnmarshalInput(raw json.RawMessage) (any, error) {
 	var in IDInput
 	err := json.Unmarshal(raw, &in)
@@ -156,15 +162,19 @@ func (t *StopTool) IsDestructive(input any) bool       { return true }
 func (t *CreateTool) CheckPermissions(ctx tools.Context, input any) tools.PermissionResult {
 	return tools.PermissionResult{Decision: tools.PermAsk, Reason: "task creation requires approval", UpdatedInput: input}
 }
+
 func (t *ListTool) CheckPermissions(ctx tools.Context, input any) tools.PermissionResult {
 	return tools.PermissionResult{Decision: tools.PermAllow, UpdatedInput: input}
 }
+
 func (t *GetTool) CheckPermissions(ctx tools.Context, input any) tools.PermissionResult {
 	return tools.PermissionResult{Decision: tools.PermAllow, UpdatedInput: input}
 }
+
 func (t *OutputTool) CheckPermissions(ctx tools.Context, input any) tools.PermissionResult {
 	return tools.PermissionResult{Decision: tools.PermAllow, UpdatedInput: input}
 }
+
 func (t *StopTool) CheckPermissions(ctx tools.Context, input any) tools.PermissionResult {
 	return tools.PermissionResult{Decision: tools.PermAllow, UpdatedInput: input}
 }
@@ -320,15 +330,19 @@ func (t *StopTool) Call(ctx tools.Context, input any, _ chan<- tools.ProgressEve
 func (t *CreateTool) Render(input any, result tools.Result) tools.RenderHints {
 	return tools.RenderHints{Title: "TaskCreate", Summary: "start"}
 }
+
 func (t *ListTool) Render(input any, result tools.Result) tools.RenderHints {
 	return tools.RenderHints{Title: "TaskList", Summary: "list"}
 }
+
 func (t *GetTool) Render(input any, result tools.Result) tools.RenderHints {
 	return tools.RenderHints{Title: "TaskGet", Summary: "status"}
 }
+
 func (t *OutputTool) Render(input any, result tools.Result) tools.RenderHints {
 	return tools.RenderHints{Title: "TaskOutput", Summary: "output"}
 }
+
 func (t *StopTool) Render(input any, result tools.Result) tools.RenderHints {
 	return tools.RenderHints{Title: "TaskStop", Summary: "stop"}
 }

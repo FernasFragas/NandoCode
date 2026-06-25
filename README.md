@@ -24,7 +24,7 @@ The point is not to hide the engineer behind the tools. It is to show what one e
 
 **Current Version:** v0.0.0-dev (Phase 29 complete; Phase 25 remote/bridge mode next)
 
-This project is under active development. For current roadmap order, read [Next Phases Implementation Plan](docs/NEXT-PHASES-IMPLEMENTATION-PLAN.md) first, then [Project Status and Engineer Onboarding](docs/PROJECT-STATUS-AND-ONBOARDING.md) and [Phase Log](docs/PHASE-LOG.md). The original [.codex implementation plan](.codex/go-ollama-plan-AGENTS.md) is historical reference material, not the current launch-status source.
+This project is under active development. For current roadmap order, read [Next Phases Implementation Plan](docs/NEXT-PHASES-IMPLEMENTATION-PLAN.md) first, then [Project Status and Engineer Onboarding](docs/PROJECT-STATUS-AND-ONBOARDING.md) and [Phase Log](docs/PHASE-LOG.md). Earlier internal implementation plans are historical reference material, not the current launch-status source.
 
 ### Completed Phases
 
@@ -218,12 +218,11 @@ See [SECURITY.md](SECURITY.md) for:
 - [Application Architecture Flowchart](docs/APPLICATION-ARCHITECTURE-FLOWCHART.md) - Detailed Mermaid flowcharts for the CLI, TUI, server, agent, tools, context, retrieval, storage, and observability architecture
 - [Remaining Phases Task Review](docs/REMAINING-PHASES-TASK-REVIEW.md) - Reviewed task detail, blockers, and evidence requirements for active gates
 - [Phase Log](docs/PHASE-LOG.md) - Historical implementation record and acceptance evidence
-- [Historical Implementation Plan](.codex/go-ollama-plan-AGENTS.md) - Original phase architecture; superseded for current roadmap order by the Next Phases plan
 - [Docker Usage](README.Docker.md) - Docker and container deployment guide
 
 ## Architecture
 
-![ Whole-Application.png](%20Whole-Application.png)
+![Whole-application architecture](Whole-Application.png)
 
 `nandocodego` is built around six core abstractions:
 

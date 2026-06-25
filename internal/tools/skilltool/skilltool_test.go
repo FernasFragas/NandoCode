@@ -21,6 +21,7 @@ func (f *fakeLoader) List() []skills.SkillFile {
 	}
 	return out
 }
+
 func (f *fakeLoader) Lookup(name string) (skills.SkillFile, bool) {
 	v, ok := f.items[name]
 	return v, ok

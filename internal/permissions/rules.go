@@ -72,7 +72,7 @@ func Merge(a, b Rules) Rules {
 		decision Decision
 		source   Source
 	}
-	
+
 	// Collect all rules keyed by decision and source.
 	allRules := make(map[keySource][]Rule)
 	for _, rule := range a.AlwaysAllow {

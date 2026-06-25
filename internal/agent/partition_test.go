@@ -29,9 +29,11 @@ func (m *mockTool) IsDestructive(input any) bool                    { return m.d
 func (m *mockTool) CheckPermissions(ctx tools.Context, input any) tools.PermissionResult {
 	return tools.PermissionResult{Decision: tools.PermAllow, UpdatedInput: input}
 }
+
 func (m *mockTool) Call(ctx tools.Context, input any, progress chan<- tools.ProgressEvent) (tools.Result, error) {
 	return tools.Result{}, nil
 }
+
 func (m *mockTool) Render(input any, result tools.Result) tools.RenderHints {
 	return tools.RenderHints{Title: m.name}
 }
