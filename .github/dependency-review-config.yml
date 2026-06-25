@@ -1,0 +1,26 @@
+# Dependency Review Configuration
+# https://docs.github.com/en/code-security/supply-chain-security/understanding-your-software-supply-chain/configuring-dependency-review
+
+# Fail the action on high and critical vulnerabilities
+fail-on-severity: high
+
+# Fail on licenses that are incompatible with the project
+# Allowed licenses: permissive open source licenses
+allow-licenses:
+  - MIT
+  - Apache-2.0
+  - BSD-2-Clause
+  - BSD-3-Clause
+  - ISC
+  - 0BSD
+  - Unlicense
+  - CC0-1.0
+
+# Allow vulnerabilities in development dependencies (not applicable for Go, but kept for consistency)
+allow-ghsas: []
+
+# Comment on pull requests with dependency changes
+comment-summary-in-pr: always
+
+# Warn about dependencies with security advisories
+warn-on-openssf-scorecard-level: 3
