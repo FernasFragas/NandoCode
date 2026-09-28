@@ -77,7 +77,7 @@ Scratchpad directory: ` + scratch + `
 `)
 }
 
-func BuildCoordinatorRegistry(agentTool tools.Tool, sendMessageTool tools.Tool, taskStopTool tools.Tool) *tools.Registry {
+func BuildCoordinatorRegistry(agentTool, sendMessageTool, taskStopTool tools.Tool) *tools.Registry {
 	r := tools.NewRegistry()
 	if agentTool != nil {
 		_ = r.Register(agentTool)

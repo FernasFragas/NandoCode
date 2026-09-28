@@ -65,7 +65,7 @@ func renderEvidenceBlock(hit SearchHit, snippet string) string {
 	b.WriteString("-")
 	b.WriteString(intToString(hit.Record.EndLine))
 	b.WriteString(`" score="`)
-	b.WriteString(fmt.Sprintf("%.3f", hit.Score))
+	fmt.Fprintf(&b, "%.3f", hit.Score)
 	b.WriteString(`">`)
 	b.WriteString("\n")
 	b.WriteString(escapeText(snippet))

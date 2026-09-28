@@ -3,6 +3,8 @@ package bash
 import (
 	"context"
 	"encoding/json"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -45,21 +47,26 @@ func TestBashCancellation(t *testing.T) {
 		t.Fatal(err)
 	}
 	out := result.Data.(Output)
-	if out.ExitCode != -1 {
-		t.Fatalf("out = %#v", out)
+	if out.ExitCode != -1 || !strings.Contains(out.Stderr, context.DeadlineExceeded.Error()) {
+		t.Fatalf("out = %#v, want exit -1 with a deadline message", out)
 	}
 }
 
 func TestBashWorkingDirAndEnv(t *testing.T) {
 	dir := t.TempDir()
 	ctx := tools.DefaultContext(context.Background(), dir)
-	result, err := NewBashTool().Call(ctx, Input{Command: "printf \"$PWD:$PHASE3_VALUE\"", Env: map[string]string{"PHASE3_VALUE": "ok"}}, nil)
+	// Write a marker relative to the shell's working directory instead of
+	// comparing $PWD: Git Bash on Windows reports it as /tmp/..., not C:\...
+	result, err := NewBashTool().Call(ctx, Input{Command: "printf \"$PHASE3_VALUE\" > marker.txt", Env: map[string]string{"PHASE3_VALUE": "ok"}}, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
-	out := result.Data.(Output)
-	if !strings.Contains(out.Stdout, dir+":ok") {
-		t.Fatalf("stdout = %q", out.Stdout)
+	if out := result.Data.(Output); out.ExitCode != 0 {
+		t.Fatalf("out = %#v", out)
+	}
+	got, err := os.ReadFile(filepath.Join(dir, "marker.txt"))
+	if err != nil || string(got) != "ok" {
+		t.Fatalf("marker in working dir = %q, %v", got, err)
 	}
 }
 

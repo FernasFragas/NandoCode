@@ -44,9 +44,11 @@ func (f fakeTool) IsDestructive(input any) bool                    { return fals
 func (f fakeTool) CheckPermissions(ctx tools.Context, input any) tools.PermissionResult {
 	return tools.PermissionResult{Decision: tools.PermAllow}
 }
+
 func (f fakeTool) Call(ctx tools.Context, input any, progress chan<- tools.ProgressEvent) (tools.Result, error) {
 	return tools.Result{Display: "ok"}, nil
 }
+
 func (f fakeTool) Render(input any, result tools.Result) tools.RenderHints {
 	return tools.RenderHints{Title: "Fake", Summary: "fake"}
 }

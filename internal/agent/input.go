@@ -73,8 +73,10 @@ const (
 
 type ToolHookFunc func(context.Context, ToolHookEvent)
 
-type StopHookFunc func(context.Context, []llm.Message) (string, bool)
-type ToolBatchObserverFunc func(batchSize int, safe bool, duration time.Duration)
+type (
+	StopHookFunc          func(context.Context, []llm.Message) (string, bool)
+	ToolBatchObserverFunc func(batchSize int, safe bool, duration time.Duration)
+)
 
 type EvidencePackReport struct {
 	OriginalRequestBytes   int

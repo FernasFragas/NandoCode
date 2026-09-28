@@ -17,15 +17,19 @@ func (f *fakeAgentHookClient) Chat(ctx context.Context, req *llm.ChatRequest) (<
 	close(ch)
 	return ch, nil
 }
+
 func (f *fakeAgentHookClient) Embed(ctx context.Context, model string, input []string) ([][]float32, error) {
 	return nil, nil
 }
+
 func (f *fakeAgentHookClient) ListModels(ctx context.Context) ([]llm.ModelInfo, error) {
 	return nil, nil
 }
+
 func (f *fakeAgentHookClient) ShowModel(ctx context.Context, name string) (llm.ModelDetails, error) {
 	return llm.ModelDetails{}, nil
 }
+
 func (f *fakeAgentHookClient) PullModel(ctx context.Context, name string, progress chan<- llm.PullProgress) error {
 	return nil
 }
@@ -36,15 +40,19 @@ func (b *blockingAgentHookClient) Chat(ctx context.Context, req *llm.ChatRequest
 	<-ctx.Done()
 	return nil, errors.New("context canceled")
 }
+
 func (b *blockingAgentHookClient) Embed(ctx context.Context, model string, input []string) ([][]float32, error) {
 	return nil, nil
 }
+
 func (b *blockingAgentHookClient) ListModels(ctx context.Context) ([]llm.ModelInfo, error) {
 	return nil, nil
 }
+
 func (b *blockingAgentHookClient) ShowModel(ctx context.Context, name string) (llm.ModelDetails, error) {
 	return llm.ModelDetails{}, nil
 }
+
 func (b *blockingAgentHookClient) PullModel(ctx context.Context, name string, progress chan<- llm.PullProgress) error {
 	return nil
 }

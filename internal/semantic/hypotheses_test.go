@@ -292,9 +292,11 @@ type captureOptsClient struct {
 func (c *captureOptsClient) Chat(context.Context, *llm.ChatRequest) (<-chan llm.StreamEvent, error) {
 	return nil, nil
 }
+
 func (c *captureOptsClient) Embed(context.Context, string, []string) ([][]float32, error) {
 	return [][]float32{{0.1, 0.2}}, nil
 }
+
 func (c *captureOptsClient) EmbedWithOptions(_ context.Context, _ string, _ []string, opts *llm.EmbedOptions) ([][]float32, error) {
 	c.lastOpts = opts
 	return [][]float32{{0.1, 0.2}}, nil
@@ -303,6 +305,7 @@ func (c *captureOptsClient) ListModels(context.Context) ([]llm.ModelInfo, error)
 func (c *captureOptsClient) ShowModel(context.Context, string) (llm.ModelDetails, error) {
 	return llm.ModelDetails{}, nil
 }
+
 func (c *captureOptsClient) PullModel(context.Context, string, chan<- llm.PullProgress) error {
 	return nil
 }

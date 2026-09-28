@@ -30,6 +30,13 @@ func TestRootCommandHasDoctor(t *testing.T) {
 	}
 }
 
+func TestRootCommandHasEval(t *testing.T) {
+	cmd := NewRootCmd()
+	if _, _, err := cmd.Find([]string{"eval"}); err != nil {
+		t.Fatal(err)
+	}
+}
+
 func TestRootCommandNoArgsShowsHelp(t *testing.T) {
 	cmd := NewRootCmd()
 	var out bytes.Buffer
@@ -47,23 +54,30 @@ func TestRootCommandNoArgsShowsHelp(t *testing.T) {
 }
 
 func TestRunNoArgs(t *testing.T) {
+	// No args launches the interactive REPL. The launcher is stubbed: starting
+	// the real TUI depends on the environment (it fails without /dev/tty on
+	// Unix but runs indefinitely against the Windows console).
+	orig := runREPLFn
+	t.Cleanup(func() { runREPLFn = orig })
+	var got *replOptions
+	runREPLFn = func(_ context.Context, _ *cobra.Command, opts replOptions) error {
+		got = &opts
+		return nil
+	}
+
 	cmd := NewRootCmd()
 	var out bytes.Buffer
 	cmd.SetOut(&out)
 	cmd.SetErr(&out)
-	// Running with no args attempts to launch the REPL.
-	// Since there's no TTY in test environment, this is expected to fail.
-	// We test that it at least tries to execute.
-	cmd.SetArgs(nil)
-	err := cmd.Execute()
-	// Error is expected in test environment (no TTY)
-	if err == nil {
-		t.Skip("Expected error in test environment without TTY")
+	cmd.SetArgs([]string{"--no-alt-screen"})
+	if err := cmd.Execute(); err != nil {
+		t.Fatal(err)
 	}
-	// Just ensure it attempted REPL initialization
-	if !strings.Contains(err.Error(), "TTY") && !strings.Contains(err.Error(), "device not configured") {
-		// If it's a different error, that's unexpected
-		t.Logf("Got error (might be expected): %v", err)
+	if got == nil {
+		t.Fatal("expected no-args invocation to launch the REPL")
+	}
+	if !got.noAltScreen {
+		t.Fatalf("REPL options not forwarded: %+v", *got)
 	}
 }
 

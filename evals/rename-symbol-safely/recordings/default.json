@@ -1,0 +1,126 @@
+{
+  "version": 1,
+  "model": "recorded/rename-symbol-safely",
+  "strict": true,
+  "turns": [
+    {
+      "match": {
+        "latest_user_contains": "BuildUsrLabel",
+        "required_tools": ["FileRead", "FileWrite", "Bash"]
+      },
+      "events": [
+        {
+          "message": {
+            "role": "assistant",
+            "tool_calls": [
+              {
+                "function": {
+                  "name": "FileRead",
+                  "arguments": {
+                    "path": "store.go"
+                  }
+                }
+              },
+              {
+                "function": {
+                  "name": "FileRead",
+                  "arguments": {
+                    "path": "store_test.go"
+                  }
+                }
+              }
+            ]
+          }
+        },
+        {
+          "done": true,
+          "done_reason": "stop"
+        }
+      ]
+    },
+    {
+      "match": {
+        "latest_user_contains": "BuildUsrLabel",
+        "required_tools": ["FileRead", "FileWrite", "Bash"]
+      },
+      "events": [
+        {
+          "message": {
+            "role": "assistant",
+            "tool_calls": [
+              {
+                "function": {
+                  "name": "FileWrite",
+                  "arguments": {
+                    "path": "store.go",
+                    "content": "package renamesymbolsafely\n\nimport \"strings\"\n\nfunc BuildUserLabel(name string) string {\n\tname = strings.TrimSpace(name)\n\tif name == \"\" {\n\t\treturn \"user:unknown\"\n\t}\n\treturn \"user:\" + strings.ToLower(name)\n}\n"
+                  }
+                }
+              },
+              {
+                "function": {
+                  "name": "FileWrite",
+                  "arguments": {
+                    "path": "store_test.go",
+                    "content": "package renamesymbolsafely\n\nimport \"testing\"\n\nfunc TestBuildUserLabel(t *testing.T) {\n\tif got := BuildUserLabel(\" Nando \"); got != \"user:nando\" {\n\t\tt.Fatalf(\"got %q\", got)\n\t}\n}\n"
+                  }
+                }
+              }
+            ]
+          }
+        },
+        {
+          "done": true,
+          "done_reason": "stop"
+        }
+      ]
+    },
+    {
+      "match": {
+        "latest_user_contains": "BuildUsrLabel",
+        "required_tools": ["FileRead", "FileWrite", "Bash"]
+      },
+      "events": [
+        {
+          "message": {
+            "role": "assistant",
+            "tool_calls": [
+              {
+                "function": {
+                  "name": "Bash",
+                  "arguments": {
+                    "command": "go test ./...",
+                    "description": "Run fixture tests",
+                    "timeout_ms": 30000
+                  }
+                }
+              }
+            ]
+          }
+        },
+        {
+          "done": true,
+          "done_reason": "stop"
+        }
+      ]
+    },
+    {
+      "match": {
+        "latest_user_contains": "BuildUsrLabel",
+        "required_tools": ["FileRead", "FileWrite", "Bash"]
+      },
+      "events": [
+        {
+          "message": {
+            "role": "assistant",
+            "content": "Renamed the helper safely, updated references, and ran tests."
+          }
+        },
+        {
+          "done": true,
+          "done_reason": "stop"
+        }
+      ]
+    }
+  ]
+}

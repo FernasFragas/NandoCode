@@ -10,6 +10,8 @@ REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 
 cd "$REPO_ROOT"
 
+export GOCACHE="${GOCACHE:-/private/tmp/go-nandocodego-gocache}"
+
 echo "=================================================="
 echo "Phase 0 Verification"
 echo "=================================================="
@@ -89,7 +91,7 @@ if [[ -f go.mod ]]; then
   
   # Check for linter (may not be installed in all environments)
   if command -v golangci-lint &> /dev/null; then
-    run_check "golangci-lint" "golangci-lint run"
+    run_check "golangci-lint" "golangci-lint run ./..."
   else
     echo ""
     echo "⚠️  golangci-lint not found; skipping (install: https://golangci-lint.run/usage/install/)"

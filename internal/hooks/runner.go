@@ -223,7 +223,7 @@ func sendNotice(ctx context.Context, out chan<- agent.Event, msg string) {
 }
 
 func sendStageTiming(ctx context.Context, out chan<- agent.Event, stage string, dur time.Duration) {
-	if stage == "" || dur <= 0 {
+	if stage == "" || dur < 0 { // 0 is a real measurement on coarse clocks (e.g. Windows)
 		return
 	}
 	select {

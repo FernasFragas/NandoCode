@@ -20,12 +20,14 @@ type fakeLLM struct {
 func (f *fakeLLM) Chat(ctx context.Context, req *llm.ChatRequest) (<-chan llm.StreamEvent, error) {
 	return f.chat(ctx, req)
 }
+
 func (f *fakeLLM) Embed(ctx context.Context, model string, input []string) ([][]float32, error) {
 	if f.embed != nil {
 		return f.embed(ctx, model, input)
 	}
 	return nil, nil
 }
+
 func (f *fakeLLM) EmbedWithOptions(ctx context.Context, model string, input []string, opts *llm.EmbedOptions) ([][]float32, error) {
 	if f.embedWithOptions != nil {
 		return f.embedWithOptions(ctx, model, input, opts)
@@ -36,6 +38,7 @@ func (f *fakeLLM) ListModels(context.Context) ([]llm.ModelInfo, error) { return 
 func (f *fakeLLM) ShowModel(context.Context, string) (llm.ModelDetails, error) {
 	return llm.ModelDetails{}, nil
 }
+
 func (f *fakeLLM) PullModel(context.Context, string, chan<- llm.PullProgress) error {
 	return nil
 }
@@ -79,7 +82,7 @@ type captureBridge struct {
 }
 
 func (c *captureBridge) RecordToolCall(string, time.Duration, error) {}
-func (c *captureBridge) RecordLLMChat(_ time.Duration, _ time.Duration, _ int64, _ int64, doneReason string, err error) {
+func (c *captureBridge) RecordLLMChat(_, _ time.Duration, _, _ int64, doneReason string, err error) {
 	c.lastDoneReason = doneReason
 	c.lastErr = err
 }

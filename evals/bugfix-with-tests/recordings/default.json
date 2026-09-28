@@ -1,0 +1,126 @@
+{
+  "version": 1,
+  "model": "recorded/bugfix-with-tests",
+  "strict": true,
+  "turns": [
+    {
+      "match": {
+        "latest_user_contains": "off-by-one range bug",
+        "required_tools": ["FileRead", "FileWrite", "Bash"]
+      },
+      "events": [
+        {
+          "message": {
+            "role": "assistant",
+            "tool_calls": [
+              {
+                "function": {
+                  "name": "FileRead",
+                  "arguments": {
+                    "path": "range.go"
+                  }
+                }
+              },
+              {
+                "function": {
+                  "name": "FileRead",
+                  "arguments": {
+                    "path": "range_test.go"
+                  }
+                }
+              }
+            ]
+          }
+        },
+        {
+          "done": true,
+          "done_reason": "stop"
+        }
+      ]
+    },
+    {
+      "match": {
+        "latest_user_contains": "off-by-one range bug",
+        "required_tools": ["FileRead", "FileWrite", "Bash"]
+      },
+      "events": [
+        {
+          "message": {
+            "role": "assistant",
+            "tool_calls": [
+              {
+                "function": {
+                  "name": "FileWrite",
+                  "arguments": {
+                    "path": "range.go",
+                    "content": "package bugfixwithtests\n\nfunc InRange(items []string, idx int) bool {\n\treturn idx >= 0 && idx < len(items)\n}\n"
+                  }
+                }
+              },
+              {
+                "function": {
+                  "name": "FileWrite",
+                  "arguments": {
+                    "path": "range_test.go",
+                    "content": "package bugfixwithtests\n\nimport \"testing\"\n\nfunc TestInRangeValidIndex(t *testing.T) {\n\tif !InRange([]string{\"a\", \"b\"}, 1) {\n\t\tt.Fatal(\"expected index 1 to be in range\")\n\t}\n}\n\nfunc TestInRangeRejectsUpperBound(t *testing.T) {\n\tif InRange([]string{\"a\", \"b\"}, 2) {\n\t\tt.Fatal(\"expected upper bound index to be out of range\")\n\t}\n}\n"
+                  }
+                }
+              }
+            ]
+          }
+        },
+        {
+          "done": true,
+          "done_reason": "stop"
+        }
+      ]
+    },
+    {
+      "match": {
+        "latest_user_contains": "off-by-one range bug",
+        "required_tools": ["FileRead", "FileWrite", "Bash"]
+      },
+      "events": [
+        {
+          "message": {
+            "role": "assistant",
+            "tool_calls": [
+              {
+                "function": {
+                  "name": "Bash",
+                  "arguments": {
+                    "command": "go test ./...",
+                    "description": "Run fixture tests",
+                    "timeout_ms": 30000
+                  }
+                }
+              }
+            ]
+          }
+        },
+        {
+          "done": true,
+          "done_reason": "stop"
+        }
+      ]
+    },
+    {
+      "match": {
+        "latest_user_contains": "off-by-one range bug",
+        "required_tools": ["FileRead", "FileWrite", "Bash"]
+      },
+      "events": [
+        {
+          "message": {
+            "role": "assistant",
+            "content": "Fixed the range bug, added a regression test, and ran tests."
+          }
+        },
+        {
+          "done": true,
+          "done_reason": "stop"
+        }
+      ]
+    }
+  ]
+}

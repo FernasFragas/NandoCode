@@ -25,12 +25,14 @@ func (f *fakeTransport) ListTools(ctx context.Context) ([]ToolDescriptor, error)
 	copy(out, f.tools)
 	return out, nil
 }
+
 func (f *fakeTransport) CallTool(ctx context.Context, name string, input json.RawMessage) (CallResult, error) {
 	if f.callErr != nil {
 		return CallResult{}, f.callErr
 	}
 	return f.callValue, nil
 }
+
 func (f *fakeTransport) Close() error {
 	f.closed = true
 	return nil

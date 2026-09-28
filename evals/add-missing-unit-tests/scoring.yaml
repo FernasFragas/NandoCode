@@ -1,0 +1,56 @@
+version: 1
+id: add-missing-unit-tests
+description: Add table-driven tests without changing production code.
+tags:
+  - deterministic
+  - tests
+  - go
+execution:
+  timeout: 90s
+  max_turns: 12
+  max_tool_calls: 30
+  permission_mode: default
+  approval_strategy: allow
+model:
+  live:
+    temperature: 0
+  recorded:
+    recording: default
+tests:
+  - name: go-test
+    command: ["go", "test", "./..."]
+    timeout: 30s
+    required: true
+workspace:
+  allowed_changes:
+    - "mathutil_test.go"
+  required_changes:
+    - "mathutil_test.go"
+  forbidden_changes:
+    - "go.mod"
+    - "mathutil.go"
+  must_exist:
+    - "mathutil.go"
+    - "mathutil_test.go"
+  must_not_exist: []
+  max_changed_files: 1
+  max_diff_lines: 80
+golden:
+  compare: exact
+  files:
+    - "mathutil_test.go"
+checks:
+  final_answer_contains:
+    - "tests"
+  required_tools:
+    - FileRead
+    - FileWrite
+    - Bash
+  forbidden_tools: []
+weights:
+  task_completion: 0.15
+  tests: 0.40
+  expected_files: 0.25
+  change_scope: 0.15
+  final_answer: 0.05
+pass_threshold: 0.90

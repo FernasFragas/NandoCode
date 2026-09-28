@@ -7,8 +7,10 @@ import (
 	"github.com/FernasFragas/Nandocode/internal/tools"
 )
 
-const conservativeCharsPerToken = 4
-const renderedEvidenceOverheadTokenAllowance = 512
+const (
+	conservativeCharsPerToken              = 4
+	renderedEvidenceOverheadTokenAllowance = 512
+)
 
 func estimateRenderedEvidenceTokens(renderedPrompt string) int {
 	return estimateTokensFromChars(len(renderedPrompt))

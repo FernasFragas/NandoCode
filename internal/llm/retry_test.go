@@ -100,7 +100,6 @@ func TestRetryWithPolicy(t *testing.T) {
 			attempts++
 			return nil
 		})
-
 		if err != nil {
 			t.Errorf("expected nil error, got %v", err)
 		}

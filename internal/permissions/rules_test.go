@@ -28,12 +28,12 @@ func TestRulesEmpty(t *testing.T) {
 
 func TestMerge(t *testing.T) {
 	tests := []struct {
-		name     string
-		a        Rules
-		b        Rules
-		wantLen  int
-		wantDeny bool
-		wantAsk  bool
+		name      string
+		a         Rules
+		b         Rules
+		wantLen   int
+		wantDeny  bool
+		wantAsk   bool
 		wantAllow bool
 	}{
 		{

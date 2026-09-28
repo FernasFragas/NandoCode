@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/FernasFragas/Nandocode/internal/llm"
 	"github.com/FernasFragas/Nandocode/internal/llm/ollama"
 	"github.com/FernasFragas/Nandocode/internal/tools"
 	"github.com/FernasFragas/Nandocode/internal/tools/builtin"

@@ -46,6 +46,7 @@ func (blockingExtractClient) ListModels(context.Context) ([]llm.ModelInfo, error
 func (blockingExtractClient) ShowModel(context.Context, string) (llm.ModelDetails, error) {
 	return llm.ModelDetails{}, nil
 }
+
 func (blockingExtractClient) PullModel(context.Context, string, chan<- llm.PullProgress) error {
 	return nil
 }

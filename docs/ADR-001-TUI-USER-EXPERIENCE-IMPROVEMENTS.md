@@ -861,8 +861,8 @@ Status: Proposed addition (post-UI-1, can land in parallel with UI-2)
 
 ### Motivation
 
-Reference UI (Claude Code TUI, see screenshot in repo `docs/Screenshot 2026-05-16
-at 16.38.42.png`) demonstrates an information-dense yet readable activity area
+Reference UI (Claude Code TUI; the original screenshot was removed because it
+captured unrelated personal content) demonstrates an information-dense yet readable activity area
 that solves several problems the current nandocodego TUI still has even after
 UI-1 lands:
 

@@ -6,11 +6,11 @@ import (
 
 func TestParsePattern(t *testing.T) {
 	tests := []struct {
-		name         string
-		pattern      string
-		wantTool     string
-		wantGlob     string
-		wantOk       bool
+		name     string
+		pattern  string
+		wantTool string
+		wantGlob string
+		wantOk   bool
 	}{
 		{"SimpleBash", "Bash(ls*)", "Bash", "ls*", true},
 		{"FileRead", "FileRead(docs/**)", "FileRead", "docs/**", true},

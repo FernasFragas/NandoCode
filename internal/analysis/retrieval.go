@@ -14,7 +14,7 @@ type FrecencyScorer interface {
 
 // RetrieveTopFiles ranks files for broad analysis prompts.
 // Explicit mentions should still outrank this retrieval in caller flow.
-func RetrieveTopFiles(entries []fileindex.Entry, question string, rootHint string, freq FrecencyScorer, limit int) []string {
+func RetrieveTopFiles(entries []fileindex.Entry, question, rootHint string, freq FrecencyScorer, limit int) []string {
 	if limit <= 0 || len(entries) == 0 {
 		return nil
 	}

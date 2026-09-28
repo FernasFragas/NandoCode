@@ -30,6 +30,7 @@ func (f *fakeClient) ListModels(context.Context) ([]llm.ModelInfo, error) {
 	copy(out, f.models)
 	return out, nil
 }
+
 func (f *fakeClient) ShowModel(context.Context, string) (llm.ModelDetails, error) {
 	return llm.ModelDetails{}, nil
 }

@@ -78,9 +78,11 @@ type keyringStore struct{}
 func (keyringStore) Get(service, account string) (string, error) {
 	return keyring.Get(service, account)
 }
+
 func (keyringStore) Set(service, account, secret string) error {
 	return keyring.Set(service, account, secret)
 }
+
 func (keyringStore) Delete(service, account string) error {
 	return keyring.Delete(service, account)
 }

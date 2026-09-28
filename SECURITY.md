@@ -17,8 +17,12 @@ automation tool rather than a sandbox.
   until the project trust model is complete.
 - MCP servers should be configured only from trusted sources. Untrusted servers
   can expose tool descriptions or data that influence model behavior.
-- `nandocodego server` binds to `127.0.0.1:8080` by default. Use `--token` when
-  exposing it beyond a local-only development environment.
+- `nandocodego server` binds to `127.0.0.1:8080` by default. The `/v1` API
+  always requires a bearer token: pass `--token`, or let the server generate
+  one and print a launch URL (`http://127.0.0.1:8080/#token=...`) to the
+  terminal. Binding beyond loopback requires an explicit `--token`. On
+  loopback the server also rejects non-loopback `Host` headers (DNS
+  rebinding), cross-origin browser requests, and non-JSON API request bodies.
 - Direct Ollama Cloud access is opt-in through model selection and credentials.
 
 ## Credential Handling

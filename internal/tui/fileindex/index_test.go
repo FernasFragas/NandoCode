@@ -79,7 +79,7 @@ func containsRel(entries []Entry, want string) bool {
 	return false
 }
 
-func mustWriteFile(t *testing.T, path string, content string) {
+func mustWriteFile(t *testing.T, path, content string) {
 	t.Helper()
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 		t.Fatal(err)

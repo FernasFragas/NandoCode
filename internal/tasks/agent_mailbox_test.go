@@ -36,6 +36,7 @@ func (c *mailboxFakeClient) Chat(ctx context.Context, req *llm.ChatRequest) (<-c
 	close(ch)
 	return ch, nil
 }
+
 func (c *mailboxFakeClient) Embed(ctx context.Context, model string, input []string) ([][]float32, error) {
 	return nil, nil
 }
@@ -43,6 +44,7 @@ func (c *mailboxFakeClient) ListModels(ctx context.Context) ([]llm.ModelInfo, er
 func (c *mailboxFakeClient) ShowModel(ctx context.Context, name string) (llm.ModelDetails, error) {
 	return llm.ModelDetails{}, nil
 }
+
 func (c *mailboxFakeClient) PullModel(ctx context.Context, name string, progress chan<- llm.PullProgress) error {
 	return nil
 }

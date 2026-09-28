@@ -61,23 +61,13 @@ func TestDoctorCommandOutput(t *testing.T) {
 }
 
 func TestDoctorFailsWhenSecurityBaselineMissing(t *testing.T) {
-	cwd, err := os.Getwd()
-	if err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() {
-		if err := os.Chdir(cwd); err != nil {
-			t.Fatal(err)
-		}
-	})
-
 	dir := t.TempDir()
 	if err := os.WriteFile(filepath.Join(dir, "go.mod"), []byte("module test\n"), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.Chdir(dir); err != nil {
-		t.Fatal(err)
-	}
+	// t.Chdir restores the previous directory before TempDir is removed;
+	// Windows cannot delete a process's current directory.
+	t.Chdir(dir)
 
 	cmd := NewRootCmd()
 	var out bytes.Buffer

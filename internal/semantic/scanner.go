@@ -292,14 +292,14 @@ func ScanWorkspace(ctx context.Context, opts ScanOptions) (ScanResult, error) {
 		}
 
 		go func() {
+			defer close(jobs)
 			for _, task := range tasks {
 				select {
 				case <-ctx.Done():
-					break
+					return
 				case jobs <- task:
 				}
 			}
-			close(jobs)
 		}()
 
 		results := make([]fileOutcome, len(tasks))

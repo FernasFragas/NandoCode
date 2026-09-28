@@ -1,0 +1,126 @@
+{
+  "version": 1,
+  "model": "recorded/add-input-validation",
+  "strict": true,
+  "turns": [
+    {
+      "match": {
+        "latest_user_contains": "Add input validation",
+        "required_tools": ["FileRead", "FileWrite", "Bash"]
+      },
+      "events": [
+        {
+          "message": {
+            "role": "assistant",
+            "tool_calls": [
+              {
+                "function": {
+                  "name": "FileRead",
+                  "arguments": {
+                    "path": "service.go"
+                  }
+                }
+              },
+              {
+                "function": {
+                  "name": "FileRead",
+                  "arguments": {
+                    "path": "service_test.go"
+                  }
+                }
+              }
+            ]
+          }
+        },
+        {
+          "done": true,
+          "done_reason": "stop"
+        }
+      ]
+    },
+    {
+      "match": {
+        "latest_user_contains": "Add input validation",
+        "required_tools": ["FileRead", "FileWrite", "Bash"]
+      },
+      "events": [
+        {
+          "message": {
+            "role": "assistant",
+            "tool_calls": [
+              {
+                "function": {
+                  "name": "FileWrite",
+                  "arguments": {
+                    "path": "service.go",
+                    "content": "package addinputvalidation\n\nimport (\n\t\"fmt\"\n\t\"strings\"\n)\n\ntype User struct {\n\tName string\n}\n\nfunc BuildUser(name string) (User, error) {\n\tname = strings.TrimSpace(name)\n\tif name == \"\" {\n\t\treturn User{}, fmt.Errorf(\"name is required\")\n\t}\n\treturn User{Name: name}, nil\n}\n"
+                  }
+                }
+              },
+              {
+                "function": {
+                  "name": "FileWrite",
+                  "arguments": {
+                    "path": "service_test.go",
+                    "content": "package addinputvalidation\n\nimport \"testing\"\n\nfunc TestBuildUserPreservesName(t *testing.T) {\n\tuser, err := BuildUser(\"nando\")\n\tif err != nil {\n\t\tt.Fatal(err)\n\t}\n\tif user.Name != \"nando\" {\n\t\tt.Fatalf(\"got %q want %q\", user.Name, \"nando\")\n\t}\n}\n\nfunc TestBuildUserRejectsBlankName(t *testing.T) {\n\tif _, err := BuildUser(\"   \"); err == nil {\n\t\tt.Fatal(\"expected blank name error\")\n\t}\n}\n"
+                  }
+                }
+              }
+            ]
+          }
+        },
+        {
+          "done": true,
+          "done_reason": "stop"
+        }
+      ]
+    },
+    {
+      "match": {
+        "latest_user_contains": "Add input validation",
+        "required_tools": ["FileRead", "FileWrite", "Bash"]
+      },
+      "events": [
+        {
+          "message": {
+            "role": "assistant",
+            "tool_calls": [
+              {
+                "function": {
+                  "name": "Bash",
+                  "arguments": {
+                    "command": "go test ./...",
+                    "description": "Run fixture tests",
+                    "timeout_ms": 30000
+                  }
+                }
+              }
+            ]
+          }
+        },
+        {
+          "done": true,
+          "done_reason": "stop"
+        }
+      ]
+    },
+    {
+      "match": {
+        "latest_user_contains": "Add input validation",
+        "required_tools": ["FileRead", "FileWrite", "Bash"]
+      },
+      "events": [
+        {
+          "message": {
+            "role": "assistant",
+            "content": "Added input validation, updated tests, and ran tests."
+          }
+        },
+        {
+          "done": true,
+          "done_reason": "stop"
+        }
+      ]
+    }
+  ]
+}

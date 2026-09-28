@@ -24,7 +24,7 @@ The point is not to hide the engineer behind the tools. It is to show what one e
 
 **Current Version:** v0.0.0-dev (Phase 29 complete; Phase 25 remote/bridge mode next)
 
-This project is under active development. For current roadmap order, read [Next Phases Implementation Plan](docs/NEXT-PHASES-IMPLEMENTATION-PLAN.md) first, then [Project Status and Engineer Onboarding](docs/PROJECT-STATUS-AND-ONBOARDING.md) and [Phase Log](docs/PHASE-LOG.md). The original [.codex implementation plan](.codex/go-ollama-plan-AGENTS.md) is historical reference material, not the current launch-status source.
+This project is under active development. For current roadmap order, read [Next Phases Implementation Plan](docs/NEXT-PHASES-IMPLEMENTATION-PLAN.md) first, then [Project Status and Engineer Onboarding](docs/PROJECT-STATUS-AND-ONBOARDING.md) and [Phase Log](docs/PHASE-LOG.md). Earlier internal implementation plans are historical reference material, not the current launch-status source.
 
 ### Completed Phases
 
@@ -167,6 +167,53 @@ In the TUI, use:
 The index uses the configured embedding model (`qwen3-embedding:8b` by default)
 and stores cache data outside the project source tree.
 
+## Evaluation Framework
+
+Run the deterministic coding-task fixture suite:
+
+```bash
+nandocodego eval run ./evals
+```
+
+Validate fixture structure without executing any agent run:
+
+```bash
+nandocodego eval validate ./evals
+```
+
+Run the same fixture set against a live configured model:
+
+```bash
+nandocodego eval run ./evals --provider live --model qwen3.6:35b
+```
+
+Eval artifacts are emitted as JSON and Markdown under `.tmp-evals/`.
+
+Example report summary:
+
+```markdown
+# NandoCode Evaluation Report
+
+| Metric | Value |
+| --- | ---: |
+| Fixtures | 5 |
+| Passed | 5 |
+| Failed | 0 |
+| Errors | 0 |
+| Aggregate score | 1.00 |
+
+| Fixture | Status | Score | Tests | Files | Tools | Approvals | Runtime |
+| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| add-input-validation | passed | 1.00 | 1/1 | 2 | 5 | 2 | 1586ms |
+| add-missing-unit-tests | passed | 1.00 | 1/1 | 1 | 4 | 1 | 666ms |
+| basic-refactor | passed | 1.00 | 1/1 | 1 | 3 | 1 | 570ms |
+| bugfix-with-tests | passed | 1.00 | 1/1 | 2 | 5 | 2 | 581ms |
+| rename-symbol-safely | passed | 1.00 | 1/1 | 2 | 5 | 2 | 587ms |
+```
+
+Review third-party fixtures before running them. They can execute code inside a
+temporary workspace during evaluation.
+
 ## Ollama Cloud API Support
 
 `nandocodego` stays local-first by default. Local models and `/pull` continue to use your configured local Ollama daemon.
@@ -218,12 +265,11 @@ See [SECURITY.md](SECURITY.md) for:
 - [Application Architecture Flowchart](docs/APPLICATION-ARCHITECTURE-FLOWCHART.md) - Detailed Mermaid flowcharts for the CLI, TUI, server, agent, tools, context, retrieval, storage, and observability architecture
 - [Remaining Phases Task Review](docs/REMAINING-PHASES-TASK-REVIEW.md) - Reviewed task detail, blockers, and evidence requirements for active gates
 - [Phase Log](docs/PHASE-LOG.md) - Historical implementation record and acceptance evidence
-- [Historical Implementation Plan](.codex/go-ollama-plan-AGENTS.md) - Original phase architecture; superseded for current roadmap order by the Next Phases plan
 - [Docker Usage](README.Docker.md) - Docker and container deployment guide
 
 ## Architecture
 
-![ Whole-Application.png](%20Whole-Application.png)
+![Whole-application architecture](Whole-Application.png)
 
 `nandocodego` is built around six core abstractions:
 

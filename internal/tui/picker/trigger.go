@@ -1,9 +1,10 @@
 package picker
 
 import (
-	"github.com/FernasFragas/Nandocode/internal/mentions"
 	"strings"
 	"unicode"
+
+	"github.com/FernasFragas/Nandocode/internal/mentions"
 )
 
 // Context describes the active trigger token under cursor.

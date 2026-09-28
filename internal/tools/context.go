@@ -26,32 +26,32 @@ const (
 
 // Context carries execution state shared across tool calls.
 type Context struct {
-	Context               context.Context
-	Logger                *slog.Logger
-	WorkingDir            string
-	AdditionalWorkingDirs []string
-	Env                   []string
-	BashTimeout           time.Duration
-	MaxResultChars        int
-	MaxReadChars          int
-	MaxDirFiles           int
-	MaxPromptFiles        int
-	MaxDirBytes           int64
-	MaxPromptBytes        int64
-	MaxDirDepth           int
-	MentionDirectorySource string
+	Context                            context.Context
+	Logger                             *slog.Logger
+	WorkingDir                         string
+	AdditionalWorkingDirs              []string
+	Env                                []string
+	BashTimeout                        time.Duration
+	MaxResultChars                     int
+	MaxReadChars                       int
+	MaxDirFiles                        int
+	MaxPromptFiles                     int
+	MaxDirBytes                        int64
+	MaxPromptBytes                     int64
+	MaxDirDepth                        int
+	MentionDirectorySource             string
 	MentionIncludeGitignoredOnExplicit bool
-	PromptDumpMode         string
-	PromptDumpKeep         int
-	PromptPreviewChars     int
-	PermissionMode        PermissionMode
-	IsSubagent            bool
-	RecordFileSnapshot    func(path string, content []byte)
-	ReadFileSnapshot      func(path string) ([]byte, bool)
-	RecordFileRangeSnapshot func(path string, startLine, lineCount int, mtimeUnixNano int64, content []byte)
-	ReadFileRangeSnapshot   func(path string, startLine, lineCount int, mtimeUnixNano int64) ([]byte, bool)
-	AllowLocalFetch       bool
-	TodoList              any // *todo.TodoList; any to avoid import cycle
+	PromptDumpMode                     string
+	PromptDumpKeep                     int
+	PromptPreviewChars                 int
+	PermissionMode                     PermissionMode
+	IsSubagent                         bool
+	RecordFileSnapshot                 func(path string, content []byte)
+	ReadFileSnapshot                   func(path string) ([]byte, bool)
+	RecordFileRangeSnapshot            func(path string, startLine, lineCount int, mtimeUnixNano int64, content []byte)
+	ReadFileRangeSnapshot              func(path string, startLine, lineCount int, mtimeUnixNano int64) ([]byte, bool)
+	AllowLocalFetch                    bool
+	TodoList                           any // *todo.TodoList; any to avoid import cycle
 }
 
 // DefaultContext builds a conservative tool context for a working directory.
@@ -68,24 +68,24 @@ func DefaultContext(ctx context.Context, workingDir string) Context {
 		workingDir = abs
 	}
 	return Context{
-		Context:        ctx,
-		Logger:         slog.Default(),
-		WorkingDir:     workingDir,
-		Env:            os.Environ(),
-		BashTimeout:    defaultBashTimeout,
-		MaxResultChars: defaultMaxResultChars,
-		MaxReadChars:   defaultMaxReadChars,
-		MaxDirFiles:    defaultMaxDirFiles,
-		MaxPromptFiles: defaultMaxPromptFiles,
-		MaxDirBytes:    defaultMaxDirBytes,
-		MaxPromptBytes: defaultMaxPromptBytes,
-		MaxDirDepth:    defaultMaxDirDepth,
-		MentionDirectorySource: "auto",
+		Context:                            ctx,
+		Logger:                             slog.Default(),
+		WorkingDir:                         workingDir,
+		Env:                                os.Environ(),
+		BashTimeout:                        defaultBashTimeout,
+		MaxResultChars:                     defaultMaxResultChars,
+		MaxReadChars:                       defaultMaxReadChars,
+		MaxDirFiles:                        defaultMaxDirFiles,
+		MaxPromptFiles:                     defaultMaxPromptFiles,
+		MaxDirBytes:                        defaultMaxDirBytes,
+		MaxPromptBytes:                     defaultMaxPromptBytes,
+		MaxDirDepth:                        defaultMaxDirDepth,
+		MentionDirectorySource:             "auto",
 		MentionIncludeGitignoredOnExplicit: true,
-		PromptDumpMode: "off",
-		PromptDumpKeep: 10,
-		PromptPreviewChars: 600,
-		PermissionMode: PermissionDefault,
+		PromptDumpMode:                     "off",
+		PromptDumpKeep:                     10,
+		PromptPreviewChars:                 600,
+		PermissionMode:                     PermissionDefault,
 	}
 }
 

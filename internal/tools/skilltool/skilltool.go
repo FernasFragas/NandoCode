@@ -40,6 +40,7 @@ func (t *Tool) JSONSchema() map[string]any {
 		"required": []string{"name"},
 	}
 }
+
 func (t *Tool) UnmarshalInput(raw json.RawMessage) (any, error) {
 	var in Input
 	if err := json.Unmarshal(raw, &in); err != nil {
@@ -57,6 +58,7 @@ func (t *Tool) IsDestructive(input any) bool     { return true }
 func (t *Tool) CheckPermissions(ctx tools.Context, input any) tools.PermissionResult {
 	return tools.PermissionResult{Decision: tools.PermAllow, UpdatedInput: input}
 }
+
 func (t *Tool) Call(ctx tools.Context, input any, progress chan<- tools.ProgressEvent) (tools.Result, error) {
 	if t.loader == nil {
 		return tools.Result{}, fmt.Errorf("skill loader is not configured")
@@ -82,6 +84,7 @@ func (t *Tool) Call(ctx tools.Context, input any, progress chan<- tools.Progress
 	display := fmt.Sprintf("Skill loaded: %s\nSource: %s\n\nThe following behavioral context has been adopted for this session:\n\n%s", sf.Name, sf.Source.String(), body)
 	return tools.Result{Display: display}, nil
 }
+
 func (t *Tool) Render(input any, result tools.Result) tools.RenderHints {
 	return tools.RenderHints{Title: "Skill", Summary: "skill context loaded"}
 }

@@ -37,7 +37,7 @@ func Dot(a, b []float32) (float32, error) {
 	return out, nil
 }
 
-func ValidateVectorSet(vs VectorSet, expectedDimensions int, expectedCount int) error {
+func ValidateVectorSet(vs VectorSet, expectedDimensions, expectedCount int) error {
 	if vs.Dimensions <= 0 {
 		return fmt.Errorf("vector set dimensions must be > 0")
 	}
@@ -76,7 +76,7 @@ func WriteF32File(path string, vectors [][]float32, dimensions int) error {
 	return nil
 }
 
-func LoadF32File(path string, dimensions int, expectedCount int) ([][]float32, error) {
+func LoadF32File(path string, dimensions, expectedCount int) ([][]float32, error) {
 	if dimensions <= 0 {
 		return nil, fmt.Errorf("dimensions must be > 0")
 	}

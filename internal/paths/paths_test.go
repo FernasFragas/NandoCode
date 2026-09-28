@@ -63,6 +63,7 @@ func TestDataDirLocalShareFallback(t *testing.T) {
 	t.Setenv("XDG_DATA_HOME", "")
 	home := t.TempDir()
 	t.Setenv("HOME", home)
+	t.Setenv("USERPROFILE", home) // os.UserHomeDir reads USERPROFILE on Windows
 	if err := os.MkdirAll(filepath.Join(home, ".local", "share"), 0o700); err != nil {
 		t.Fatal(err)
 	}

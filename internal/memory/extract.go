@@ -28,14 +28,14 @@ func ExtractDrafts(ctx context.Context, client llm.Client, cfg Config, conversat
 		if strings.TrimSpace(m.Content) == "" {
 			continue
 		}
-		convo.WriteString(fmt.Sprintf("%s: %s\n", m.Role, m.Content))
+		fmt.Fprintf(&convo, "%s: %s\n", m.Role, m.Content)
 	}
 	if convo.Len() == 0 {
 		return nil, nil
 	}
 	var known strings.Builder
 	for _, e := range manifest {
-		known.WriteString(fmt.Sprintf("- %s: %s\n", e.Filename, e.Description))
+		fmt.Fprintf(&known, "- %s: %s\n", e.Filename, e.Description)
 	}
 	req := &llm.ChatRequest{
 		Model: cfg.Model,

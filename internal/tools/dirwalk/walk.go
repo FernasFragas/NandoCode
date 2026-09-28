@@ -58,15 +58,15 @@ type Entry struct {
 }
 
 type Stats struct {
-	FileCount             int
-	DirCount              int
-	ByteCount             int64
-	Truncated             bool
-	Reason                string
-	Source                string
-	IgnoredByGit          int
-	TotalFilesystemFiles  int
-	TotalFilesystemDirs   int
+	FileCount            int
+	DirCount             int
+	ByteCount            int64
+	Truncated            bool
+	Reason               string
+	Source               string
+	IgnoredByGit         int
+	TotalFilesystemFiles int
+	TotalFilesystemDirs  int
 }
 
 func DefaultExcludes() []string {
@@ -151,16 +151,16 @@ func Walk(ctx context.Context, root string, opts Options) ([]Entry, Stats, error
 }
 
 type walker struct {
-	root           string
-	opts           Options
-	excludedDir    map[string]struct{}
-	entriesByRel   map[string]Entry
-	files          int
-	bytes          int64
-	truncated      bool
-	truncatedCause string
-	source         string
-	ignoredByGit   int
+	root                 string
+	opts                 Options
+	excludedDir          map[string]struct{}
+	entriesByRel         map[string]Entry
+	files                int
+	bytes                int64
+	truncated            bool
+	truncatedCause       string
+	source               string
+	ignoredByGit         int
 	totalFilesystemFiles int
 	totalFilesystemDirs  int
 }

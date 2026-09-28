@@ -233,14 +233,13 @@ func stripHTML(r io.Reader) string {
 		switch tt {
 		case html.StartTagToken, html.SelfClosingTagToken:
 			name, _ := z.TagName()
-			tag := string(name)
-			if skipTags[tag] {
+			if skipTags[string(name)] {
 				if tt == html.StartTagToken {
 					inSkip = true
 					skipDepth++
 				}
 			}
-			if breakTags[tag] && !inSkip {
+			if breakTags[string(name)] && !inSkip {
 				if b.Len() > 0 {
 					last := b.String()
 					if !strings.HasSuffix(last, "\n\n") {
@@ -250,15 +249,14 @@ func stripHTML(r io.Reader) string {
 			}
 		case html.EndTagToken:
 			name, _ := z.TagName()
-			tag := string(name)
-			if skipTags[tag] && inSkip {
+			if skipTags[string(name)] && inSkip {
 				skipDepth--
 				if skipDepth <= 0 {
 					skipDepth = 0
 					inSkip = false
 				}
 			}
-			if breakTags[tag] && !inSkip {
+			if breakTags[string(name)] && !inSkip {
 				if !strings.HasSuffix(b.String(), "\n\n") {
 					b.WriteString("\n\n")
 				}
