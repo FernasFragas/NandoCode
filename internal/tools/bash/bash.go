@@ -192,12 +192,16 @@ func call(ctx tools.Context, input any, progress chan<- tools.ProgressEvent) (to
 	exitCode := 0
 	if waitErr != nil {
 		var exitErr *exec.ExitError
-		if errors.As(waitErr, &exitErr) {
-			exitCode = exitErr.ExitCode()
-		} else if errors.Is(cmdCtx.Err(), context.DeadlineExceeded) || errors.Is(cmdCtx.Err(), context.Canceled) {
+		switch {
+		// Check the context first: a process killed on timeout or cancel reports
+		// exit code -1 on Unix but 1 on Windows, so its exit status alone cannot
+		// tell a timeout from an ordinary failure.
+		case errors.Is(cmdCtx.Err(), context.DeadlineExceeded) || errors.Is(cmdCtx.Err(), context.Canceled):
 			exitCode = -1
 			stderrBuf.WriteString(cmdCtx.Err().Error())
-		} else {
+		case errors.As(waitErr, &exitErr):
+			exitCode = exitErr.ExitCode()
+		default:
 			return tools.Result{}, waitErr
 		}
 	}

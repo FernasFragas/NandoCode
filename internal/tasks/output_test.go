@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"runtime"
 	"sync"
 	"testing"
 )
@@ -44,14 +45,16 @@ func TestOutputWriterAndTailLines(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got := st.Mode().Perm(); got != 0o600 {
+	// Windows has no Unix permission bits (files report 0666); access comes
+	// from the ACL inherited from the user's profile directory.
+	if got := st.Mode().Perm(); runtime.GOOS != "windows" && got != 0o600 {
 		t.Fatalf("expected 0600 file mode, got %o", got)
 	}
 	dirSt, err := os.Stat(filepath.Dir(path))
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got := dirSt.Mode().Perm(); got != 0o700 {
+	if got := dirSt.Mode().Perm(); runtime.GOOS != "windows" && got != 0o700 {
 		t.Fatalf("expected 0700 dir mode, got %o", got)
 	}
 }

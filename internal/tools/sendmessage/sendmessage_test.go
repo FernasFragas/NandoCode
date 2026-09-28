@@ -7,6 +7,7 @@ import (
 	"net"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -81,7 +82,13 @@ func TestSendMessageRejectsUnknownTarget(t *testing.T) {
 }
 
 func TestSendMessageUDS(t *testing.T) {
-	stateRoot, err := os.MkdirTemp("/tmp", "sm-state-")
+	// Unix socket paths are length-limited (104 bytes on macOS), so use the
+	// short /tmp instead of t.TempDir(); Windows has no /tmp.
+	base := "/tmp"
+	if runtime.GOOS == "windows" {
+		base = os.TempDir()
+	}
+	stateRoot, err := os.MkdirTemp(base, "sm-state-")
 	if err != nil {
 		t.Fatal(err)
 	}

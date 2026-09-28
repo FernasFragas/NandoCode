@@ -5,6 +5,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"runtime"
 	"sync"
 	"testing"
 	"time"
@@ -307,7 +308,8 @@ func TestSupervisorQueueMessagePersistsMailboxJSONL(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got := st.Mode().Perm(); got != 0o600 {
+	// Windows has no Unix permission bits (files report 0666).
+	if got := st.Mode().Perm(); runtime.GOOS != "windows" && got != 0o600 {
 		t.Fatalf("mailbox mode=%o want=600", got)
 	}
 	if err := s.Stop(id); err != nil {

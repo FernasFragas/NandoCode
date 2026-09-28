@@ -10,14 +10,27 @@ import (
 
 type fakeRunner struct {
 	events []agent.Event
+	// gap, when set, spaces events out so latencies are measurable on coarse
+	// clocks: Windows advances its monotonic clock in ticks of up to ~15.6ms.
+	gap time.Duration
 }
 
 func (f *fakeRunner) Run(context.Context, agent.Input) <-chan agent.Event {
 	ch := make(chan agent.Event, len(f.events))
-	for _, e := range f.events {
-		ch <- e
+	if f.gap == 0 {
+		for _, e := range f.events {
+			ch <- e
+		}
+		close(ch)
+		return ch
 	}
-	close(ch)
+	go func() {
+		defer close(ch)
+		for _, e := range f.events {
+			time.Sleep(f.gap)
+			ch <- e
+		}
+	}()
 	return ch
 }
 
@@ -80,6 +93,7 @@ func TestRunnerDecoratorRecordsRetryNotices(t *testing.T) {
 			agent.RetryNotice{Kind: "incomplete_assistant_response", Cause: "incomplete", DoneReason: "stop"},
 			agent.Terminal{Reason: agent.TerminalCompleted, Usage: agent.Usage{Turns: 1, DoneReason: "stop"}},
 		},
+		gap: 20 * time.Millisecond,
 	}, m, nil)
 
 	for range r.Run(context.Background(), agent.Input{

@@ -14,7 +14,10 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var runPrintFn = runPrint
+var (
+	runPrintFn = runPrint
+	runREPLFn  = runREPL
+)
 
 // NewRootCmd creates the root command for the CLI.
 func NewRootCmd() *cobra.Command {
@@ -73,7 +76,7 @@ Features:
 				return cmd.Help()
 			}
 			// No args: run REPL
-			return runREPL(cmd.Context(), cmd, replOptions{
+			return runREPLFn(cmd.Context(), cmd, replOptions{
 				model:                     opts.model,
 				ollamaURL:                 opts.ollamaURL,
 				noAltScreen:               opts.noAltScreen,
