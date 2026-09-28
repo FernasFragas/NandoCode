@@ -112,6 +112,7 @@ Features:
 	rootCmd.AddCommand(newInitCmd())
 	rootCmd.AddCommand(newIndexCmd())
 	rootCmd.AddCommand(newServerCmd())
+	rootCmd.AddCommand(newEvalCmd())
 
 	return rootCmd
 }

@@ -1,0 +1,109 @@
+{
+  "version": 1,
+  "model": "recorded/basic-refactor",
+  "strict": true,
+  "turns": [
+    {
+      "match": {
+        "latest_user_contains": "duplicated integer parsing logic",
+        "required_tools": ["FileRead", "FileWrite", "Bash"]
+      },
+      "events": [
+        {
+          "message": {
+            "role": "assistant",
+            "tool_calls": [
+              {
+                "function": {
+                  "name": "FileRead",
+                  "arguments": {
+                    "path": "parser.go"
+                  }
+                }
+              }
+            ]
+          }
+        },
+        {
+          "done": true,
+          "done_reason": "stop"
+        }
+      ]
+    },
+    {
+      "match": {
+        "latest_user_contains": "duplicated integer parsing logic",
+        "required_tools": ["FileRead", "FileWrite", "Bash"]
+      },
+      "events": [
+        {
+          "message": {
+            "role": "assistant",
+            "tool_calls": [
+              {
+                "function": {
+                  "name": "FileWrite",
+                  "arguments": {
+                    "path": "parser.go",
+                    "content": "package basicrefactor\n\nimport (\n\t\"fmt\"\n\t\"strconv\"\n\t\"strings\"\n)\n\nfunc ParseLimit(value string) (int, error) {\n\treturn parseNonNegative(value, \"limit\")\n}\n\nfunc ParseOffset(value string) (int, error) {\n\treturn parseNonNegative(value, \"offset\")\n}\n\nfunc parseNonNegative(value string, field string) (int, error) {\n\tvalue = strings.TrimSpace(value)\n\tif value == \"\" {\n\t\treturn 0, fmt.Errorf(\"%s is required\", field)\n\t}\n\tn, err := strconv.Atoi(value)\n\tif err != nil {\n\t\treturn 0, fmt.Errorf(\"invalid %s: %w\", field, err)\n\t}\n\tif n < 0 {\n\t\treturn 0, fmt.Errorf(\"%s must be >= 0\", field)\n\t}\n\treturn n, nil\n}\n"
+                  }
+                }
+              }
+            ]
+          }
+        },
+        {
+          "done": true,
+          "done_reason": "stop"
+        }
+      ]
+    },
+    {
+      "match": {
+        "latest_user_contains": "duplicated integer parsing logic",
+        "required_tools": ["FileRead", "FileWrite", "Bash"]
+      },
+      "events": [
+        {
+          "message": {
+            "role": "assistant",
+            "tool_calls": [
+              {
+                "function": {
+                  "name": "Bash",
+                  "arguments": {
+                    "command": "go test ./...",
+                    "description": "Run fixture tests",
+                    "timeout_ms": 30000
+                  }
+                }
+              }
+            ]
+          }
+        },
+        {
+          "done": true,
+          "done_reason": "stop"
+        }
+      ]
+    },
+    {
+      "match": {
+        "latest_user_contains": "duplicated integer parsing logic",
+        "required_tools": ["FileRead", "FileWrite", "Bash"]
+      },
+      "events": [
+        {
+          "message": {
+            "role": "assistant",
+            "content": "Refactored the duplicated parser logic and ran tests."
+          }
+        },
+        {
+          "done": true,
+          "done_reason": "stop"
+        }
+      ]
+    }
+  ]
+}

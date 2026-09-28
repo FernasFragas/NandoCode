@@ -6,6 +6,7 @@
 
 .gocache/
 .tmp-config/
+.tmp-evals/
 .tmp-regression/
 dist/
 

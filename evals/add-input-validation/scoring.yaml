@@ -1,0 +1,58 @@
+version: 1
+id: add-input-validation
+description: Add validation and tests for user input handling.
+tags:
+  - deterministic
+  - validation
+  - go
+execution:
+  timeout: 90s
+  max_turns: 12
+  max_tool_calls: 30
+  permission_mode: default
+  approval_strategy: allow
+model:
+  live:
+    temperature: 0
+  recorded:
+    recording: default
+tests:
+  - name: go-test
+    command: ["go", "test", "./..."]
+    timeout: 30s
+    required: true
+workspace:
+  allowed_changes:
+    - "service.go"
+    - "service_test.go"
+  required_changes:
+    - "service.go"
+    - "service_test.go"
+  forbidden_changes:
+    - "go.mod"
+  must_exist:
+    - "service.go"
+    - "service_test.go"
+  must_not_exist: []
+  max_changed_files: 2
+  max_diff_lines: 90
+golden:
+  compare: exact
+  files:
+    - "service.go"
+    - "service_test.go"
+checks:
+  final_answer_contains:
+    - "tests"
+  required_tools:
+    - FileRead
+    - FileWrite
+    - Bash
+  forbidden_tools: []
+weights:
+  task_completion: 0.15
+  tests: 0.40
+  expected_files: 0.25
+  change_scope: 0.15
+  final_answer: 0.05
+pass_threshold: 0.90

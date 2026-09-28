@@ -30,6 +30,13 @@ func TestRootCommandHasDoctor(t *testing.T) {
 	}
 }
 
+func TestRootCommandHasEval(t *testing.T) {
+	cmd := NewRootCmd()
+	if _, _, err := cmd.Find([]string{"eval"}); err != nil {
+		t.Fatal(err)
+	}
+}
+
 func TestRootCommandNoArgsShowsHelp(t *testing.T) {
 	cmd := NewRootCmd()
 	var out bytes.Buffer

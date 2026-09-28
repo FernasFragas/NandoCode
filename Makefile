@@ -1,4 +1,4 @@
-.PHONY: build test test-race test-integration test-e2e lint fmt fmt-check vet security verify-phase-0 tidy install clean vendor check help docker-build docker-run docker-run-daemon docker-stop docker-clean docker-shell docker-compose-up docker-compose-down docker-compose-logs regression-fast regression-full load-suite regression-report
+.PHONY: build test test-race test-integration test-e2e lint fmt fmt-check vet security verify-phase-0 tidy install clean vendor check help docker-build docker-run docker-run-daemon docker-stop docker-clean docker-shell docker-compose-up docker-compose-down docker-compose-logs regression-fast regression-full load-suite regression-report eval eval-ci eval-validate
 
 # Variables
 BINARY_NAME=nandocodego
@@ -54,6 +54,9 @@ help:
 	@echo "  regression-full  Run full regression gate from docs plan"
 	@echo "  load-suite       Run load/perf test suite from docs plan"
 	@echo "  regression-report Run all automated gates and generate markdown report"
+	@echo "  eval             Run deterministic eval fixtures"
+	@echo "  eval-ci          Run deterministic eval fixtures and write CI artifacts"
+	@echo "  eval-validate    Validate eval fixtures without executing them"
 	@echo ""
 	@echo "Docker targets:"
 	@echo "  docker-build     Build Docker image"
@@ -219,6 +222,18 @@ load-suite:
 ## regression-report: Run all automated gates and generate markdown report artifact
 regression-report:
 	@tools/run-regression-report.sh
+
+## eval: Run deterministic eval fixtures
+eval: build
+	./bin/nandocodego eval run ./evals
+
+## eval-ci: Run deterministic eval fixtures and write CI artifacts
+eval-ci: build
+	./bin/nandocodego eval run ./evals --output-dir .tmp-evals/ci --fail-under 1.0
+
+## eval-validate: Validate eval fixtures without executing them
+eval-validate: build
+	./bin/nandocodego eval validate ./evals
 
 ## docker-build: Build Docker image
 docker-build:

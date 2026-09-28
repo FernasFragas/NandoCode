@@ -1,0 +1,117 @@
+{
+  "version": 1,
+  "model": "recorded/add-missing-unit-tests",
+  "strict": true,
+  "turns": [
+    {
+      "match": {
+        "latest_user_contains": "table-driven unit tests",
+        "required_tools": ["FileRead", "FileWrite", "Bash"]
+      },
+      "events": [
+        {
+          "message": {
+            "role": "assistant",
+            "tool_calls": [
+              {
+                "function": {
+                  "name": "FileRead",
+                  "arguments": {
+                    "path": "mathutil.go"
+                  }
+                }
+              },
+              {
+                "function": {
+                  "name": "FileRead",
+                  "arguments": {
+                    "path": "mathutil_test.go"
+                  }
+                }
+              }
+            ]
+          }
+        },
+        {
+          "done": true,
+          "done_reason": "stop"
+        }
+      ]
+    },
+    {
+      "match": {
+        "latest_user_contains": "table-driven unit tests",
+        "required_tools": ["FileRead", "FileWrite", "Bash"]
+      },
+      "events": [
+        {
+          "message": {
+            "role": "assistant",
+            "tool_calls": [
+              {
+                "function": {
+                  "name": "FileWrite",
+                  "arguments": {
+                    "path": "mathutil_test.go",
+                    "content": "package addmissingunittests\n\nimport \"testing\"\n\nfunc TestClampTable(t *testing.T) {\n\ttests := []struct {\n\t\tname  string\n\t\tvalue int\n\t\tmin   int\n\t\tmax   int\n\t\twant  int\n\t}{\n\t\t{name: \"below min\", value: 0, min: 1, max: 5, want: 1},\n\t\t{name: \"within bounds\", value: 3, min: 1, max: 5, want: 3},\n\t\t{name: \"above max\", value: 8, min: 1, max: 5, want: 5},\n\t}\n\n\tfor _, tc := range tests {\n\t\tt.Run(tc.name, func(t *testing.T) {\n\t\t\tif got := Clamp(tc.value, tc.min, tc.max); got != tc.want {\n\t\t\t\tt.Fatalf(\"got %d want %d\", got, tc.want)\n\t\t\t}\n\t\t})\n\t}\n}\n"
+                  }
+                }
+              }
+            ]
+          }
+        },
+        {
+          "done": true,
+          "done_reason": "stop"
+        }
+      ]
+    },
+    {
+      "match": {
+        "latest_user_contains": "table-driven unit tests",
+        "required_tools": ["FileRead", "FileWrite", "Bash"]
+      },
+      "events": [
+        {
+          "message": {
+            "role": "assistant",
+            "tool_calls": [
+              {
+                "function": {
+                  "name": "Bash",
+                  "arguments": {
+                    "command": "go test ./...",
+                    "description": "Run fixture tests",
+                    "timeout_ms": 30000
+                  }
+                }
+              }
+            ]
+          }
+        },
+        {
+          "done": true,
+          "done_reason": "stop"
+        }
+      ]
+    },
+    {
+      "match": {
+        "latest_user_contains": "table-driven unit tests",
+        "required_tools": ["FileRead", "FileWrite", "Bash"]
+      },
+      "events": [
+        {
+          "message": {
+            "role": "assistant",
+            "content": "Added the missing unit tests and ran tests."
+          }
+        },
+        {
+          "done": true,
+          "done_reason": "stop"
+        }
+      ]
+    }
+  ]
+}
