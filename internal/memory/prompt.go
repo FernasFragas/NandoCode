@@ -31,7 +31,7 @@ func BuildSection(input SectionInput) string {
 	if len(input.Recalled) > 0 {
 		b.WriteString("\nRecalled memory files:\n")
 		for _, r := range input.Recalled {
-			b.WriteString(fmt.Sprintf("\n[%s]\n", r.Filename))
+			fmt.Fprintf(&b, "\n[%s]\n", r.Filename)
 			if r.StalenessWarning != "" {
 				b.WriteString(r.StalenessWarning + "\n")
 			}

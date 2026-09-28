@@ -470,6 +470,15 @@
 
   // DOM refs
   const tokenInput = document.getElementById('token');
+  // `nandocodego server` prints a launch URL ending in #token=...; the
+  // fragment is never sent to the server, and is removed from the address bar
+  // once the token is in the field.
+  (function adoptTokenFromURL() {
+    const match = /(?:^#|&)token=([^&]+)/.exec(location.hash);
+    if (!match) return;
+    tokenInput.value = decodeURIComponent(match[1]);
+    history.replaceState(null, '', location.pathname + location.search);
+  })();
   const newSessionBtn = document.getElementById('new-session-btn');
   const sidebarToggle = document.getElementById('sidebar-toggle');
   const app = document.getElementById('app');

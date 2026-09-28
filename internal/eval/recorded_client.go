@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"slices"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/FernasFragas/Nandocode/internal/llm"
@@ -13,7 +14,10 @@ import (
 
 type RecordedClient struct {
 	recording Recording
-	nextTurn  int
+
+	mu       sync.Mutex
+	nextTurn int
+	err      error
 }
 
 func NewRecordedClient(recording Recording) *RecordedClient {
@@ -21,18 +25,13 @@ func NewRecordedClient(recording Recording) *RecordedClient {
 }
 
 func (c *RecordedClient) Chat(ctx context.Context, req *llm.ChatRequest) (<-chan llm.StreamEvent, error) {
-	if c.nextTurn >= len(c.recording.Turns) {
-		return nil, errors.New("recording exhausted")
-	}
-	if req == nil {
-		return nil, errors.New("chat request is nil")
-	}
-	if req.Model != c.recording.Model {
-		return nil, fmt.Errorf("recording model mismatch: got %q want %q", req.Model, c.recording.Model)
-	}
-	turn := c.recording.Turns[c.nextTurn]
-	c.nextTurn++
-	if err := validateRecordedRequest(req, turn); err != nil {
+	turn, err := c.nextRecordedTurn(req)
+	if err != nil {
+		c.mu.Lock()
+		if c.err == nil {
+			c.err = err
+		}
+		c.mu.Unlock()
 		return nil, err
 	}
 	ch := make(chan llm.StreamEvent, len(turn.Events))
@@ -47,6 +46,41 @@ func (c *RecordedClient) Chat(ctx context.Context, req *llm.ChatRequest) (<-chan
 		}
 	}()
 	return ch, nil
+}
+
+func (c *RecordedClient) nextRecordedTurn(req *llm.ChatRequest) (RecordedTurn, error) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if c.nextTurn >= len(c.recording.Turns) {
+		return RecordedTurn{}, errors.New("recording exhausted")
+	}
+	if req == nil {
+		return RecordedTurn{}, errors.New("chat request is nil")
+	}
+	if req.Model != c.recording.Model {
+		return RecordedTurn{}, fmt.Errorf("recording model mismatch: got %q want %q", req.Model, c.recording.Model)
+	}
+	turn := c.recording.Turns[c.nextTurn]
+	c.nextTurn++
+	if err := validateRecordedRequest(req, turn); err != nil {
+		return RecordedTurn{}, err
+	}
+	return turn, nil
+}
+
+// Verify reports replay problems, which are infrastructure errors rather than
+// task failures: the first request the recording could not serve, and, for
+// strict recordings of runs that completed normally, turns left unconsumed.
+func (c *RecordedClient) Verify(runCompleted bool) error {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if c.err != nil {
+		return c.err
+	}
+	if runCompleted && c.recording.Strict && c.nextTurn < len(c.recording.Turns) {
+		return fmt.Errorf("recording has %d unused turn(s) after turn %d", len(c.recording.Turns)-c.nextTurn, c.nextTurn)
+	}
+	return nil
 }
 
 func validateRecordedRequest(req *llm.ChatRequest, turn RecordedTurn) error {

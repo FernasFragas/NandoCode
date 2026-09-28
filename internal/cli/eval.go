@@ -35,6 +35,9 @@ func newEvalRunCmd() *cobra.Command {
 			if len(args) > 0 && strings.TrimSpace(args[0]) != "" {
 				root = args[0]
 			}
+			if err := opts.Validate(); err != nil {
+				return &cliExitError{code: 2, err: err}
+			}
 			fixtures, _, err := loadValidatedFixtures(root)
 			if err != nil {
 				return err

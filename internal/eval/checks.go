@@ -16,6 +16,7 @@ type scoringContext struct {
 	Diff        DiffSize
 	FinalAnswer string
 	ToolNames   map[string]int
+	ToolLimit   bool // execution.max_tool_calls was exceeded
 	Terminal    string
 	TestResults []TestResult
 }
@@ -98,17 +99,36 @@ func EvaluateChecks(ctx scoringContext) (float64, []CheckResult, []string, strin
 
 	requiredToolsMissing := missingTools(ctx.Fixture.Config.Checks.RequiredTools, ctx.ToolNames)
 	forbiddenToolsUsed := presentTools(ctx.Fixture.Config.Checks.ForbiddenTools, ctx.ToolNames)
+	var toolProblems []string
+	if len(requiredToolsMissing) > 0 {
+		toolProblems = append(toolProblems, "required tools not called: "+strings.Join(requiredToolsMissing, ", "))
+	}
+	if len(forbiddenToolsUsed) > 0 {
+		toolProblems = append(toolProblems, "forbidden tools called: "+strings.Join(forbiddenToolsUsed, ", "))
+	}
+	if ctx.ToolLimit {
+		toolProblems = append(toolProblems, fmt.Sprintf("tool call limit %d exceeded", ctx.Fixture.Config.Execution.MaxToolCalls))
+		hardFailures = append(hardFailures, "tool call limit exceeded")
+	}
 	if len(requiredToolsMissing) > 0 || len(forbiddenToolsUsed) > 0 {
 		hardFailures = append(hardFailures, "tool usage check failed")
 	}
+	toolUsageScore := 1.0
+	if len(toolProblems) > 0 {
+		toolUsageScore = 0
+	}
+	// tool_usage is a hard gate with no weight; it is reported so a failed
+	// status is never shown next to an all-passed check list.
+	checks = append(checks, CheckResult{Name: "tool_usage", Status: passFail(len(toolProblems) == 0), Score: toolUsageScore, Details: strings.Join(toolProblems, "; ")})
 
 	finalAnswerScore := containsAllScore(ctx.FinalAnswer, ctx.Fixture.Config.Checks.FinalAnswerContains)
 	checks = append(checks, CheckResult{Name: "final_answer", Status: passFail(finalAnswerScore == 1.0), Score: finalAnswerScore})
 
 	taskCompletionScore := 0.0
-	if ctx.Terminal == "completed" {
+	switch ctx.Terminal {
+	case "completed":
 		taskCompletionScore = 1.0
-	} else if ctx.Terminal == "unrecoverable" || ctx.Terminal == "context_overflow" || ctx.Terminal == "max_turns" {
+	case "unrecoverable", "context_overflow", "max_turns":
 		hardFailures = append(hardFailures, "terminal reason indicates task failure")
 	}
 	checks = append(checks, CheckResult{Name: "task_completion", Status: passFail(taskCompletionScore == 1.0), Score: taskCompletionScore})
@@ -139,6 +159,10 @@ func compareExpectedFiles(expectedDir, workspaceDir string, files []string) (int
 			return 0, 0, err
 		}
 		actualBytes, err := os.ReadFile(filepath.Join(workspaceDir, filepath.FromSlash(rel)))
+		if os.IsNotExist(err) {
+			// The agent removed a golden file: a task failure, not a harness error.
+			continue
+		}
 		if err != nil {
 			return 0, 0, err
 		}

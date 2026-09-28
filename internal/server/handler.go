@@ -3,7 +3,6 @@ package server
 import (
 	"encoding/json"
 	"errors"
-	"fmt"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -27,7 +26,12 @@ func (s *Server) handleCreateSession(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "session limit reached", http.StatusTooManyRequests)
 		return
 	}
-	id := fmt.Sprintf("sess_%d", time.Now().UnixNano())
+	id, err := newSessionID()
+	if err != nil {
+		http.Error(w, "failed to create session", http.StatusInternalServerError)
+		s.limiter.ReleaseSession()
+		return
+	}
 	app := s.baseApp.Clone()
 	runner := s.runner
 	var supervisor *tasks.Supervisor

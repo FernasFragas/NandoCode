@@ -35,10 +35,15 @@ func RunTestCommand(ctx context.Context, workspaceDir, artifactDir string, env m
 
 	cmd := exec.CommandContext(runCtx, cfg.Command[0], cfg.Command[1:]...)
 	cmd.Dir = workspaceDir
-	cmd.Env = buildCommandEnv(env, workspaceDir)
-	var stdoutBuf, stderrBuf bytes.Buffer
-	cmd.Stdout = &stdoutBuf
-	cmd.Stderr = &stderrBuf
+	cmd.Env = buildCommandEnv(env)
+	// Kill the whole process tree on timeout (e.g. the test binary spawned by
+	// `go test`), and stop waiting on inherited pipes shortly after.
+	configureProcessTree(cmd)
+	cmd.WaitDelay = commandWaitDelay
+	stdoutBuf := &cappedBuffer{limit: maxCommandOutputBytes}
+	stderrBuf := &cappedBuffer{limit: maxCommandOutputBytes}
+	cmd.Stdout = stdoutBuf
+	cmd.Stderr = stderrBuf
 
 	start := time.Now()
 	err := cmd.Run()
@@ -77,17 +82,17 @@ func RunTestCommand(ctx context.Context, workspaceDir, artifactDir string, env m
 	return res, err
 }
 
-func buildCommandEnv(overrides map[string]string, workspaceDir string) []string {
+// buildCommandEnv starts from a minimal allowlist plus fixture overrides.
+// GOCACHE/GOMODCACHE are inherited so scored commands reuse the caller's warm
+// build cache (content-addressed and safe to share) instead of recompiling the
+// standard library for every fixture.
+func buildCommandEnv(overrides map[string]string) []string {
 	allow := map[string]string{}
-	for _, key := range []string{"PATH", "HOME", "TMPDIR", "TMP", "TEMP", "USER", "SHELL", "LANG", "LC_ALL", "TERM", "GOCACHE", "GOMODCACHE", "GOPATH"} {
+	for _, key := range []string{"PATH", "HOME", "TMPDIR", "TMP", "TEMP", "USER", "SHELL", "LANG", "LC_ALL", "TERM", "GOCACHE", "GOMODCACHE", "GOPATH", "LOCALAPPDATA", "APPDATA", "SYSTEMROOT", "USERPROFILE"} {
 		if value := os.Getenv(key); value != "" {
 			allow[key] = value
 		}
 	}
-	cacheDir := filepath.Join(workspaceDir, ".tmp-go-cache")
-	modCache := filepath.Join(workspaceDir, ".tmp-go-mod-cache")
-	allow["GOCACHE"] = cacheDir
-	allow["GOMODCACHE"] = modCache
 	allow["CGO_ENABLED"] = "0"
 	for key, value := range overrides {
 		allow[key] = value
@@ -97,4 +102,35 @@ func buildCommandEnv(overrides map[string]string, workspaceDir string) []string 
 		out = append(out, key+"="+strings.TrimSpace(value))
 	}
 	return out
+}
+
+const (
+	maxCommandOutputBytes = 1 << 20
+	commandWaitDelay      = 5 * time.Second
+)
+
+// cappedBuffer keeps at most limit bytes and drops the rest, so a noisy or
+// runaway command cannot exhaust memory.
+type cappedBuffer struct {
+	buf       bytes.Buffer
+	limit     int
+	truncated bool
+}
+
+func (b *cappedBuffer) Write(p []byte) (int, error) {
+	if room := b.limit - b.buf.Len(); room < len(p) {
+		b.truncated = true
+		if room > 0 {
+			b.buf.Write(p[:room])
+		}
+		return len(p), nil
+	}
+	return b.buf.Write(p)
+}
+
+func (b *cappedBuffer) String() string {
+	if b.truncated {
+		return b.buf.String() + fmt.Sprintf("\n[output truncated at %d bytes]\n", b.limit)
+	}
+	return b.buf.String()
 }

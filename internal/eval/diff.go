@@ -36,7 +36,7 @@ func DiffManifests(before, after Manifest) ([]FileChange, DiffSize, string, erro
 			content := a.Content
 			size.BytesAdded += len(content)
 			size.LinesAdded += lineCount(content)
-			patch.WriteString(fmt.Sprintf("--- /dev/null\n+++ %s\n", rel))
+			fmt.Fprintf(&patch, "--- /dev/null\n+++ %s\n", rel)
 			for _, line := range splitLines(normalizeText(content)) {
 				if line == "" {
 					continue
@@ -52,7 +52,7 @@ func DiffManifests(before, after Manifest) ([]FileChange, DiffSize, string, erro
 			content := b.Content
 			size.BytesDeleted += len(content)
 			size.LinesDeleted += lineCount(content)
-			patch.WriteString(fmt.Sprintf("--- %s\n+++ /dev/null\n", rel))
+			fmt.Fprintf(&patch, "--- %s\n+++ /dev/null\n", rel)
 			for _, line := range splitLines(normalizeText(content)) {
 				if line == "" {
 					continue
@@ -79,7 +79,7 @@ func DiffManifests(before, after Manifest) ([]FileChange, DiffSize, string, erro
 			size.LinesDeleted += linesDeleted
 			size.BytesAdded += bytesAdded
 			size.BytesDeleted += bytesDeleted
-			patch.WriteString(fmt.Sprintf("--- %s\n+++ %s\n", rel, rel))
+			fmt.Fprintf(&patch, "--- %s\n+++ %s\n", rel, rel)
 			beforeText := splitLines(normalizeText(beforeContent))
 			afterText := splitLines(normalizeText(afterContent))
 			for _, line := range beforeText {

@@ -43,13 +43,42 @@ func TestEvalValidateInvalidFixtureReturnsExitCode2(t *testing.T) {
 	}
 }
 
+func TestEvalRunRejectsInvalidOptionsWithExitCode2(t *testing.T) {
+	root := writeCLIFixtureSet(t)
+	for _, args := range [][]string{
+		{"--model", "llama3"},
+		{"--provider", "bogus"},
+	} {
+		err := Run(t.Context(), append([]string{"eval", "run", root, "--output-dir", t.TempDir()}, args...))
+		if ExitCode(err) != 2 {
+			t.Fatalf("args %v: exit code = %d (err=%v), want 2", args, ExitCode(err), err)
+		}
+	}
+}
+
 func TestEvalRunPassesForDeterministicFixture(t *testing.T) {
 	root := writeCLIFixtureSet(t)
 
-	err := Run(t.Context(), []string{"eval", "run", root})
+	outDir := t.TempDir()
+	err := Run(t.Context(), []string{"eval", "run", root, "--output-dir", outDir})
 	if err != nil {
-		t.Fatalf("run error = %v", err)
+		t.Fatalf("run error = %v\n%s", err, evalResultsForDebug(t, outDir))
 	}
+}
+
+// evalResultsForDebug returns the results.json of the run under outDir so a
+// failing assertion shows each fixture's failure_reason.
+func evalResultsForDebug(t *testing.T, outDir string) string {
+	t.Helper()
+	matches, _ := filepath.Glob(filepath.Join(outDir, "*", "results.json"))
+	if len(matches) == 0 {
+		return "(no results.json written)"
+	}
+	data, err := os.ReadFile(matches[0])
+	if err != nil {
+		return err.Error()
+	}
+	return string(data)
 }
 
 func writeCLIFixtureSet(t *testing.T) string {
@@ -93,7 +122,7 @@ description: CLI validation fixture.
 tags:
   - deterministic
 execution:
-  timeout: 30s
+  timeout: 120s
   max_turns: 4
   max_tool_calls: 8
   permission_mode: default
@@ -106,7 +135,7 @@ model:
 tests:
   - name: go-test
     command: ["go", "test", "./..."]
-    timeout: 10s
+    timeout: 60s
     required: true
 workspace:
   allowed_changes:

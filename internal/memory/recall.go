@@ -27,8 +27,8 @@ func Recall(ctx context.Context, client llm.Client, cfg Config, query Query, ent
 			continue
 		}
 		index[e.Filename] = e
-		manifest.WriteString(fmt.Sprintf("- %s | type=%s | name=%s | updated=%s | description=%s\n",
-			e.Filename, e.Type, e.Name, e.UpdatedAt.UTC().Format("2006-01-02"), e.Description))
+		fmt.Fprintf(&manifest, "- %s | type=%s | name=%s | updated=%s | description=%s\n",
+			e.Filename, e.Type, e.Name, e.UpdatedAt.UTC().Format("2006-01-02"), e.Description)
 	}
 	if manifest.Len() == 0 {
 		return RecallResult{}, nil

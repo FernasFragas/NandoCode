@@ -167,6 +167,53 @@ In the TUI, use:
 The index uses the configured embedding model (`qwen3-embedding:8b` by default)
 and stores cache data outside the project source tree.
 
+## Evaluation Framework
+
+Run the deterministic coding-task fixture suite:
+
+```bash
+nandocodego eval run ./evals
+```
+
+Validate fixture structure without executing any agent run:
+
+```bash
+nandocodego eval validate ./evals
+```
+
+Run the same fixture set against a live configured model:
+
+```bash
+nandocodego eval run ./evals --provider live --model qwen3.6:35b
+```
+
+Eval artifacts are emitted as JSON and Markdown under `.tmp-evals/`.
+
+Example report summary:
+
+```markdown
+# NandoCode Evaluation Report
+
+| Metric | Value |
+| --- | ---: |
+| Fixtures | 5 |
+| Passed | 5 |
+| Failed | 0 |
+| Errors | 0 |
+| Aggregate score | 1.00 |
+
+| Fixture | Status | Score | Tests | Files | Tools | Approvals | Runtime |
+| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| add-input-validation | passed | 1.00 | 1/1 | 2 | 5 | 2 | 1586ms |
+| add-missing-unit-tests | passed | 1.00 | 1/1 | 1 | 4 | 1 | 666ms |
+| basic-refactor | passed | 1.00 | 1/1 | 1 | 3 | 1 | 570ms |
+| bugfix-with-tests | passed | 1.00 | 1/1 | 2 | 5 | 2 | 581ms |
+| rename-symbol-safely | passed | 1.00 | 1/1 | 2 | 5 | 2 | 587ms |
+```
+
+Review third-party fixtures before running them. They can execute code inside a
+temporary workspace during evaluation.
+
 ## Ollama Cloud API Support
 
 `nandocodego` stays local-first by default. Local models and `/pull` continue to use your configured local Ollama daemon.

@@ -202,7 +202,7 @@ func buildSummaryPrompt(cfg CompactionConfig, messages []llm.Message) string {
 	var b strings.Builder
 	b.WriteString(prefix)
 	for _, m := range messages {
-		b.WriteString(fmt.Sprintf("[%s]: %s\n", m.Role, m.Content))
+		fmt.Fprintf(&b, "[%s]: %s\n", m.Role, m.Content)
 	}
 	return b.String()
 }

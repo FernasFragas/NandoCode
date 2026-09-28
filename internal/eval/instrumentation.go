@@ -3,7 +3,6 @@ package eval
 import (
 	"context"
 	"sync"
-	"time"
 
 	"github.com/FernasFragas/Nandocode/internal/agent"
 	"github.com/FernasFragas/Nandocode/internal/logging"
@@ -19,11 +18,29 @@ type runMetrics struct {
 	retries           int
 	terminal          *agent.Terminal
 	terminalReason    string
+
+	// maxToolCalls caps attempted tool calls (0 = unlimited); onLimit is
+	// invoked once when the cap is exceeded, to stop the run.
+	maxToolCalls      int
+	onLimit           func()
+	attemptedCalls    int
+	toolLimitExceeded bool
 }
 
-func newRunMetrics() *runMetrics {
+type metricsSnapshot struct {
+	ApprovalsRequired int
+	PermissionCounts  PermissionCounts
+	ToolCallsByName   map[string]int
+	ToolSummaries     []ToolCallSummary
+	Retries           int
+	ToolLimitExceeded bool
+}
+
+func newRunMetrics(maxToolCalls int, onLimit func()) *runMetrics {
 	return &runMetrics{
 		toolCallsByName: make(map[string]int),
+		maxToolCalls:    maxToolCalls,
+		onLimit:         onLimit,
 	}
 }
 
@@ -39,10 +56,20 @@ func (m *runMetrics) wrapPrompt(next permissions.PromptFunc) permissions.PromptF
 	}
 }
 
+// permissionObserver sees every tool call the model attempts, including calls
+// the permission layer denies before any ToolUseStart event, so it is the
+// source of truth for per-tool usage counts and the tool-call limit.
 func (m *runMetrics) permissionObserver() permissions.ObserverFunc {
-	return func(_ context.Context, _ permissions.Request, result permissions.Result) {
+	return func(_ context.Context, req permissions.Request, result permissions.Result) {
 		m.mu.Lock()
-		defer m.mu.Unlock()
+		m.attemptedCalls++
+		if req.ToolName != "" {
+			m.toolCallsByName[req.ToolName]++
+		}
+		limitHit := m.maxToolCalls > 0 && m.attemptedCalls > m.maxToolCalls && !m.toolLimitExceeded
+		if limitHit {
+			m.toolLimitExceeded = true
+		}
 		switch result.Decision {
 		case permissions.DecisionAllow:
 			m.permissionCounts.Allowed++
@@ -50,6 +77,10 @@ func (m *runMetrics) permissionObserver() permissions.ObserverFunc {
 			m.permissionCounts.Denied++
 		case permissions.DecisionAsk:
 			m.permissionCounts.Asked++
+		}
+		m.mu.Unlock()
+		if limitHit && m.onLimit != nil {
+			m.onLimit()
 		}
 	}
 }
@@ -63,7 +94,6 @@ func (m *runMetrics) collect(events <-chan agent.Event) (string, agent.Terminal)
 			finalAnswer += e.Content
 		case agent.ToolUseStart:
 			m.mu.Lock()
-			m.toolCallsByName[e.Name]++
 			m.toolSummaries = append(m.toolSummaries, ToolCallSummary{ID: e.ID, Name: e.Name})
 			m.mu.Unlock()
 		case agent.ToolUseResult:
@@ -102,16 +132,21 @@ func (m *runMetrics) collect(events <-chan agent.Event) (string, agent.Terminal)
 	return finalAnswer, terminal
 }
 
-func (m *runMetrics) snapshot() (int, PermissionCounts, map[string]int, []ToolCallSummary, int, string) {
+func (m *runMetrics) snapshot() metricsSnapshot {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	counts := m.permissionCounts
 	byName := make(map[string]int, len(m.toolCallsByName))
 	for k, v := range m.toolCallsByName {
 		byName[k] = v
 	}
-	summaries := append([]ToolCallSummary(nil), m.toolSummaries...)
-	return m.approvalsRequired, counts, byName, summaries, m.retries, m.terminalReason
+	return metricsSnapshot{
+		ApprovalsRequired: m.approvalsRequired,
+		PermissionCounts:  m.permissionCounts,
+		ToolCallsByName:   byName,
+		ToolSummaries:     append([]ToolCallSummary(nil), m.toolSummaries...),
+		Retries:           m.retries,
+		ToolLimitExceeded: m.toolLimitExceeded,
+	}
 }
 
 func terminalTaskCompletion(term agent.TerminalReason) string {
@@ -131,8 +166,4 @@ func terminalTaskCompletion(term agent.TerminalReason) string {
 	default:
 		return "not_started"
 	}
-}
-
-func runtimeMS(start time.Time) int64 {
-	return time.Since(start).Milliseconds()
 }

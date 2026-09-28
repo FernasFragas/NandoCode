@@ -2,11 +2,13 @@ package eval
 
 import (
 	"context"
+	"crypto/rand"
+	"encoding/hex"
 	"errors"
 	"fmt"
-	"math/rand"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 	"time"
 
@@ -15,9 +17,30 @@ import (
 	"github.com/FernasFragas/Nandocode/internal/tools/filewrite"
 )
 
+// Validate rejects option combinations that cannot produce a meaningful run.
+func (o RunOptions) Validate() error {
+	switch o.Provider {
+	case ProviderRecorded, "":
+		// Recordings are bound to the model they were captured with.
+		if strings.TrimSpace(o.Model) != "" {
+			return errors.New("--model is only supported with --provider live; recorded runs use the recording's model")
+		}
+		if strings.TrimSpace(o.OllamaURL) != "" {
+			return errors.New("--ollama-url is only supported with --provider live")
+		}
+	case ProviderLive:
+	default:
+		return fmt.Errorf("unsupported provider %q (want %q or %q)", o.Provider, ProviderRecorded, ProviderLive)
+	}
+	return nil
+}
+
 func Run(ctx context.Context, fixtures []Fixture, opts RunOptions, progress func(string)) (RunReport, error) {
 	if len(fixtures) == 0 {
 		return RunReport{}, errors.New("no fixtures selected")
+	}
+	if err := opts.Validate(); err != nil {
+		return RunReport{}, err
 	}
 	jobs := opts.Jobs
 	if jobs <= 0 {
@@ -28,7 +51,7 @@ func Run(ctx context.Context, fixtures []Fixture, opts RunOptions, progress func
 		repeat = 1
 	}
 	started := time.Now().UTC()
-	runID := fmt.Sprintf("%s-%08x", started.Format("20060102T150405Z"), rand.Uint32())
+	runID := fmt.Sprintf("%s-%s", started.Format("20060102T150405Z"), randomSuffix())
 	outputDir := opts.OutputDir
 	if outputDir == "" {
 		outputDir = ".tmp-evals"
@@ -78,6 +101,13 @@ func Run(ctx context.Context, fixtures []Fixture, opts RunOptions, progress func
 		return RunReport{}, err
 	}
 	return report, nil
+}
+
+// randomSuffix disambiguates run IDs created within the same second.
+func randomSuffix() string {
+	var b [4]byte
+	_, _ = rand.Read(b[:]) // crypto/rand.Read never returns an error
+	return hex.EncodeToString(b[:])
 }
 
 type runTarget struct {
@@ -189,14 +219,19 @@ func runFixture(parent context.Context, runID, runDir string, target runTarget, 
 		return finalizeFixtureResult(result)
 	}
 
-	bundle, err := buildRuntime(ctx, fixture, workspace.Path, opts)
+	// runCtx bounds the agent run only; it is cancelled early when the
+	// fixture's tool-call limit is exceeded. Scoring (tests) still uses ctx.
+	runCtx, stopRun := context.WithCancel(ctx)
+	defer stopRun()
+
+	bundle, err := buildRuntime(runCtx, fixture, workspace.Path, opts)
 	if err != nil {
 		result.FailureReason = logging.Redact(err.Error())
 		return finalizeFixtureResult(result)
 	}
 	result.ModelUsed = bundle.model
-	input, prompt := buildAgentInput(ctx, fixture, workspace.Path, fixture.Config, bundle.model)
-	metrics := newRunMetrics()
+	input, prompt := buildAgentInput(runCtx, fixture, workspace.Path, fixture.Config, bundle.model)
+	metrics := newRunMetrics(fixture.Config.Execution.MaxToolCalls, stopRun)
 	input.PermissionPrompt = metrics.wrapPrompt(prompt)
 	bundle.agentCfg.PermissionObserver = metrics.permissionObserver()
 	runner, err := agent.New(bundle.client, bundle.registry, agent.WithConfig(bundle.agentCfg))
@@ -204,14 +239,30 @@ func runFixture(parent context.Context, runID, runDir string, target runTarget, 
 		result.FailureReason = logging.Redact(err.Error())
 		return finalizeFixtureResult(result)
 	}
-	events := runner.Run(ctx, input)
+	events := runner.Run(runCtx, input)
 	finalAnswer, terminal := metrics.collect(events)
+	stats := metrics.snapshot()
 
 	result.TaskCompletionStatus = terminalTaskCompletion(terminal.Reason)
 	result.TerminalReason = string(terminal.Reason)
 	result.Usage = terminal.Usage
 	result.ToolCalls = terminal.Usage.ToolCalls
 	result.RuntimeMS = time.Since(started).Milliseconds()
+	result.ApprovalsRequired = stats.ApprovalsRequired
+	result.PermissionCounts = stats.PermissionCounts
+	result.ToolCallsByName = stats.ToolCallsByName
+	result.ToolSummaries = stats.ToolSummaries
+	result.Retries = stats.Retries
+
+	// A recording that cannot serve the agent's requests is a harness problem,
+	// not a task failure: report it as an error with the replay message.
+	if bundle.recorded != nil {
+		runCompleted := terminal.Reason == agent.TerminalCompleted && !stats.ToolLimitExceeded
+		if err := bundle.recorded.Verify(runCompleted); err != nil {
+			result.FailureReason = logging.Redact("recording: " + err.Error())
+			return finalizeFixtureResult(result)
+		}
+	}
 
 	after, err := Snapshot(workspace.Path)
 	if err != nil {
@@ -252,20 +303,14 @@ func runFixture(parent context.Context, runID, runDir string, target runTarget, 
 		}
 	}
 
-	approvals, permissionCounts, byName, summaries, retries, _ := metrics.snapshot()
-	result.ApprovalsRequired = approvals
-	result.PermissionCounts = permissionCounts
-	result.ToolCallsByName = byName
-	result.ToolSummaries = summaries
-	result.Retries = retries
-
 	score, checks, hardFailures, failureReason, unexpected, err := EvaluateChecks(scoringContext{
 		Fixture:     fixture,
 		Workspace:   workspace,
 		Changes:     changes,
 		Diff:        diffSize,
 		FinalAnswer: finalAnswer,
-		ToolNames:   byName,
+		ToolNames:   stats.ToolCallsByName,
+		ToolLimit:   stats.ToolLimitExceeded,
 		Terminal:    string(terminal.Reason),
 		TestResults: result.TestResults,
 	})

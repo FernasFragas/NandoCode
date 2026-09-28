@@ -32,6 +32,9 @@ type runtimeBundle struct {
 	client   llm.Client
 	registry *tools.Registry
 	agentCfg agent.Config
+	// recorded is set for the recorded provider so replay errors can be
+	// reported as infrastructure errors after the run.
+	recorded *RecordedClient
 }
 
 func buildRuntime(ctx context.Context, fixture Fixture, workspaceDir string, opts RunOptions) (runtimeBundle, error) {
@@ -55,16 +58,13 @@ func buildRuntime(ctx context.Context, fixture Fixture, workspaceDir string, opt
 			return runtimeBundle{}, fmt.Errorf("load recording %s: %w", recordingPath, err)
 		}
 		client := NewRecordedClient(recording)
-		model := recording.Model
-		if strings.TrimSpace(opts.Model) != "" {
-			model = opts.Model
-		}
 		return runtimeBundle{
-			model:    model,
+			model:    recording.Model,
 			provider: ProviderRecorded,
 			client:   client,
 			registry: registry,
 			agentCfg: cfg,
+			recorded: client,
 		}, nil
 	case ProviderLive:
 		model, client, liveCfg, err := buildLiveClient(ctx, opts)
@@ -82,7 +82,7 @@ func buildRuntime(ctx context.Context, fixture Fixture, workspaceDir string, opt
 		return runtimeBundle{
 			model:    model,
 			provider: ProviderLive,
-			client:   client,
+			client:   withChatOptions(client, map[string]any{"temperature": fixture.Config.Model.Live.Temperature}),
 			registry: registry,
 			agentCfg: cfg,
 		}, nil
@@ -182,8 +182,7 @@ func buildAgentInput(ctx context.Context, fixture Fixture, workspaceDir string, 
 	toolCtx := tools.DefaultContext(ctx, workspaceDir)
 	toolCtx.PermissionMode = permissions.ToToolsMode(permissions.Mode(cfg.Execution.PermissionMode).Normalize())
 	toolCtx.Env = os.Environ()
-	prompt, promptFunc := permissionPromptFor(cfg.Execution.ApprovalStrategy)
-	_ = prompt
+	promptFunc := permissionPromptFor(cfg.Execution.ApprovalStrategy)
 	input := agent.Input{
 		Model:        model,
 		SystemPrompt: evaluatorSystemPrompt,
@@ -199,25 +198,52 @@ func buildAgentInput(ctx context.Context, fixture Fixture, workspaceDir string, 
 	return input, promptFunc
 }
 
-func permissionPromptFor(strategy ApprovalStrategy) (string, permissions.PromptFunc) {
+func permissionPromptFor(strategy ApprovalStrategy) permissions.PromptFunc {
 	switch strategy {
 	case ApprovalStrategyAllow:
-		return "allow", func(context.Context, permissions.Prompt) (permissions.Decision, string, error) {
+		return func(context.Context, permissions.Prompt) (permissions.Decision, string, error) {
 			return permissions.DecisionAllow, "approved by eval policy", nil
 		}
 	case ApprovalStrategyDeny:
-		return "deny", func(context.Context, permissions.Prompt) (permissions.Decision, string, error) {
+		return func(context.Context, permissions.Prompt) (permissions.Decision, string, error) {
 			return permissions.DecisionDeny, "denied by eval policy", nil
 		}
 	case ApprovalStrategyUnavailable:
-		return "unavailable", nil
+		return nil
 	case ApprovalStrategyScripted:
-		return "scripted", func(context.Context, permissions.Prompt) (permissions.Decision, string, error) {
+		return func(context.Context, permissions.Prompt) (permissions.Decision, string, error) {
 			return permissions.DecisionDeny, "scripted approvals are not implemented", nil
 		}
 	default:
-		return "allow", func(context.Context, permissions.Prompt) (permissions.Decision, string, error) {
+		return func(context.Context, permissions.Prompt) (permissions.Decision, string, error) {
 			return permissions.DecisionAllow, "approved by eval policy", nil
 		}
 	}
+}
+
+// chatOptionsClient applies fixed model options (such as temperature) to every
+// chat request, so live runs honour model.live settings without changing the
+// shared agent loop.
+type chatOptionsClient struct {
+	llm.Client
+	options map[string]any
+}
+
+func withChatOptions(client llm.Client, options map[string]any) llm.Client {
+	return &chatOptionsClient{Client: client, options: options}
+}
+
+func (c *chatOptionsClient) Chat(ctx context.Context, req *llm.ChatRequest) (<-chan llm.StreamEvent, error) {
+	if req != nil {
+		clone := *req
+		clone.Options = make(map[string]any, len(req.Options)+len(c.options))
+		for k, v := range req.Options {
+			clone.Options[k] = v
+		}
+		for k, v := range c.options {
+			clone.Options[k] = v
+		}
+		req = &clone
+	}
+	return c.Client.Chat(ctx, req)
 }

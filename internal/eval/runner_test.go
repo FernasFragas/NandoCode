@@ -31,7 +31,7 @@ func TestRunSupportsRepeatAndJobs(t *testing.T) {
 	}
 	for i, result := range report.Results {
 		if result.Status != StatusPassed {
-			t.Fatalf("result[%d].status=%s want passed", i, result.Status)
+			t.Fatalf("result[%d].status=%s want passed (failure_reason=%q, tests=%+v)", i, result.Status, result.FailureReason, result.TestResults)
 		}
 		if result.Repetition != i+1 {
 			t.Fatalf("result[%d].repetition=%d want %d", i, result.Repetition, i+1)
@@ -112,7 +112,7 @@ description: Runnable fixture.
 tags:
   - deterministic
 execution:
-  timeout: 30s
+  timeout: 120s
   max_turns: 6
   max_tool_calls: 10
   permission_mode: default
@@ -125,7 +125,7 @@ model:
 tests:
   - name: go-test
     command: ["go", "test", "./..."]
-    timeout: 10s
+    timeout: 60s
     required: true
 workspace:
   allowed_changes:

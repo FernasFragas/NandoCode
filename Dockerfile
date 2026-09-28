@@ -1,8 +1,8 @@
-# Stage 1: Build the application
-ARG GO_VERSION=1.26.2
-ARG ALPINE_VERSION=3.20
+# Base images use literal tags (not ARGs) so Dependabot can propose updates.
+# Keep the Go version in step with the toolchain directive in go.mod.
 
-FROM golang:${GO_VERSION} AS builder
+# Stage 1: Build the application
+FROM golang:1.26.6 AS builder
 
 # Install build dependencies
 RUN apt-get update && apt-get install -y --no-install-recommends git make && rm -rf /var/lib/apt/lists/*
@@ -35,7 +35,7 @@ RUN MODULE_PATH="$(go list -m)" && \
       ./cmd/nandocodego
 
 # Stage 2: Create minimal runtime image
-FROM alpine:${ALPINE_VERSION}
+FROM alpine:3.24
 
 # Install runtime dependencies
 RUN apk add --no-cache ca-certificates

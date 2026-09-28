@@ -5,7 +5,6 @@ import (
 	"encoding/hex"
 	"io/fs"
 	"os"
-	"path/filepath"
 	"strings"
 	"unicode/utf8"
 )
@@ -25,9 +24,19 @@ type FileInfo struct {
 	Content    []byte
 }
 
+// Snapshot records every file under root. It reads through an os.Root so a
+// symlink created by the agent cannot make the snapshot read outside the
+// workspace.
 func Snapshot(root string) (Manifest, error) {
+	rootFS, err := os.OpenRoot(root)
+	if err != nil {
+		return Manifest{}, err
+	}
+	defer rootFS.Close()
+	fsys := rootFS.FS()
+
 	files := make(map[string]FileInfo)
-	err := filepath.WalkDir(root, func(path string, d fs.DirEntry, err error) error {
+	err = fs.WalkDir(fsys, ".", func(rel string, d fs.DirEntry, err error) error {
 		if err != nil {
 			return err
 		}
@@ -38,16 +47,11 @@ func Snapshot(root string) (Manifest, error) {
 		if err != nil {
 			return err
 		}
-		content, err := os.ReadFile(path)
+		content, err := fs.ReadFile(fsys, rel)
 		if err != nil {
 			return err
 		}
 		sum := sha256.Sum256(content)
-		rel, err := filepath.Rel(root, path)
-		if err != nil {
-			return err
-		}
-		rel = filepath.ToSlash(rel)
 		files[rel] = FileInfo{
 			Path:       rel,
 			Size:       info.Size(),
@@ -55,7 +59,7 @@ func Snapshot(root string) (Manifest, error) {
 			Executable: info.Mode().Perm()&0o111 != 0,
 			Binary:     isBinary(content),
 			Mode:       info.Mode(),
-			Content:    append([]byte(nil), content...),
+			Content:    content,
 		}
 		return nil
 	})

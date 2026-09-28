@@ -269,9 +269,9 @@ func createBenchmarkWorkspaceFiles(b *testing.B, root string, fileCount int) map
 		rel := fmt.Sprintf("pkg/file_%05d.go", i)
 		var sb strings.Builder
 		sb.WriteString("package pkg\n\n")
-		sb.WriteString(fmt.Sprintf("// file_%05d benchmark fixture\n", i))
+		fmt.Fprintf(&sb, "// file_%05d benchmark fixture\n", i)
 		for line := 0; line < 80; line++ {
-			sb.WriteString(fmt.Sprintf("func Handler%05dLine%02d() string { return \"auth token middleware %d\" }\n", i, line, line))
+			fmt.Fprintf(&sb, "func Handler%05dLine%02d() string { return \"auth token middleware %d\" }\n", i, line, line)
 		}
 		content := sb.String()
 		full := filepath.Join(root, filepath.FromSlash(rel))

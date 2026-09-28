@@ -5,8 +5,10 @@ import (
 	"embed"
 	"errors"
 	"fmt"
+	"io"
 	"io/fs"
 	"log/slog"
+	"net"
 	"net/http"
 	"os"
 	"os/signal"
@@ -57,6 +59,9 @@ type Config struct {
 	IdleTimeout               time.Duration
 	ReadTimeout               time.Duration
 	WriteTimeout              time.Duration
+
+	// tokenGenerated records that New created Token because none was given.
+	tokenGenerated bool
 }
 
 type Server struct {
@@ -98,6 +103,16 @@ func New(ctx context.Context, logger *slog.Logger, cfg Config) (*Server, error) 
 	}
 	if err := validateNonLoopback(cfg.Bind, cfg.Token); err != nil {
 		return nil, err
+	}
+	// The API always requires a bearer token. Without --token (loopback only,
+	// enforced above) a random one is generated and announced at startup.
+	if strings.TrimSpace(cfg.Token) == "" {
+		token, err := GenerateToken()
+		if err != nil {
+			return nil, fmt.Errorf("generate server token: %w", err)
+		}
+		cfg.Token = token
+		cfg.tokenGenerated = true
 	}
 	cctx, cancel := context.WithCancel(ctx)
 
@@ -347,7 +362,7 @@ func (s *Server) routes() http.Handler {
 			mux.Handle("/", http.FileServer(http.FS(sub)))
 		}
 	}
-	return NewAuthMiddleware(s.cfg.Token, securityHeaders(mux))
+	return securityHeaders(NewRequestGuard(s.cfg.Bind, NewAuthMiddleware(s.cfg.Token, mux)))
 }
 
 func (s *Server) sessionRoutes(w http.ResponseWriter, r *http.Request) {
@@ -438,6 +453,7 @@ func RunUntilSignal(ctx context.Context, logger *slog.Logger, cfg Config) error 
 	if err != nil {
 		return err
 	}
+	announce(os.Stderr, srv.cfg)
 	errCh := make(chan error, 1)
 	go func() { errCh <- srv.Start() }()
 	sigCh := make(chan os.Signal, 1)
@@ -455,6 +471,23 @@ func RunUntilSignal(ctx context.Context, logger *slog.Logger, cfg Config) error 
 		return startErr
 	}
 	return nil
+}
+
+// announce prints where to open the web UI. A generated token is carried in
+// the URL fragment, which browsers never send to the server, and is written
+// only to the terminal, never to the structured logger.
+func announce(w io.Writer, cfg Config) {
+	host := cfg.Bind
+	if host == "" || host == "0.0.0.0" || host == "::" {
+		host = "localhost"
+	}
+	uiURL := "http://" + net.JoinHostPort(host, strconv.Itoa(cfg.Port)) + "/"
+	if !cfg.tokenGenerated {
+		fmt.Fprintf(w, "nandocodego server: open %s and enter your --token in the Token field\n", uiURL)
+		return
+	}
+	fmt.Fprintf(w, "nandocodego server: open %s#token=%s\n", uiURL, cfg.Token)
+	fmt.Fprintf(w, "nandocodego server: API clients must send \"Authorization: Bearer %s\"\n", cfg.Token)
 }
 
 func ptrOrNil(s string) *string {
