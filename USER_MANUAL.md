@@ -381,7 +381,7 @@ Explain @internal/cli/root.go and list every supported top-level CLI flag.
 You can also request an explicit line slice:
 
 ```text
-Review @docs/PHASE-LOG.md#L3000-L3300 and summarize blockers.
+Review @docs/phases/PHASE-LOG.md#L3000-L3300 and summarize blockers.
 ```
 
 Supported range syntax is only `@file#Lstart-Lend`.

@@ -64,7 +64,7 @@ check_file ".github/workflows/ci.yml"
 check_file ".github/dependabot.yml"
 check_file ".github/dependency-review-config.yml"
 check_file ".github/ISSUE_TEMPLATE/security-hardening.md"
-check_file "docs/PHASE-LOG.md"
+check_file "docs/phases/PHASE-LOG.md"
 check_file "tools/verify-phase-0.sh"
 
 # Check scripts are executable
