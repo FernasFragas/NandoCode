@@ -207,15 +207,15 @@ check:
 	@echo ""
 	@echo "✓ All checks passed!"
 
-## regression-fast: Run fast regression gate from docs/REGRESSION-AND-LOAD-TEST-PLAN.md
+## regression-fast: Run fast regression gate from docs/plans/REGRESSION-AND-LOAD-TEST-PLAN.md
 regression-fast:
 	@tools/run-regression-fast.sh
 
-## regression-full: Run full regression gate from docs/REGRESSION-AND-LOAD-TEST-PLAN.md
+## regression-full: Run full regression gate from docs/plans/REGRESSION-AND-LOAD-TEST-PLAN.md
 regression-full:
 	@tools/run-regression-full.sh
 
-## load-suite: Run load/perf suite from docs/REGRESSION-AND-LOAD-TEST-PLAN.md
+## load-suite: Run load/perf suite from docs/plans/REGRESSION-AND-LOAD-TEST-PLAN.md
 load-suite:
 	@tools/run-load-suite.sh
 

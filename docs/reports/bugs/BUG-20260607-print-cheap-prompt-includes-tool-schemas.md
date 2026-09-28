@@ -106,7 +106,7 @@ Make the print path apply the same routing/tool-mode decision used by the TUI be
 - `internal/cli/print.go`
 - `internal/retrievalroute/route.go`
 - `internal/agent/stream.go`
-- `docs/AGENT-E2E-TEST-AND-BUG-REPORT-PLAN.md`
+- `docs/plans/AGENT-E2E-TEST-AND-BUG-REPORT-PLAN.md`
 
 ## Retest Plan
 

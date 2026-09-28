@@ -80,7 +80,7 @@ Decide whether malformed config should be fatal for CLI commands that load confi
 
 - `internal/cli/print.go`
 - `internal/config/loader.go`
-- `docs/AGENT-E2E-TEST-AND-BUG-REPORT-PLAN.md`
+- `docs/plans/AGENT-E2E-TEST-AND-BUG-REPORT-PLAN.md`
 
 ## Retest Plan
 

@@ -22,9 +22,9 @@ The point is not to hide the engineer behind the tools. It is to show what one e
 
 ## Status
 
-**Current Version:** v0.0.0-dev (Phase 29 complete; Phase 25 remote/bridge mode next)
+**Current Version:** v0.0.0-dev (Phase 29 and the evaluation framework complete; Phase 25 remote/bridge mode next)
 
-This project is under active development. For current roadmap order, read [Next Phases Implementation Plan](docs/NEXT-PHASES-IMPLEMENTATION-PLAN.md) first, then [Project Status and Engineer Onboarding](docs/PROJECT-STATUS-AND-ONBOARDING.md) and [Phase Log](docs/PHASE-LOG.md). Earlier internal implementation plans are historical reference material, not the current launch-status source.
+This project is under active development. **Engineers** should start with [engineers.md](engineers.md); **product managers** with [product-managers.md](product-managers.md). The committed roadmap is in [Next Phases Implementation Plan](docs/roadmap/NEXT-PHASES-IMPLEMENTATION-PLAN.md) and everything else is in the [Backlog](docs/roadmap/BACKLOG.md).
 
 ### Completed Phases
 
@@ -42,7 +42,8 @@ This project is under active development. For current roadmap order, read [Next 
 - ✅ **Phases 26-27:** Inline completion and directory mention expansion
 - ✅ **Phases 28-29:** Semantic workspace indexing/retrieval and TUI index-progress observability
 - ✅ **Ollama Cloud API key support:** complete
-- ⏳ **Next:** Phase 25 Remote / Bridge Mode
+- ✅ **Evaluation framework:** `nandocodego eval` with deterministic fixtures in CI
+- ⏳ **Next:** Phase 25 Remote / Bridge Mode, then Phase 17 (distribution) and Phase 18 (hardening and release)
 
 ## Prerequisites
 
@@ -113,7 +114,7 @@ Explain the startup flow in @internal/cli/root.go and @internal/cli/repl.go
 For large files, you can request a specific line range:
 
 ```text
-Review @docs/PHASE-LOG.md#L3000-L3300
+Review @docs/phases/PHASE-LOG.md#L3000-L3300
 ```
 
 Range syntax supports only `@file#Lstart-Lend`.
@@ -259,17 +260,21 @@ See [SECURITY.md](SECURITY.md) for:
 
 ## Documentation
 
-- [Security Policy](SECURITY.md) - Comprehensive security documentation
-- [Next Phases Implementation Plan](docs/NEXT-PHASES-IMPLEMENTATION-PLAN.md) - Authoritative roadmap order, active work routing, and pre-start checklist
-- [Project Status and Engineer Onboarding](docs/PROJECT-STATUS-AND-ONBOARDING.md) - Current progress, gaps, local setup, Docker notes, and multi-model guidance
-- [Application Architecture Flowchart](docs/APPLICATION-ARCHITECTURE-FLOWCHART.md) - Detailed Mermaid flowcharts for the CLI, TUI, server, agent, tools, context, retrieval, storage, and observability architecture
-- [Remaining Phases Task Review](docs/REMAINING-PHASES-TASK-REVIEW.md) - Reviewed task detail, blockers, and evidence requirements for active gates
-- [Phase Log](docs/PHASE-LOG.md) - Historical implementation record and acceptance evidence
+- [Engineer Guide](engineers.md) - Onboarding: build, test, repo layout, how work is done, what's next
+- [Product Guide](product-managers.md) - What the product does today, release status, backlog highlights, open decisions
+- [User Manual](USER_MANUAL.md) - Every command, tool, slash command, and configuration option
+- [Architecture Overview](docs/architecture/ARCHITECTURE.md) - Layers, package map, request lifecycle, design rules, extension points
+- [Application Architecture Flowchart](docs/architecture/APPLICATION-ARCHITECTURE-FLOWCHART.md) - Mermaid diagrams for each flow
+- [Next Phases Implementation Plan](docs/roadmap/NEXT-PHASES-IMPLEMENTATION-PLAN.md) - Committed roadmap order and active work routing
+- [Backlog](docs/roadmap/BACKLOG.md) - Ideas, open bugs, UX follow-ups, tech debt, parked scope
+- [Phase Log](docs/phases/PHASE-LOG.md) - Implementation record and acceptance evidence
+- [Security Policy](SECURITY.md) - Trust boundaries and reporting
 - [Docker Usage](README.Docker.md) - Docker and container deployment guide
+- [All documentation](docs/README.md)
 
 ## Architecture
 
-![Whole-application architecture](Whole-Application.png)
+![Whole-application architecture](docs/architecture/images/whole-application.png)
 
 `nandocodego` is built around six core abstractions:
 
@@ -296,10 +301,11 @@ See [SECURITY.md](SECURITY.md) for:
 - ✅ **Phases 26-27:** Inline completion and directory mention expansion
 - ✅ **Phases 28-29:** Semantic workspace indexing/retrieval and TUI index-progress observability
 - ✅ **Ollama Cloud API key support:** complete
+- ✅ **Evaluation framework:** `nandocodego eval`
 - ⏳ **Phase 25:** Remote / Bridge Mode
 - ⏳ **Phases 17-18:** Distribution, hardening, evals, docs, and release approval
 
-See the [Next Phases Implementation Plan](docs/NEXT-PHASES-IMPLEMENTATION-PLAN.md), [Project Status and Engineer Onboarding](docs/PROJECT-STATUS-AND-ONBOARDING.md), and [Phase Log](docs/PHASE-LOG.md) for detailed implementation progress and current launch-readiness routing.
+See the [Next Phases Implementation Plan](docs/roadmap/NEXT-PHASES-IMPLEMENTATION-PLAN.md), [Project Status](docs/roadmap/PROJECT-STATUS-AND-ONBOARDING.md), and [Phase Log](docs/phases/PHASE-LOG.md) for detailed implementation progress and current launch-readiness routing.
 
 ## Development
 
@@ -365,9 +371,11 @@ nandocodego/
 │   ├── permissions/        # Permission system
 │   ├── state/              # State management
 │   ├── tui/                # Terminal UI
-│   └── ...
+│   ├── eval/               # Evaluation framework
+│   └── ...                 # full map: docs/architecture/ARCHITECTURE.md
+├── evals/                  # Eval fixtures
 ├── tools/                  # Build and check scripts
-├── docs/                   # Documentation
+├── docs/                   # Documentation (index: docs/README.md)
 └── .github/                # CI/CD workflows
 ```
 
@@ -377,11 +385,12 @@ MIT License - see [LICENSE](LICENSE) for details.
 
 ## Contributing
 
-This project is currently in active pre-v0.1 development. Contributions should follow the current roadmap in `docs/NEXT-PHASES-IMPLEMENTATION-PLAN.md` and the detailed phase or validation plan it routes to.
+This project is currently in active pre-v0.1 development. Contributions should follow the current roadmap in `docs/roadmap/NEXT-PHASES-IMPLEMENTATION-PLAN.md` and the detailed phase or validation plan it routes to.
 
 Please see:
+- [engineers.md](engineers.md) for the development workflow
 - [SECURITY.md](SECURITY.md) for security guidelines
-- [Project Status and Engineer Onboarding](docs/PROJECT-STATUS-AND-ONBOARDING.md) for current status and source-of-truth routing
+- [Project Status](docs/roadmap/PROJECT-STATUS-AND-ONBOARDING.md) for current status and source-of-truth routing
 
 ## Acknowledgments
 
