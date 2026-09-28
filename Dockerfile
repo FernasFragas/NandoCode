@@ -2,7 +2,7 @@
 # Keep the Go version in step with the toolchain directive in go.mod.
 
 # Stage 1: Build the application
-FROM golang:1.26.6 AS builder
+FROM golang:1.27.1 AS builder
 
 # Install build dependencies
 RUN apt-get update && apt-get install -y --no-install-recommends git make && rm -rf /var/lib/apt/lists/*
