@@ -8,6 +8,35 @@ This file is the implementation history and acceptance-evidence log. It is not t
 
 For current launch-readiness routing, read `docs/NEXT-PHASES-IMPLEMENTATION-PLAN.md` first, then `docs/PROJECT-STATUS-AND-ONBOARDING.md` and `docs/REMAINING-PHASES-TASK-REVIEW.md`. Use this log to verify what shipped, what checks ran, and which manual gates still need evidence.
 
+## Evaluation Framework — Deterministic Fixture Runner (2026-06-25)
+
+**Date:** 2026-06-25
+**Status:** Implemented and validated in deterministic local checks
+**Scope:** First-class eval CLI, deterministic recorded fixture runner, scoring, reports, fixtures, Makefile, CI, and README integration.
+
+### Completed
+
+- Added `nandocodego eval run` and `nandocodego eval validate`.
+- Implemented strict fixture loading and validation in `internal/eval`,
+  including duplicate-ID checks, path validation, recording validation, and
+  symlink-escape rejection.
+- Implemented deterministic recorded-model execution through the real agent loop
+  with workspace isolation, permission instrumentation, test-command execution,
+  file-change detection, scoring, and JSON/Markdown report emission.
+- Added five Go fixtures under `evals/`:
+  `basic-refactor`, `bugfix-with-tests`, `add-input-validation`,
+  `rename-symbol-safely`, and `add-missing-unit-tests`.
+- Added `make eval`, `make eval-ci`, and `make eval-validate`.
+- Added a deterministic eval CI job that validates fixtures, runs the recorded
+  suite, and uploads artifacts.
+- Updated `README.md` with eval commands and an example report summary.
+
+### Checks Run
+
+- `go test ./internal/eval ./internal/cli`
+- `env GOCACHE=/Users/fernando/personal-projects/NandoCode/.gocache go run ./cmd/nandocodego eval validate ./evals`
+- `env GOCACHE=/Users/fernando/personal-projects/NandoCode/.gocache go run ./cmd/nandocodego eval run ./evals --output-dir .tmp-evals/manual`
+
 ## Launch-Readiness Follow-Ups Completion (2026-06-23)
 
 **Date:** 2026-06-23

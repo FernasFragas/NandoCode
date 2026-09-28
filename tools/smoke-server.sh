@@ -3,6 +3,10 @@ set -euo pipefail
 
 BASE_URL="${BASE_URL:-http://127.0.0.1:8080}"
 TOKEN="${TOKEN:-}"
+if [[ -z "$TOKEN" ]]; then
+  echo "set TOKEN to the token printed by 'nandocodego server' (or passed via --token)" >&2
+  exit 2
+fi
 
 curl_with_auth() {
   if [[ -n "$TOKEN" ]]; then
