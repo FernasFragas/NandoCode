@@ -33,7 +33,10 @@ func RunTestCommand(ctx context.Context, workspaceDir, artifactDir string, env m
 	runCtx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 
-	cmd := exec.CommandContext(runCtx, cfg.Command[0], cfg.Command[1:]...)
+	// Running the fixture's configured test command is the purpose of this
+	// function. It runs without a shell (argv only), in the workspace, with a
+	// minimal environment and a timeout; fixtures are trusted inputs.
+	cmd := exec.CommandContext(runCtx, cfg.Command[0], cfg.Command[1:]...) // #nosec G204 -- intended: executes the fixture's test command (see above)
 	cmd.Dir = workspaceDir
 	cmd.Env = buildCommandEnv(env)
 	// Kill the whole process tree on timeout (e.g. the test binary spawned by
@@ -50,7 +53,7 @@ func RunTestCommand(ctx context.Context, workspaceDir, artifactDir string, env m
 	res.DurationMS = time.Since(start).Milliseconds()
 	res.StdoutPath = filepath.Join(artifactDir, cfg.Name+".stdout.txt")
 	res.StderrPath = filepath.Join(artifactDir, cfg.Name+".stderr.txt")
-	if writeErr := os.MkdirAll(artifactDir, 0o755); writeErr != nil {
+	if writeErr := os.MkdirAll(artifactDir, 0o750); writeErr != nil {
 		return res, writeErr
 	}
 	if writeErr := filewrite.AtomicWrite(res.StdoutPath, []byte(logging.Redact(stdoutBuf.String())), 0o644); writeErr != nil {

@@ -9,7 +9,7 @@ import (
 )
 
 func WriteJSONReport(path string, value any) error {
-	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+	if err := os.MkdirAll(filepath.Dir(path), 0o750); err != nil {
 		return err
 	}
 	data, err := json.MarshalIndent(value, "", "  ")

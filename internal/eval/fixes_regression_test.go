@@ -35,6 +35,78 @@ func TestEvaluateChecksDeletedGoldenFileIsTaskFailure(t *testing.T) {
 	}
 }
 
+func TestCompareExpectedFilesDoesNotFollowEscapingSymlinks(t *testing.T) {
+	base := t.TempDir()
+	expectedDir, workspaceDir := filepath.Join(base, "expected"), filepath.Join(base, "workspace")
+	mustMkdirAll(t, expectedDir)
+	mustMkdirAll(t, workspaceDir)
+	outside := filepath.Join(base, "outside.txt")
+	mustWriteFile(t, outside, "package a\n")
+	mustWriteFile(t, filepath.Join(expectedDir, "a.go"), "package a\n")
+
+	// The agent swaps the golden file for a link to identical content outside
+	// the workspace: it must not be read (or count as a match).
+	if err := os.Symlink(outside, filepath.Join(workspaceDir, "a.go")); err != nil {
+		t.Skipf("symlinks unavailable: %v", err)
+	}
+	matches, total, err := compareExpectedFiles(expectedDir, workspaceDir, []string{"a.go"})
+	if err != nil || matches != 0 || total != 1 {
+		t.Fatalf("workspace escape: matches=%d total=%d err=%v, want 0/1 mismatch without error", matches, total, err)
+	}
+
+	// A golden path that escapes the fixture's expected/ dir is refused.
+	if err := os.Symlink(outside, filepath.Join(expectedDir, "b.go")); err != nil {
+		t.Fatal(err)
+	}
+	mustWriteFile(t, filepath.Join(workspaceDir, "b.go"), "package a\n")
+	if _, _, err := compareExpectedFiles(expectedDir, workspaceDir, []string{"b.go"}); err == nil {
+		t.Fatal("expected an error for a golden file that resolves outside expected/")
+	}
+}
+
+func TestLoadRecordingRejectsUnsafeNames(t *testing.T) {
+	root := t.TempDir()
+	writeRunnableFixture(t, root, "rec")
+	fixtureRoot := filepath.Join(root, "rec")
+	if _, err := LoadRecording(fixtureRoot, "default"); err != nil {
+		t.Fatalf("valid recording: %v", err)
+	}
+	for _, name := range []string{"", "../rec/recordings/default", "sub/default", "Default"} {
+		if _, err := LoadRecording(fixtureRoot, name); err == nil {
+			t.Errorf("LoadRecording(%q) succeeded, want rejection", name)
+		}
+	}
+}
+
+func TestPrepareWorkspaceCopiesTreeAndRejectsSymlinks(t *testing.T) {
+	repo := t.TempDir()
+	mustWriteFile(t, filepath.Join(repo, "go.mod"), "module x\n")
+	mustMkdirAll(t, filepath.Join(repo, "pkg", "sub"))
+	mustWriteFile(t, filepath.Join(repo, "pkg", "sub", "a.go"), "package sub\n")
+	if err := os.Chmod(filepath.Join(repo, "go.mod"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+
+	ws, err := PrepareWorkspace(t.TempDir(), Fixture{RepoDir: repo})
+	if err != nil {
+		t.Fatal(err)
+	}
+	got, err := os.ReadFile(filepath.Join(ws.Path, "pkg", "sub", "a.go"))
+	if err != nil || string(got) != "package sub\n" {
+		t.Fatalf("nested file = %q, %v", got, err)
+	}
+	if info, err := os.Stat(filepath.Join(ws.Path, "go.mod")); err != nil || info.Mode().Perm()&0o100 == 0 && os.PathSeparator == '/' {
+		t.Fatalf("file mode not preserved: %v %v", info.Mode(), err)
+	}
+
+	if err := os.Symlink(filepath.Join(repo, "go.mod"), filepath.Join(repo, "link.go")); err != nil {
+		t.Skipf("symlinks unavailable: %v", err)
+	}
+	if _, err := PrepareWorkspace(t.TempDir(), Fixture{RepoDir: repo}); err == nil || !strings.Contains(err.Error(), "symlinks inside repo are not supported") {
+		t.Fatalf("PrepareWorkspace with symlink: err=%v", err)
+	}
+}
+
 func TestEvaluateChecksReportsToolUsageCheck(t *testing.T) {
 	cfg := ScoringConfig{
 		Execution: ExecutionConfig{MaxToolCalls: 2},
@@ -171,6 +243,7 @@ func TestRunOptionsValidate(t *testing.T) {
 		{RunOptions{Provider: ProviderRecorded, Model: "m"}, "--model"},
 		{RunOptions{Provider: ProviderRecorded, OllamaURL: "http://localhost:11434"}, "--ollama-url"},
 		{RunOptions{Provider: "bogus"}, "unsupported provider"},
+		{RunOptions{Provider: ProviderRecorded, Recording: "../../etc/x"}, "--recording"},
 	}
 	for _, tc := range cases {
 		err := tc.opts.Validate()

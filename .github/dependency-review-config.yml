@@ -15,6 +15,10 @@ allow-licenses:
   - 0BSD
   - Unlicense
   - CC0-1.0
+  # The Go project's PATENTS file (an additional royalty-free patent grant, not
+  # a restriction) shipped with golang.org/x/* modules; detected as
+  # "BSD-3-Clause AND LicenseRef-scancode-google-patent-license-golang".
+  - LicenseRef-scancode-google-patent-license-golang
 
 # Allow vulnerabilities in development dependencies (not applicable for Go, but kept for consistency)
 allow-ghsas: []

@@ -28,6 +28,9 @@ func (o RunOptions) Validate() error {
 		if strings.TrimSpace(o.OllamaURL) != "" {
 			return errors.New("--ollama-url is only supported with --provider live")
 		}
+		if o.Recording != "" && !slugPattern.MatchString(o.Recording) {
+			return fmt.Errorf("--recording %q must match ^[a-z0-9][a-z0-9-]*$", o.Recording)
+		}
 	case ProviderLive:
 	default:
 		return fmt.Errorf("unsupported provider %q (want %q or %q)", o.Provider, ProviderRecorded, ProviderLive)
@@ -57,7 +60,7 @@ func Run(ctx context.Context, fixtures []Fixture, opts RunOptions, progress func
 		outputDir = ".tmp-evals"
 	}
 	runDir := filepath.Join(outputDir, runID)
-	if err := os.MkdirAll(filepath.Join(runDir, "fixtures"), 0o755); err != nil {
+	if err := os.MkdirAll(filepath.Join(runDir, "fixtures"), 0o750); err != nil {
 		return RunReport{}, err
 	}
 
@@ -187,7 +190,7 @@ func runFixture(parent context.Context, runID, runDir string, target runTarget, 
 		TestStdoutPaths: map[string]string{},
 		TestStderrPaths: map[string]string{},
 	}
-	if err := os.MkdirAll(testsDir, 0o755); err != nil {
+	if err := os.MkdirAll(testsDir, 0o750); err != nil {
 		result.FailureReason = logging.Redact(err.Error())
 		return finalizeFixtureResult(result)
 	}

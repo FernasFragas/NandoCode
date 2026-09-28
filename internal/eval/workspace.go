@@ -34,43 +34,53 @@ func CleanupWorkspace(ws Workspace, keep bool) {
 	_ = os.RemoveAll(ws.Root)
 }
 
+// copyTree copies the fixture repo into dst. Both sides are accessed through
+// os.Root and symlinks are rejected, so the copy can neither read nor write
+// outside its directories.
 func copyTree(src, dst string) error {
-	return filepath.WalkDir(src, func(path string, d fs.DirEntry, err error) error {
+	if err := os.MkdirAll(dst, 0o750); err != nil {
+		return err
+	}
+	srcRoot, err := os.OpenRoot(src)
+	if err != nil {
+		return err
+	}
+	defer srcRoot.Close()
+	dstRoot, err := os.OpenRoot(dst)
+	if err != nil {
+		return err
+	}
+	defer dstRoot.Close()
+
+	return fs.WalkDir(srcRoot.FS(), ".", func(rel string, d fs.DirEntry, err error) error {
 		if err != nil {
 			return err
 		}
-		rel, err := filepath.Rel(src, path)
-		if err != nil {
-			return err
+		if d.Type()&fs.ModeSymlink != 0 {
+			return fmt.Errorf("symlinks inside repo are not supported: %s", filepath.Join(src, filepath.FromSlash(rel)))
 		}
-		target := dst
-		if rel != "." {
-			target = filepath.Join(dst, rel)
+		if rel == "." {
+			return nil
 		}
 		info, err := d.Info()
 		if err != nil {
 			return err
 		}
-		if info.Mode()&os.ModeSymlink != 0 {
-			return fmt.Errorf("symlinks inside repo are not supported: %s", path)
-		}
+		name := filepath.FromSlash(rel)
 		if d.IsDir() {
-			return os.MkdirAll(target, info.Mode().Perm())
+			return dstRoot.Mkdir(name, info.Mode().Perm())
 		}
-		return copyFile(path, target, info.Mode())
+		return copyFile(srcRoot, dstRoot, name, info.Mode().Perm())
 	})
 }
 
-func copyFile(src, dst string, mode os.FileMode) error {
-	if err := os.MkdirAll(filepath.Dir(dst), 0o755); err != nil {
-		return err
-	}
-	in, err := os.Open(src)
+func copyFile(srcRoot, dstRoot *os.Root, name string, perm os.FileMode) error {
+	in, err := srcRoot.Open(name)
 	if err != nil {
 		return err
 	}
 	defer in.Close()
-	out, err := os.OpenFile(dst, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, mode.Perm())
+	out, err := dstRoot.OpenFile(name, os.O_CREATE|os.O_WRONLY|os.O_EXCL, perm)
 	if err != nil {
 		return err
 	}

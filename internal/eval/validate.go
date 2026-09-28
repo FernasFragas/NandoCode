@@ -234,12 +234,14 @@ func validateFixture(f Fixture) []Diagnostic {
 		recordingName := cfg.Model.Recorded.Recording
 		recordingRel := filepath.Join("recordings", recordingName+".json")
 		recordingPath, err := resolveFixturePath(f.Root, recordingRel, false)
-		if err != nil {
+		if !slugPattern.MatchString(recordingName) {
+			add("scoring.yaml", "model.recorded.recording must match ^[a-z0-9][a-z0-9-]*$")
+		} else if err != nil {
 			add(recordingRel, fmt.Sprintf("recording is required: %v", err))
 		} else if _, err := os.Stat(recordingPath); err != nil {
 			add(filepath.Join("recordings", recordingName+".json"), fmt.Sprintf("recording is required: %v", err))
 		} else {
-			recording, err := LoadRecording(recordingPath)
+			recording, err := LoadRecording(f.Root, recordingName)
 			if err != nil {
 				add(recordingRel, fmt.Sprintf("invalid recording: %v", err))
 			} else {

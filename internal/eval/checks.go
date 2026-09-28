@@ -152,18 +152,31 @@ func compareExpectedFiles(expectedDir, workspaceDir string, files []string) (int
 	if len(files) == 0 {
 		return 0, 0, nil
 	}
+	// Read through os.Root so neither a golden path nor a symlink the agent
+	// planted in the workspace can resolve to a file outside its directory.
+	expectedRoot, err := os.OpenRoot(expectedDir)
+	if err != nil {
+		return 0, 0, err
+	}
+	defer expectedRoot.Close()
+	workspaceRoot, err := os.OpenRoot(workspaceDir)
+	if err != nil {
+		return 0, 0, err
+	}
+	defer workspaceRoot.Close()
+
 	matches := 0
 	for _, rel := range files {
-		expectedBytes, err := os.ReadFile(filepath.Join(expectedDir, filepath.FromSlash(rel)))
+		name := filepath.FromSlash(rel)
+		expectedBytes, err := expectedRoot.ReadFile(name)
 		if err != nil {
 			return 0, 0, err
 		}
-		actualBytes, err := os.ReadFile(filepath.Join(workspaceDir, filepath.FromSlash(rel)))
-		if os.IsNotExist(err) {
-			// The agent removed a golden file: a task failure, not a harness error.
-			continue
-		}
+		actualBytes, err := workspaceRoot.ReadFile(name)
 		if err != nil {
+			if agentReplacedGoldenPath(workspaceRoot, name, err) {
+				continue // a task failure (mismatch), not a harness error
+			}
 			return 0, 0, err
 		}
 		if normalizeText(expectedBytes) == normalizeText(actualBytes) {
@@ -171,6 +184,17 @@ func compareExpectedFiles(expectedDir, workspaceDir string, files []string) (int
 		}
 	}
 	return matches, len(files), nil
+}
+
+// agentReplacedGoldenPath reports whether a golden file is unreadable because
+// the agent deleted it or replaced it with a symlink (os.Root refuses links
+// that escape the workspace).
+func agentReplacedGoldenPath(root *os.Root, name string, readErr error) bool {
+	if os.IsNotExist(readErr) {
+		return true
+	}
+	info, err := root.Lstat(name)
+	return err == nil && info.Mode()&os.ModeSymlink != 0
 }
 
 func unexpectedChanges(allowed []string, changes []FileChange) []string {

@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"path/filepath"
 	"strings"
 	"time"
 
@@ -52,10 +51,9 @@ func buildRuntime(ctx context.Context, fixture Fixture, workspaceDir string, opt
 		if strings.TrimSpace(opts.Recording) != "" {
 			recordingName = opts.Recording
 		}
-		recordingPath := filepath.Join(fixture.Root, "recordings", recordingName+".json")
-		recording, err := LoadRecording(recordingPath)
+		recording, err := LoadRecording(fixture.Root, recordingName)
 		if err != nil {
-			return runtimeBundle{}, fmt.Errorf("load recording %s: %w", recordingPath, err)
+			return runtimeBundle{}, fmt.Errorf("load recording %q: %w", recordingName, err)
 		}
 		client := NewRecordedClient(recording)
 		return runtimeBundle{

@@ -111,13 +111,21 @@ func LoadFixture(root string) (Fixture, error) {
 		return Fixture{}, fmt.Errorf("fixture %s scoring.yaml: %w", absRoot, err)
 	}
 
-	taskBytes, err := os.ReadFile(taskPath)
+	// Read fixture files through os.Root so they cannot resolve outside the
+	// fixture directory (resolveFixturePath above reports the friendlier error).
+	fixtureRoot, err := os.OpenRoot(absRoot)
+	if err != nil {
+		return Fixture{}, fmt.Errorf("open fixture root %q: %w", absRoot, err)
+	}
+	defer fixtureRoot.Close()
+
+	taskBytes, err := fixtureRoot.ReadFile(filepath.Base(taskPath))
 	if err != nil {
 		return Fixture{}, fmt.Errorf("read task.md: %w", err)
 	}
 	taskText := strings.ReplaceAll(string(taskBytes), "\r\n", "\n")
 
-	scoringBytes, err := os.ReadFile(scoringPath)
+	scoringBytes, err := fixtureRoot.ReadFile(filepath.Base(scoringPath))
 	if err != nil {
 		return Fixture{}, fmt.Errorf("read scoring.yaml: %w", err)
 	}
@@ -151,8 +159,19 @@ func LoadFixture(root string) (Fixture, error) {
 	}, nil
 }
 
-func LoadRecording(path string) (Recording, error) {
-	file, err := os.Open(path)
+// LoadRecording reads recordings/<name>.json from a fixture. The name must be a
+// slug, and the file is opened through os.Root, so neither a crafted name
+// (e.g. from --recording) nor a symlink can read outside recordings/.
+func LoadRecording(fixtureRoot, name string) (Recording, error) {
+	if !slugPattern.MatchString(name) {
+		return Recording{}, fmt.Errorf("recording name %q must match %s", name, slugPattern.String())
+	}
+	recordings, err := os.OpenRoot(filepath.Join(fixtureRoot, "recordings"))
+	if err != nil {
+		return Recording{}, err
+	}
+	defer recordings.Close()
+	file, err := recordings.Open(name + ".json")
 	if err != nil {
 		return Recording{}, err
 	}
