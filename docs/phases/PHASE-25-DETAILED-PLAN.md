@@ -1,7 +1,7 @@
-# Phase 25 Detailed Plan — Remote / Bridge Mode (Required v0.1)
+# Phase 25 Detailed Plan — Browser Session Durability (rescoped from Remote / Bridge Mode, Required v0.1)
 
 Date: 2026-05-07
-Status: Final plan and implementation checklist; ready to start after Ollama Cloud API key support completion review on 2026-05-22
+Status: **Rescoped 2026-10-05 by [ADR-002](../adr/ADR-002-BROWSER-UI-PRIMARY-SURFACE.md).** Read "Rescope - 2026-10-05" first; it overrides the rest of this document wherever they conflict.
 Source plans:
 
 - `.codex/go-ollama-plan-AGENTS.md`
@@ -9,8 +9,78 @@ Source plans:
 - `docs/phases/PHASE-LOG.md`
 - `docs/roadmap/PROJECT-STATUS-AND-ONBOARDING.md`
 - `docs/phases/PHASE-8-DETAILED-PLAN.md`
-- `docs/phases/PHASE-24-DETAILED-PLAN.md`
+- `docs/archive/phases/PHASE-24-DETAILED-PLAN.md`
 - `book/ch16-remote.md`
+
+## Rescope - 2026-10-05
+
+The browser UI is now the primary surface and v0.1 is localhost only
+(ADR-002). Phase 25 no longer builds a remote TUI client. Its new goal:
+
+> A browser session survives a closed tab, a network blip, and a server
+> restart. The agent keeps working while no tab is attached, and a returning
+> tab catches up without dropped or duplicated events.
+
+### Slice 0 - Reliable Event Log (added 2026-10-06)
+
+Do this first; detach/reattach and replay depend on it. Source: review P1-4 in `docs/reports/investigations/CODE-COMPLEXITY-AND-ARCHITECTURE-REVIEW-2026-10-06.md`.
+
+Today `Session.Emit` (`internal/server/session.go`) assigns IDs, appends to the ring buffer, and fans out in three separate critical sections. Events emitted between replay and subscribe are lost (`handler.go` `handleEvents`), slow subscribers silently drop events, and an unknown or evicted `Last-Event-ID` returns nothing.
+
+- An `eventLog` type with an atomic `SubscribeFrom(lastID)` (replay plus subscribe under one lock).
+- On overflow, close the slow subscriber's channel so the client reconnects instead of silently losing events.
+- Unknown or evicted `Last-Event-ID`: send a `replay_gap` event, then the available backlog.
+- Heartbeats as SSE comments, not events with IDs.
+- Typed event DTOs with JSON tags instead of `map[string]any` payloads (and JSON tags on `agent.Usage`).
+
+Tests first (all under `-race`): IDs stay monotonic with concurrent emitters; no event is lost between replay and subscribe; an unknown ID yields `replay_gap`; overflow closes the subscriber; golden JSON per event type.
+
+The browser side (send `Last-Event-ID`, drop already-seen IDs on reconnect) lands earlier, in B2 with the page split (`js/sse.js`).
+
+### Kept (from the original plan)
+
+- Session state machine with detach/reattach (`running` → `detached` → `running`),
+  from Step 5 "Session Store" and Step 6 "Reconnect Protocol".
+- Event IDs, replay on reconnect via `Last-Event-ID`, and an explicit gap event
+  when the ring buffer has overflowed (Step 4). Reuse `internal/server/ringbuffer.go`
+  and `recentids.go`; add types only where gap detection needs them (Step 2).
+- Persisted session metadata (id, title, model, created/last-active, state) so the
+  browser session list (WEB-UI plan BF-6) survives a server restart. Transcript
+  persistence is limited to what is needed to re-render a session; full agent
+  state resume after restart is out of scope unless explicitly added.
+- Detached-session cleanup with a documented idle timeout, so detached sessions
+  cannot leak forever.
+- Permission requests that arrive while detached stay pending and are shown
+  when a tab reattaches (or time out with the same semantics as the TUI).
+- Session metadata in `nandocodego doctor` (Step 11), reduced to local paths and counts.
+- Integration and race tests (Step 13).
+
+### Removed
+
+- Step 3 JWT signing, refresh, and epoch management. v0.1 keeps the generated
+  opaque bearer token on loopback.
+- Step 7 `prctl` build tags (remote-host hardening).
+- Step 9 `internal/tui/remote_bridge.go` and Step 10 `nandocodego connect`.
+- Step 12 UDS server for `SendMessage` (parked in the backlog).
+- `--print-token`: the token is already printed at startup.
+
+### New Definition Of Success
+
+1. Start `nandocodego server` and open the printed URL.
+2. Send a prompt that triggers a long run with tool calls.
+3. Close the tab mid-run; wait 5 seconds; reopen the URL.
+4. The session appears in the session list, the run continued while detached,
+   and missed events replay in order with no duplicates.
+5. Force a ring-buffer overflow in a test and confirm the browser shows a gap
+   notice instead of silently dropping events.
+6. Restart the server; the session list still shows the previous sessions with
+   their metadata.
+7. A permission request raised while detached is shown on reattach and the
+   decision reaches the agent.
+8. `go test -race ./internal/server/...` passes.
+
+Historical sections below still describe JWT, `connect`, and the TUI bridge.
+Treat them as background only.
 
 ## Roadmap Precondition - 2026-05-22
 
@@ -18,7 +88,7 @@ Source plans:
 
 ## Implementation Readiness Review - 2026-05-21
 
-Status: ready to start. Ollama Cloud API key support has landed, and no blocking issues remain in the Phase 22 large-file prompt path for Phase 25 planning.
+Historical review (pre-ADR-002). Its JWT, `connect`, and UDS items no longer apply; the source-baseline facts below are still useful.
 
 Current source baseline:
 
@@ -40,7 +110,7 @@ Plan corrections from this review:
 
 ## Roadmap Placement
 
-Phase 25 is required v0.1 work. It depends on Phase 21 server mode, Phase 24 multi-agent coordination, and the completed Ollama Cloud API key support workstream. It must be implemented before Phase 17 and Phase 18.
+Phase 25 (rescoped) is required v0.1 work. It runs after browser-first step B2 (parity blockers, including the session list it persists) and before B3 (management panels), then the G0/CL validation gates, Phase 17, and Phase 18. See `docs/roadmap/NEXT-PHASES-IMPLEMENTATION-PLAN.md`. Its prerequisites (Phase 21 server mode, Phase 24 coordination, Ollama Cloud API key support) are complete.
 
 Historical baseline sections below may describe Phase 17 and Phase 18 as already implemented because this plan was originally written in numeric order. Under the current roadmap, Phase 17 and Phase 18 are final and must not be started until Phase 25 is complete.
 

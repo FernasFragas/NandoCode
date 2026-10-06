@@ -1,5 +1,7 @@
 # Nandocodego User Manual
 
+> **Browser-first (2026-10-05, [ADR-002](docs/adr/ADR-002-BROWSER-UI-PRIMARY-SURFACE.md)).** The browser UI is the primary surface for v0.1. Today, start it with `nandocodego server` and open the printed URL; after Phase 17, plain `nandocodego` will open the browser and the terminal UI moves to `nandocodego tui`. The terminal UI described in much of this manual still ships, in maintenance mode. A browser-first rewrite of this manual is Phase 18 docs work.
+
 ## 1. What Nandocodego Is
 
 **Nandocodego** is a local-first AI coding assistant for your terminal. It connects a local Ollama model to your project directory by default, can optionally switch to direct Ollama Cloud models with explicit credential consent, and gives the model controlled access to tools for reading files, editing files, searching code, running shell commands, tracking tasks, using skills, loading memory, and calling configured MCP servers.

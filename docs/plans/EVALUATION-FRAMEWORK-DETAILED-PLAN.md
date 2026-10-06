@@ -1,7 +1,7 @@
 # Evaluation Framework Detailed Plan
 
 Date: 2026-06-25  
-Status: Implementation-ready plan  
+Status: Implemented 2026-06-25 (see `docs/phases/PHASE-LOG.md`). Live-model runs and a larger fixture set remain for Phase 18.  
 Command: `nandocodego eval run ./evals`
 
 ## Goal

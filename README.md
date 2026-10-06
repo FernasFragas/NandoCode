@@ -22,7 +22,7 @@ The point is not to hide the engineer behind the tools. It is to show what one e
 
 ## Status
 
-**Current Version:** v0.0.0-dev (Phase 29 and the evaluation framework complete; Phase 25 remote/bridge mode next)
+**Current Version:** v0.0.0-dev (Phase 29 and the evaluation framework complete; next: P0 security fixes (B1), then browser-first parity and Phase 25 browser session durability, see [ADR-002](docs/adr/ADR-002-BROWSER-UI-PRIMARY-SURFACE.md))
 
 This project is under active development. **Engineers** should start with [engineers.md](engineers.md); **product managers** with [product-managers.md](product-managers.md). The committed roadmap is in [Next Phases Implementation Plan](docs/roadmap/NEXT-PHASES-IMPLEMENTATION-PLAN.md) and everything else is in the [Backlog](docs/roadmap/BACKLOG.md).
 
@@ -43,7 +43,7 @@ This project is under active development. **Engineers** should start with [engin
 - ✅ **Phases 28-29:** Semantic workspace indexing/retrieval and TUI index-progress observability
 - ✅ **Ollama Cloud API key support:** complete
 - ✅ **Evaluation framework:** `nandocodego eval` with deterministic fixtures in CI
-- ⏳ **Next:** Phase 25 Remote / Bridge Mode, then Phase 17 (distribution) and Phase 18 (hardening and release)
+- ⏳ **Next:** browser-first work (the browser UI is now the primary surface, see [ADR-002](docs/adr/ADR-002-BROWSER-UI-PRIMARY-SURFACE.md)), Phase 25 browser session durability, then Phase 17 (distribution) and Phase 18 (hardening and release)
 
 ## Prerequisites
 
@@ -302,7 +302,7 @@ See [SECURITY.md](SECURITY.md) for:
 - ✅ **Phases 28-29:** Semantic workspace indexing/retrieval and TUI index-progress observability
 - ✅ **Ollama Cloud API key support:** complete
 - ✅ **Evaluation framework:** `nandocodego eval`
-- ⏳ **Phase 25:** Remote / Bridge Mode
+- ⏳ **Phase 25:** Browser session durability (rescoped from Remote / Bridge Mode)
 - ⏳ **Phases 17-18:** Distribution, hardening, evals, docs, and release approval
 
 See the [Next Phases Implementation Plan](docs/roadmap/NEXT-PHASES-IMPLEMENTATION-PLAN.md), [Project Status](docs/roadmap/PROJECT-STATUS-AND-ONBOARDING.md), and [Phase Log](docs/phases/PHASE-LOG.md) for detailed implementation progress and current launch-readiness routing.

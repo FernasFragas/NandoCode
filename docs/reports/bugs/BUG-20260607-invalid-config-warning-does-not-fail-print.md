@@ -1,5 +1,7 @@
 # BUG-20260607-invalid-config-warning-does-not-fail-print
 
+> **Status: Open. Decision 2026-10-06: fail fast.** `--print` must exit non-zero with actionable error text when the config is malformed, instead of warning and continuing (today: `internal/cli/print.go` prints `Config warning:` and continues). Owner: roadmap step B1. Implement test-first: a failing `--print` test with a malformed config TOML, then the fix. The browser should surface the same error.
+
 ## Summary
 
 `nandocodego --print` does not fail when the project config TOML is malformed. It emits a parse warning to stderr and continues with the run, which diverges from the Lane A scenario expectation that invalid config should fail with actionable error text.

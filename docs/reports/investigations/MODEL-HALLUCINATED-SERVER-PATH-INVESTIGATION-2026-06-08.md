@@ -1,5 +1,7 @@
 # Model Hallucinated Server Path Investigation - 2026-06-08
 
+Status: **Open — recommended fixes not implemented** (checked 2026-10-06: `isWorkspaceDiscoveryPrompt` in `internal/retrievalroute/route.go` still lacks the investigation vocabulary, and normal runs have no grounding system prompt). Tracked in `docs/roadmap/BACKLOG.md` §5.
+
 ## Scope
 
 This report investigates why the application produced an inaccurate answer to this prompt:

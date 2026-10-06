@@ -1,6 +1,6 @@
 # Architecture Overview
 
-Last reviewed: 2026-09-28 against `main` (`de64d62`).
+Last reviewed: 2026-10-06 (architecture and complexity review; see `docs/reports/investigations/CODE-COMPLEXITY-AND-ARCHITECTURE-REVIEW-2026-10-06.md`).
 
 This is the narrative entry point to how `nandocodego` is built. For diagrams of
 each flow, see [APPLICATION-ARCHITECTURE-FLOWCHART.md](APPLICATION-ARCHITECTURE-FLOWCHART.md).
@@ -20,9 +20,9 @@ several surfaces:
 
 | Surface | Entry | Notes |
 | --- | --- | --- |
-| Interactive TUI (REPL) | `nandocodego` with no subcommand | Bubble Tea UI. Primary surface. |
+| Interactive TUI (REPL) | `nandocodego` with no subcommand (moves to `nandocodego tui` in Phase 17) | Bubble Tea UI. Maintenance mode since ADR-002 (2026-10-05): bug fixes only. |
 | One-shot | `nandocodego --print "<prompt>"` (`--json` for machine output) | No interactive prompts; fails closed when input is needed. |
-| HTTP/SSE server + browser UI | `nandocodego server` (default `127.0.0.1:8080`) | Token-authenticated sessions, embedded web UI, HTTP permission broker. |
+| HTTP/SSE server + browser UI | `nandocodego server` (default `127.0.0.1:8080`); plain `nandocodego` after Phase 17 | **Primary v0.1 surface** ([ADR-002](../adr/ADR-002-BROWSER-UI-PRIMARY-SURFACE.md)). Localhost only, token-authenticated sessions, embedded web UI, HTTP permission broker. |
 | Semantic index | `nandocodego index build\|refresh\|status\|clear [path]` | Builds the local embedding index used for retrieval. |
 | Evaluation | `nandocodego eval run\|validate [path]` | Runs the coding-task fixtures in `evals/` through the real agent loop. |
 | Utilities | `doctor`, `init`, `version` | Environment diagnostics, project setup, build info. |
@@ -64,8 +64,10 @@ selects one and supplies an `OLLAMA_API_KEY`.
 └──────────────────────────────────────────────────────────────────────────┘
 ```
 
-Dependencies point downward. `internal/agent` depends only on the `llm.Client`
-interface, not on Ollama. The surfaces never call tools directly; they submit
+Dependencies mostly point downward. `internal/agent` depends only on the `llm.Client`
+interface, not on Ollama. Known exceptions (2026-10-06): `analysis` imports
+`tui/fileindex`, `hooks` imports `mcp` to reuse its SSRF-safe HTTP client,
+`state` embeds `agent` types, and `config` embeds `semantic.Config`. The surfaces never call tools directly; they submit
 input to the agent and render the events it emits.
 
 ## Package Map
@@ -73,7 +75,7 @@ input to the agent and render the events it emits.
 | Package | Responsibility |
 | --- | --- |
 | `cmd/nandocodego` | Process entrypoint; signal handling; calls `cli.Run`. |
-| `internal/cli` | Cobra commands (`root`, `repl`, `print`, `server`, `index`, `eval`, `doctor`, `init`) and runtime assembly for each surface. |
+| `internal/cli` | Cobra commands (`root`, `repl`, `print`, `server`, `index`, `eval`, `doctor`, `init`) and runtime assembly for the TUI (`repl.go`) and `--print` (`print.go`). The server assembles its own runtime in `server.New`, and eval in `internal/eval`; the four assemblies are separate copies (see Known Architectural Gaps). |
 | `internal/tui` | Bubble Tea model: transcript, markdown, input, Vim mode, keybindings, permission modal, run state/status bar, index progress. `fileindex/` and `picker/` power `@` file completion. |
 | `internal/server` | HTTP/SSE API (`/v1/health`, `/v1/models`, `/v1/sessions/...`), token auth, rate limiting, session manager with event ring buffer, HTTP permission broker, embedded browser UI in `web/`. |
 | `internal/commands` | Slash-command registry: `/help /clear /exit /model /models /pull /memory /context /hooks /permissions /skills /cost /trace /prompt /init /agents /queue /compact /refresh-index /analyze-project /checkpoint /bg /btw /semantic /index`. |
@@ -116,13 +118,16 @@ input to the agent and render the events it emits.
 8. Tool results are appended and the loop repeats until the model stops, a limit is hit, or the user aborts. The run ends with a `Terminal` event.
 9. The TUI reduces every event into transcript items, status bar, usage, and notices. Memory extraction may queue pending drafts.
 
-The server (`internal/server`) runs the same steps per HTTP session, with SSE
-events instead of Bubble Tea messages and an HTTP permission broker instead of the
-modal. `--print` runs them once, without prompting.
+The server (`internal/server`, the primary surface) runs equivalent steps per HTTP
+session, with SSE events instead of Bubble Tea messages and an HTTP permission
+broker instead of the modal. Steps 2 and 5 are separate implementations
+(`server.New` and `Session.runAgent`), not shared code, and they have drifted from
+the TUI's (see Known Architectural Gaps). `--print` runs once, without prompting
+(`cli/print.go` `buildPrintInput`).
 
 ## Design Rules To Preserve
 
-- **One event stream.** The agent emits typed events; every surface (TUI, server, future remote client) is a consumer. New surfaces should reuse it, not add side channels.
+- **One event stream.** The agent emits typed events; every surface (browser/server, TUI, `--print`) is a consumer. New surfaces should reuse it, not add side channels.
 - **Separate session facts from UI state.** `bootstrap` holds immutable session facts; `state` holds reactive UI state.
 - **Fail closed at boundaries.** Tools, permissions, hooks, MCP, credentials, and server auth deny by default. Tools are unsafe and destructive unless they declare otherwise.
 - **Permissions have one decision point.** Nothing executes a tool without `permissions.Resolve`.
@@ -152,15 +157,27 @@ See [SECURITY.md](../../SECURITY.md) for the full policy. In short:
 - Shell and file tools run with the user's permissions. The permission modes and rules are the guard.
 - Project-controlled hooks are not executed until a workspace trust flow exists.
 - Cloud API keys come from env, keychain, or an interactive prompt, and are never logged.
-- The server binds to loopback by default and requires a bearer token.
+- The server binds to loopback by default. `/v1/*` always requires a bearer token (generated at startup when `--token` is not set). `NewRequestGuard` enforces a loopback `Host`, a same-origin `Origin`, and JSON request bodies; `securityHeaders` sets CSP (still with `'unsafe-inline'` until the page is split), frame denial, and related headers.
 - CI (`.github/workflows/ci.yml`) enforces the dependency allowlist, network policy, build/vet/race tests on Linux/macOS/Windows, formatting and golangci-lint, dependency review, and the deterministic eval suite. `security.yml` runs gosec (report-only), govulncheck, and a container image scan that fails on fixable critical/high vulnerabilities.
+
+## Known Architectural Gaps (2026-10-06 review)
+
+Verified against code; details, evidence, and recommended order in
+`docs/reports/investigations/CODE-COMPLEXITY-AND-ARCHITECTURE-REVIEW-2026-10-06.md`.
+
+- **Turn preparation exists three times** (TUI `submitPrompt`, server `runAgent`, `--print` `buildPrintInput`) and **runtime assembly four times** (REPL, print, server, eval). The server maps about half the config fields and skips several tools and wrappers.
+- **Browser-needed logic lives in the TUI**: model activation and limits refresh, run cancel/compact control, `/clear` and `/compact`, end-of-run history handling, prompt queue, semantic toggles. ADR-002 endpoints need it extracted into surface-neutral packages.
+- **Per-session vs process-wide state**: one `llm.RuntimeClient` is shared by all server sessions, and some diagnostics (`/cost`, the current run trace) are process-wide.
+- **Event-stream contract is not enforced**: some tool results are emitted without a start event, tool results can return out of call order, `ToolUseProgress` is never emitted, and the server event log has a replay/subscribe gap.
+- **Boundary gaps**: model-requested sub-agent permission mode can be looser than the parent's; project MCP config can mark itself trusted; some Bash commands with destructive arguments are classified read-only.
 
 ## Extension Points
 
 | To add... | Do this |
 | --- | --- |
 | A tool | Implement `tools.Tool` in `internal/tools/<name>`, declare `IsConcurrencySafe`/`IsDestructive`, register in `internal/tools/builtin`, add tests. |
-| A slash command | Register it in `internal/commands/registry.go`; the TUI dispatches through the registry. |
+| A slash command (TUI) | Register it in `internal/commands/registry.go`; the TUI dispatches through the registry, though several commands are still handled inline in `internal/tui`. |
+| A browser capability | Add a small, tested endpoint in `internal/server` that reuses the owning package (no generic slash-command bridge, ADR-002). |
 | A model family | Update `internal/llm/capabilities.go` and its tests. |
 | An eval fixture | Add `evals/<id>/` with `task.md`, `repo/`, `expected/`, `scoring.yaml`, `recordings/`; run `make eval-validate`. |
 | An MCP server or skill | Configuration only. See `USER_MANUAL.md` §12 and §14. |
@@ -170,7 +187,6 @@ See [SECURITY.md](../../SECURITY.md) for the full policy. In short:
 
 - [APPLICATION-ARCHITECTURE-FLOWCHART.md](APPLICATION-ARCHITECTURE-FLOWCHART.md): Mermaid diagrams per flow.
 - [EMBEDDING-AND-MODEL-ROUTING.md](EMBEDDING-AND-MODEL-ROUTING.md): local vs cloud chat and embedding routing.
-- [../guides/file-and-folder-context-pipeline.md](../guides/file-and-folder-context-pipeline.md): how files and folders become model context.
 - [../guides/DEBUG-BREAKPOINTS.md](../guides/DEBUG-BREAKPOINTS.md): where to break in each stage of a request.
 - [../adr/](../adr/): architecture decision records.
-- `docs/phases/PHASE-N-DETAILED-PLAN.md`: the design spec each subsystem was built from.
+- `docs/phases/PHASE-N-DETAILED-PLAN.md` (active) and `docs/archive/phases/` (finished): the design spec each subsystem was built from.

@@ -4,7 +4,9 @@
 **Project:** `nandocodego`  
 **Purpose:** verify that the features already implemented in the application still work after recent context, latency, checkpoint, retrieval, TUI, and reliability changes.
 
-This document is agent-ready. Use it as the regression and load-test checklist before starting Phase 22, before large refactors, and before release hardening.
+This document is agent-ready. Use it as the regression and load-test checklist before large refactors and before release hardening.
+
+> **2026-10-05:** browser-first re-plan ([ADR-002](../adr/ADR-002-BROWSER-UI-PRIMARY-SURFACE.md)). Task A5 (TUI core) becomes a maintenance regression check; add an equivalent browser/server task covering the served UI, SSE replay, permissions, and model switching. Task A6 (slash commands) should cover the browser command endpoints as they land.
 
 ## Scope
 
@@ -137,7 +139,7 @@ Use these task cards when assigning work to agents. Each task is intentionally b
 2. Create isolated `NANDOCODEGO_*` dirs and export `GOCACHE`.
 3. Run the fast regression gate.
 4. Run the full local regression gate.
-5. Assign A1-A14 and L0-L10 tasks to specialized agents.
+5. Assign A1-A15 and L0-L10 tasks to specialized agents.
 6. Merge findings into the report template.
 7. Mark each finding as `blocker`, `defer`, or `non-blocking`.
 
@@ -602,6 +604,44 @@ go test ./internal/agent/... ./internal/analysis/... ./internal/tui/... -run 'Co
 
 - R14 pass criteria are satisfied or each CL regression is listed as pre-Phase-22 blocker.
 
+### Task A15 - Browser And Server Agent
+
+**Goal:** verify the primary v0.1 surface (ADR-002): the served browser UI, HTTP/SSE session lifecycle, event replay, permissions, and model switching. Task A5 (TUI) is now a maintenance regression check; this task is the release-relevant one.
+
+**Owns:** R15.
+
+**Inspect:**
+
+- `internal/server/server.go` (routes, `securityHeaders`, embedded UI)
+- `internal/server/handler.go`
+- `internal/server/session.go`
+- `internal/server/sse.go`, `ringbuffer.go`, `recentids.go`
+- `internal/server/permission.go`, `auth.go`, `ratelimit.go`
+- `internal/server/web/index.html`
+- `tools/smoke-server.sh`
+
+**Commands:**
+
+```sh
+go test ./internal/server/...
+go test -race ./internal/server/...
+go test ./internal/server/... -run 'TestRoutesServeRichEmbeddedUI|TestEventsHandlerLastEventIDReplay|TestSessionStartRunAndReplay|TestHTTPPermissionBrokerResolve|TestUpdateModel|TestPostMessageRequiresCredentialForCloudModel|TestDeleteSessionCancelsRunningAgent|TestGetTree|TestAuthMiddleware'
+```
+
+**Manual browser checks** (start `nandocodego server`, open the printed `#token=` URL):
+
+- Send a prompt with a tool call; transcript, tool activity, and the final answer render.
+- Approve and deny a permission request from the browser modal; the decision reaches the agent.
+- Reload the tab mid-run; missed events replay in order without duplicates.
+- Switch to a local model and to a listed `:cloud` model (P0 bug `BUG-20260607-server-model-endpoint-rejects-listed-cloud-model`).
+- Open the file tree; paths outside the workspace are not reachable.
+- Run `TOKEN=<printed token> tools/smoke-server.sh`.
+- As browser-first steps B2-B4 land, add their endpoints here: run cancel, cloud key entry, clear/compact/index/cost, session list, management panels.
+
+**Done when:**
+
+- R15 pass criteria are satisfied, and every failure has exact reproduction steps and a failing test where automatable.
+
 ### Task L0 - Load Test Harness Agent
 
 **Goal:** turn load scenarios L0-L6 into repeatable tests or benchmarks where missing.
@@ -1025,6 +1065,30 @@ Pass criteria:
 - Small prompts do not always request max context.
 - Large prompts can scale context up without globally shrinking quality.
 - Checkpoint resume does not trigger from stale/completed checkpoints once hardening is implemented.
+
+### R15 - Browser UI And HTTP/SSE Server
+
+Automated checks:
+
+- `go test ./internal/server/...`
+- `go test -race ./internal/server/...`
+
+Required cases:
+
+- `/` serves the embedded UI; `/v1/...` requires the bearer token; security headers are present.
+- Session create/get/delete; deleting a session cancels its running agent.
+- Duplicate or conflicting message POSTs are rejected.
+- SSE `Last-Event-ID` replay returns missed events in order with no duplicates.
+- Permission requests resolve through `POST /v1/sessions/{id}/permissions/{reqID}`.
+- Model switch accepts every model listed by `/v1/models` that is actually runnable, and fails with a clear error otherwise.
+- Cloud-only models require credentials before any project context is sent.
+- The file tree cannot escape the workspace root.
+
+Pass criteria:
+
+- No data race under `-race`.
+- No event loss or duplication on reconnect within ring-buffer capacity.
+- Manual browser checks in Task A15 pass.
 
 ## Load And Performance Tests
 

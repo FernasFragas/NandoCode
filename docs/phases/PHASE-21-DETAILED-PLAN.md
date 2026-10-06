@@ -11,8 +11,8 @@ Source plans and references:
 - `docs/phases/PHASE-8-DETAILED-PLAN.md`
 - `docs/phases/PHASE-9-DETAILED-PLAN.md`
 - `docs/phases/PHASE-18-DETAILED-PLAN.md`
-- `docs/phases/PHASE-19-DETAILED-PLAN.md`
-- `docs/phases/PHASE-20-DETAILED-PLAN.md`
+- `docs/archive/phases/PHASE-19-DETAILED-PLAN.md`
+- `docs/archive/phases/PHASE-20-DETAILED-PLAN.md`
 - `book/ch04-api-layer.md`
 - `book/ch05-agent-loop.md`
 - `book/ch06-tools.md`
@@ -21,11 +21,7 @@ Source plans and references:
 
 ## Roadmap Placement
 
-Phase 21 is required after Phase 22 and before Phase 17 and Phase 18 because Phase 25 remote/bridge mode is required for v0.1 and depends on server mode. Phase 22 must land first so the local TUI has the run-state visibility, render performance, modal correctness, and activity display needed before those interaction patterns are reused or mirrored by server/remote workflows.
-
-Phase 17 and Phase 18 are the final release-packaging and hardening phases; do not start them while Phase 21 is unimplemented.
-
-Some baseline references in this document mention Phase 17/18 as earlier numbered phases. Treat those as historical planning context only. The current implementation order is documented in `docs/phases/PHASE-LOG.md` and `docs/roadmap/PROJECT-STATUS-AND-ONBOARDING.md`.
+Phase 21 is complete (2026-05-19). Since ADR-002 (2026-10-05) the browser UI it introduced is the primary v0.1 surface, and this phase is the baseline for the browser-first roadmap steps B1-B4 and the rescoped Phase 25 (browser session durability). The current order lives in `docs/roadmap/NEXT-PHASES-IMPLEMENTATION-PLAN.md`; this document's older ordering notes (Phase 22 first, Phase 25 remote/bridge) are historical.
 
 ## Goal
 
@@ -292,7 +288,7 @@ Phase 21 implications:
 
 ### Phase 17 - Distribution and Install
 
-Roadmap note: Phase 17 is not implemented yet under the current roadmap. It remains after Phase 21 because server mode is required for Phase 25 and v0.1.
+Roadmap note: Phase 17 is not implemented yet. It runs after the browser-first steps B1-B4 and the rescoped Phase 25; see `docs/roadmap/NEXT-PHASES-IMPLEMENTATION-PLAN.md`.
 
 Phase 21 implications:
 

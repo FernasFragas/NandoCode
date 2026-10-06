@@ -1,20 +1,20 @@
 # Phase 8 Detailed Plan - Memory
 
 Date: 2026-05-03
-Status: Final plan and implementation checklist
+Status: Core implementation landed; manual exit gate pending (Gate G0, `docs/roadmap/GATE-G0-PHASE-8-14-VALIDATION-PLAN.md`).
 Source plans:
 
 - `.codex/go-ollama-plan-AGENTS.md`
 - `.codex/go-ollama-plan-HUMANS.md`
 - `docs/phases/PHASE-LOG.md`
 - `docs/roadmap/PROJECT-STATUS-AND-ONBOARDING.md`
-- `docs/phases/PHASE-1-DETAILED-PLAN.md`
-- `docs/phases/PHASE-3-DETAILED-PLAN.md`
-- `docs/phases/PHASE-4-DETAILED-PLAN.md`
-- `docs/phases/PHASE-5-DETAILED-PLAN.md`
-- `docs/phases/PHASE-6-DETAILED-PLAN.md`
-- `docs/phases/PHASE-7-DETAILED-PLAN.md`
-- `docs/fixes/REPL-OLLAMA-STREAMING-FIX.md`
+- `docs/archive/phases/PHASE-1-DETAILED-PLAN.md`
+- `docs/archive/phases/PHASE-3-DETAILED-PLAN.md`
+- `docs/archive/phases/PHASE-4-DETAILED-PLAN.md`
+- `docs/archive/phases/PHASE-5-DETAILED-PLAN.md`
+- `docs/archive/phases/PHASE-6-DETAILED-PLAN.md`
+- `docs/archive/phases/PHASE-7-DETAILED-PLAN.md`
+- `docs/archive/fixes/REPL-OLLAMA-STREAMING-FIX.md`
 - `book/ch01-architecture.md`
 - `book/ch03-state.md`
 - `book/ch04-api-layer.md`

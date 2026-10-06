@@ -47,10 +47,12 @@ endpoints.
 
 ## Reporting Security Issues
 
-For now, report security issues through the repository issue tracker with a
-clear `security` label and avoid posting secrets, tokens, or exploit payloads in
-public text. Before public release, replace this section with a private security
-contact and coordinated disclosure process.
+Report vulnerabilities privately through GitHub private vulnerability reporting:
+open the repository's **Security** tab and choose **Report a vulnerability**
+(https://github.com/FernasFragas/NandoCode/security/advisories/new). Do not open
+a public issue for a vulnerability, and do not post secrets, tokens, or exploit
+payloads in public text. Reports are handled through a GitHub security advisory,
+and fixes are disclosed in a coordinated way once a release is available.
 
 ## Release Security Checklist
 

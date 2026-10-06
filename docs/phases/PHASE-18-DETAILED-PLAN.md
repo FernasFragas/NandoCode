@@ -2,6 +2,15 @@
 
 Date: 2026-05-07
 Status: Pre-implementation plan; final implementation phase
+
+**Browser-first changes (2026-10-05, [ADR-002](../adr/ADR-002-BROWSER-UI-PRIMARY-SURFACE.md)):**
+
+- Replace the REPL frame-time release gate (`BenchmarkREPLView500Items` p99 ≤ 33ms) with browser gates: a long-transcript render budget and SSE event throughput/latency for a 500-event run. The TUI benchmark may stay as a non-blocking regression check.
+- Add browser security work: tests for CSP, `X-Frame-Options`, and `Referrer-Policy`; keep the existing Origin/Host/JSON request guard (`NewRequestGuard`) under test; token never logged; file-tree traversal through `tools.ResolvePath` + `dirwalk.Walk`.
+- Manual exit gates (including the Phase 9 hook-blocking gate) run through the browser where the browser exposes the feature.
+- The docs site leads with the browser; the TUI is documented as a secondary, maintenance-mode surface.
+- Decided 2026-10-06: the remaining work in `docs/plans/PERFORMANCE-FOLLOW-UP-MULTI-AGENT-PLAN.md` (latency evidence, semantic benchmarks, `/trace` diagnostics, browser SSE/render benchmarks) feeds this phase's performance gates. Known limitations to document: heuristic (not LLM map/reduce) project-analysis summaries; token estimation is calibrated per model from Ollama counts, not tokenizer-exact; no workspace trust flow, so project/HTTP/agent hooks stay disabled.
+- Launch positioning (decided 2026-10-06): "the local agentic engineer", with Proof Mode (B5) as the differentiator. The README and docs site lead with it, and include an "ask the codebase" demo with cited answers (no new code needed).
 Source plans and references:
 
 - `.codex/go-ollama-plan-AGENTS.md`
@@ -14,11 +23,11 @@ Source plans and references:
 
 ## Roadmap Placement
 
-Phase 18 is the final implementation phase before v0.1.0. It must be implemented after Phase 17 and after all earlier feature, runtime reliability, multi-agent, remote/bridge, and distribution work is complete.
+Phase 18 is the final implementation phase before v0.1.0. It must be implemented after Phase 17 and after all earlier feature, runtime reliability, multi-agent, browser-first (B1-B4, Phase 25 rescoped), and distribution work is complete.
 
 The final implementation order is:
 
-1. Complete all feature and runtime reliability phases, including Phase 25 remote/bridge mode.
+1. Complete all feature and runtime reliability work, including browser steps B1-B4 and Phase 25 (rescoped to browser session durability).
 2. Implement Phase 17: distribution, install, release workflow, and release-facing doctor checks.
 3. Implement Phase 18 last: hardening, evals, docs, security review, and v0.1.0 release approval.
 
@@ -834,13 +843,7 @@ The architecture page must include a text-form layer diagram (ASCII or mermaid) 
 
 ## Implementation Todos
 
-- [ ] Create `eval/` directory structure with `run_test.go` and `scenarios/` subdirectory.
-- [ ] Implement `eval/run_test.go` test runner with `//go:build eval` tag.
-- [ ] Add `NANDOCODEGO_EVAL` environment variable guard in eval runner.
-- [ ] Implement scenario YAML loading and validation in eval runner.
-- [ ] Implement per-scenario pass/fail verdict calculation in eval runner.
-- [ ] Implement overall pass-rate calculation and assertion at ≥80% in eval runner.
-- [ ] Implement JSON results output in eval runner for CI artifact collection.
+- [x] Eval runner: done early (2026-06-25) by the evaluation framework, which replaces the `eval/run_test.go` + `//go:build eval` design described above. See `docs/plans/EVALUATION-FRAMEWORK-DETAILED-PLAN.md` (`nandocodego eval run|validate`, `internal/eval`, fixtures under `evals/`, `make eval|eval-ci|eval-validate`, deterministic CI job). Phase 18 still owns live-model runs and the larger fixture set below; write each scenario as an `evals/` fixture, not as YAML for the old runner.
 - [ ] Write eval scenario: read a file and report line count (FileRead required, Bash forbidden).
 - [ ] Write eval scenario: write a new file with specified content.
 - [ ] Write eval scenario: edit an existing file by replacing a function.
@@ -1060,3 +1063,56 @@ Phase 18 and v0.1.0 are complete only when:
 - v0.1.0 is tagged and the GitHub release is published;
 - the phase log records the implementation, results, and the release event;
 - no further implementation phase is needed for v0.1.0.
+
+## Release Review - Evidence, Blockers, Exit Criteria
+
+_Folded in on 2026-10-06 from the archived `REMAINING-PHASES-TASK-REVIEW.md` (2026-06-22 review) and updated for ADR-002 (browser-first, localhost only, no remote/JWT/`connect`)._
+
+### Reviewed Gap
+
+Phase 18 must be a final release gate, not a new feature bucket. It should harden everything already implemented, including Workstream CL/PA, the browser UI and server, the coordinator, and the TUI (maintenance mode).
+
+### Required Slice Order
+
+1. Extend the shipped eval framework (`nandocodego eval`, `docs/plans/EVALUATION-FRAMEWORK-DETAILED-PLAN.md`) with live-model runs and more fixtures.
+2. Add large-project analysis evals.
+3. Add browser/ask-response reliability checks where automatable (TUI checks are non-blocking regressions).
+4. Add server/browser/coordinator end-to-end evals.
+5. Add fuzz/property tests.
+6. Run security tooling and fix findings.
+7. Verify performance gates.
+8. Complete docs site/user docs/security docs.
+9. Finalize changelog.
+10. Record release approval or blockers.
+
+### Implementation Notes
+
+- Evals should include local Ollama model matrix where feasible.
+- Security review must include hooks, MCP HTTP, server auth (opaque token, Origin check, security headers), installer, file writes, and task/sub-agent paths.
+- Docs must clearly state v0.1 provider scope: Ollama/local-provider based, no OpenAI adapter.
+- Known limitations must be specific and non-blocking.
+- Any release trust issue is a blocker by default.
+
+### Evidence To Collect
+
+- `make eval` or equivalent output.
+- `go test -race ./...`.
+- fuzz/property test output.
+- `gosec` and `govulncheck` output.
+- link/doc check output.
+- binary size/performance measurements.
+- external/manual smoke sign-off notes.
+
+### Blockers
+
+- Security findings without documented mitigation.
+- Eval suite cannot pass minimum threshold.
+- Docs claim unsupported OpenAI/provider behavior.
+- Server/browser/coordinator flows lack any release validation.
+- Phase 17 packaging blocker remains open.
+
+### Exit Criteria
+
+- No further v0.1 implementation phase is needed.
+- All release blockers closed or explicitly accepted as non-blocking limitations.
+- v0.1.0 release approval is recorded in `docs/phases/PHASE-LOG.md`.

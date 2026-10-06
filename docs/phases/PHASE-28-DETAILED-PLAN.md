@@ -138,7 +138,7 @@ Policy matrix:
 A built semantic index means retrieval is available; it must not mean every
 non-listing prompt pays the retrieval and prompt-growth cost. The detailed
 latency/regression rationale and acceptance criteria live in
-`docs/reports/investigations/WAITING-FOR-MODEL-LATENCY-REPORT.md`.
+`docs/archive/reports/investigations/WAITING-FOR-MODEL-LATENCY-REPORT.md`.
 
 ## Official API And Model Facts
 

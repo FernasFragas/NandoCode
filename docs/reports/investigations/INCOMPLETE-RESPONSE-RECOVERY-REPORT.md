@@ -1,5 +1,7 @@
 # Incomplete Response Recovery Report
 
+Status: Recovery implemented (`docs/phases/PHASE-LOG.md`, 2026-05-16); final-answer completeness evidence pending in the Workstream CL/PA gate.
+
 Date: 2026-05-16
 
 ## Purpose

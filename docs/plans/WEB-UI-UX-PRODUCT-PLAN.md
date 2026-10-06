@@ -2,8 +2,9 @@
 
 **Date reviewed:** 2026-05-24  
 **Implementation audit:** 2026-05-28  
-**Status:** P0 browser gap implemented as of 2026-06-23; the served embedded UI is reconciled with the richer root UI and event payload mapping now normalizes `SessionEvent.data`. P1 management panels remain future work.
-**Scope:** Upgrade the existing Phase 21 browser page into a usable local web UI.  
+**Re-planned:** 2026-10-05 - the browser UI is now the **primary v0.1 surface** ([ADR-002](../adr/ADR-002-BROWSER-UI-PRIMARY-SURFACE.md)). The P1 panels are committed roadmap work and new browser-first P0 items were added; see "Browser-First P0 Additions (2026-10-05)".  
+**Status:** Original P0 chat scope implemented as of 2026-06-23. Browser-first P0 additions, P1 management panels (UI-7), and UI-8 hardening remain.
+**Scope:** Make the Phase 21 browser page the primary local product surface.  
 **Module path:** `github.com/FernasFragas/Nandocode`
 
 This plan is grounded in the current repository. It intentionally builds on the
@@ -62,9 +63,8 @@ Use these facts as the starting point for implementation:
 | Default bind | `127.0.0.1:8080` |
 | Server package | `internal/server` |
 | Embedded UI | `internal/server/web/index.html`, embedded by `//go:embed web/index.html` in `internal/server/server.go` |
-| Rich UI draft | Root `web/index.html`, synchronized with the embedded served UI |
 | Transport | Served rich UI uses fetch-stream SSE plus HTTP writes |
-| Auth | Bearer token middleware when `--token` is set |
+| Auth | Bearer token always required on `/v1/...`; generated at startup and passed via the `#token=` URL fragment when `--token` is not set |
 | Non-loopback safety | Non-loopback bind is rejected unless `--token` is set |
 | Rate/session limits | `internal/server/ratelimit.go` |
 | Session replay | Ring buffer with `Last-Event-ID` support |
@@ -131,7 +131,7 @@ Current code has progressed beyond the original plan baseline:
 | --- | --- | --- |
 | HTTP/SSE server baseline | Implemented | `internal/server` exposes sessions, message POST, SSE events, model list, permissions, replay, auth, rate limiting, and embedded UI. |
 | Served browser UI | Rich P0 UI served | `internal/server/web/index.html` now contains the rich shell and no native `EventSource` manual-connect flow. |
-| Root rich browser shell | Served and mirrored | Root `web/index.html` and embedded `internal/server/web/index.html` are synchronized. |
+| Root rich browser shell | Removed 2026-10-05 | The root `web/index.html` mirror was deleted; `internal/server/web/` is the only browser UI source. |
 | Session lifecycle UI | Implemented in served UI | Served UI creates a session on load and reconnects the SSE stream with exponential backoff. |
 | Chat input | Implemented in served UI | Served UI posts prompts with `message_id` for duplicate-safe submission. |
 | Permission modal UI | Implemented in served UI | Served UI posts `allow`, `deny`, and `always_allow` to the existing permission endpoint and reads request fields through normalized event payloads. |
@@ -202,7 +202,6 @@ Resolved P0 correctness gap:
 - Theme engine beyond a basic light/dark CSS toggle.
 - MCP server manager.
 - Model pull progress UI.
-- Browser token flow for protected SSE.
 - Multi-user collaboration.
 - Cloud hosting.
 
@@ -296,20 +295,38 @@ Tests:
 - `.git` and default excludes are omitted.
 - Depth and file caps are enforced.
 
+## Browser-First P0 Additions (2026-10-05)
+
+These close the gaps that stop the browser from replacing the TUI as the main
+surface. Each item ships with backend tests and follows the Architecture Rules
+(no generic slash-command bridge; reuse the owning package).
+
+| ID | Requirement | Implementation notes |
+| --- | --- | --- |
+| BF-1 | Split the page into embedded static files | Move inline CSS/JS out of `index.html` into files under `internal/server/web/` (for example `app.css`, `app.js`, small ES modules). Plain JS, no build tools, no npm. Embed the directory with `//go:embed web` and keep the existing route/embed test. Tighten CSP once inline script/style is gone. The SSE module must send `Last-Event-ID` on reconnect and drop already-seen event IDs, which fixes today's duplicated transcript after a reconnect (server-side event-log fixes are Phase 25 slice 0). Keep the markdown, SSE-parser, and tree modules DOM-free and test them with `node --test` (no npm; decided 2026-10-06). |
+| BF-2 | Stop/cancel an active run | Add `POST /v1/sessions/{id}/cancel` that cancels the run context and emits the normal terminal event. Add a Stop button. Today the only option is deleting the session. |
+| BF-3 | Ollama Cloud API key entry | Server mode must not block on input, so add an explicit endpoint (for example `POST /v1/credentials/ollama-cloud` with use-once or save-to-keychain) and handle `requires_credential` in the model picker. The key must be provided before any project context is sent; never log or echo it. Follow `docs/plans/OLLAMA-CLOUD-API-KEY-PLAN.md`. |
+| BF-4 | Model list matches what can be selected | Fix the P0 bug: `/v1/models` must not advertise stale `:cloud` tags that the switch path rejects, or the switch must return a precise "not available in Ollama Cloud" error. The picker should mark cloud models and their credential state. |
+| BF-5 | Session commands | Small endpoints for clear, compact, index build/refresh/status (with the Phase 29 progress events), and cost. Reuse the same code paths as the TUI commands. |
+| BF-6 | Session list | List, switch, and delete sessions in the browser. Persistence across server restarts comes from rescoped Phase 25. |
+| BF-7 | Default command opens the browser | Plain `nandocodego` starts the server on loopback and opens the browser with the `#token=` URL; the TUI moves to `nandocodego tui`; `--print` is unchanged. Owned by Phase 17 but can land earlier. |
+
 ## Implementation Slices
 
 Each slice must leave the repo testable. Do not mix later panels into P0 slices.
 
-Recommended next implementation order:
+Recommended next implementation order (updated 2026-10-06; `docs/roadmap/NEXT-PHASES-IMPLEMENTATION-PLAN.md` is authoritative and also schedules C1 core cleanup in parallel with B2):
 
-1. Reconcile the embedded UI first: either move the root rich `web/index.html`
-   into `internal/server/web/index.html`, or intentionally change the embed path
-   and tests so `nandocodego server` serves the rich UI.
-2. Fix browser SSE payload handling in UI-2/UI-3/UI-6 so the served rich UI
-   reads `SessionEvent.data` correctly.
-3. Refactor the tree endpoint to use `tools.ResolvePath` and `dirwalk.Walk`.
-4. Add security header tests and close remaining accessibility gaps.
-5. Start P1 sidebar panels one panel at a time.
+1. B1: fix the cloud-model switch P0 bug, add security header tests (UI-8), and
+   refactor the tree endpoint to use `tools.ResolvePath` and `dirwalk.Walk` (UI-5).
+2. B1.5: surface-neutral extraction (`turnprep`, `bootstrap.ApplyConfig`, `modelruntime.Activate`, `runctl`, `ApplyTerminal`, agent event invariants); see `docs/roadmap/NEXT-PHASES-IMPLEMENTATION-PLAN.md`.
+3. B2: implement BF-1 through BF-6 from "Browser-First P0 Additions" on top of the B1.5 packages (BF-2 uses `runctl`, BF-3 uses `modelruntime.Activate`, BF-5 uses the extracted clear/compact operations).
+4. Phase 25 (rescoped): session durability, which BF-6 builds on.
+5. B3: P1 sidebar panels (UI-7), one panel at a time.
+6. B4: remaining UI-8 accessibility and hardening.
+
+The root `web/index.html` mirror was deleted on 2026-10-05; `internal/server/web/`
+is the only browser UI source.
 
 ### Slice UI-0: Serve the Rich Browser UI
 
@@ -322,14 +339,13 @@ product functionality, not an unserved root draft.
 Files:
 
 - `internal/server/web/index.html`
-- root `web/index.html`
 - `internal/server/server.go` only if changing the embed layout
 - `internal/server/handler_test.go` or a new route/embed test
 
 Tasks:
 
-- Keep the canonical served UI under `internal/server/web/` and synchronize the
-  root `web/index.html` mirror when editing browser UI.
+- Keep the canonical served UI under `internal/server/web/` (the root mirror
+  was deleted on 2026-10-05).
 - Ensure `GET /` serves the rich browser shell, not the old manual
   EventSource/debug page.
 - Preserve the fetch-stream SSE implementation so bearer-token auth can work.
@@ -365,7 +381,6 @@ creates a session and connects to SSE.
 Files:
 
 - `internal/server/web/index.html` after UI-0 reconciliation
-- root `web/index.html` only if it remains the canonical source
 - `internal/server/handler_test.go` only if route behavior changes
 
 Tasks:
@@ -396,7 +411,7 @@ WebSocket, npm, or new dependencies. Run go test ./internal/server ./internal/cl
 
 ### Slice UI-2: Chat Transcript and Event Rendering
 
-**Status:** Partially implemented; next fix is required here.
+**Status:** Implemented in the served browser UI. The payload-normalization fix described below landed by 2026-06-23 (see Implementation Audit); keep the agent prompt as history.
 
 **Goal:** Users can send prompts and read structured streaming responses.
 
@@ -523,7 +538,7 @@ pull UI in this slice. Run go test ./internal/server.
 ### Slice UI-5: Mentions and Safe File Tree
 
 **Status:** Served UI helper implemented; backend safety implementation must be
-refactored before this slice is fully complete.
+refactored before this slice is fully complete. Owner: roadmap step B1.
 
 **Goal:** Users can insert `@path` mentions from a safe browser picker.
 
@@ -565,7 +580,7 @@ tools.ResolvePath and dirwalk.Walk instead of raw filepath.WalkDir. Keep plain
 ### Slice UI-6: Status, Tasks, and Diagnostics From Existing Events
 
 **Status:** Partially implemented in the served UI; event payload shape is
-normalized and transcript search is still missing.
+normalized and transcript search is still missing (not yet scheduled on the roadmap).
 
 **Goal:** Make the UI useful for long runs without adding management endpoints.
 
@@ -600,7 +615,7 @@ endpoints in this slice. Run go test ./internal/server.
 
 ### Slice UI-7: P1 Sidebar Panels
 
-**Status:** Not implemented.
+**Status:** Not implemented. Owner: roadmap step B3.
 
 **Goal:** Add management panels after P0 browser chat is stable.
 
@@ -613,9 +628,8 @@ Panel endpoint guidance:
 | --- | --- | --- |
 | Memory | `GET /v1/sessions/{id}/memory`, `GET /v1/sessions/{id}/memory/{name}`, optional promote endpoint | `internal/memory` |
 | Skills | `GET /v1/skills`, `GET /v1/skills/{name}` | `internal/skills` |
-| Hooks | `GET /v1/hooks`, optional reload with `{"confirm":"yes"}` | current hook snapshot/reload path |
-| Permissions | `GET /v1/sessions/{id}/permissions`, allow/deny session-rule endpoints | `internal/permissions`, `Session.permRules` |
-| Tasks | `GET /v1/sessions/{id}/tasks`, optional stop endpoint | `state.App.Tasks`, `tasks.Supervisor` |
+| Trust (decided 2026-10-06: merges permissions and hooks) | `GET /v1/sessions/{id}/permissions` plus allow/deny session-rule endpoints; `GET /v1/hooks` (optional reload with `{"confirm":"yes"}`); `GET /v1/trust` for MCP servers (read-only: trust, connection status), cloud credential status (never the key), network policy, writable roots | `internal/permissions`, `Session.permRules`, hook snapshot, `internal/mcp`, `internal/credentials` |
+| Activity (decided 2026-10-06: the "mission control" view) | `GET /v1/sessions/{id}/tasks`, optional stop endpoint; the rest from existing events (run phase, tools, sub-agents, queue, permission waits, index activity) | `state.App.Tasks`, `tasks.Supervisor`, agent events |
 | Trace/cost | Start with event-derived data; add endpoints only if event data is insufficient | terminal usage and observability data |
 | Prompt inspector | Add only after confirming prompt dump data is retained server-side | `agent/prompt_dump` and session state |
 
@@ -637,7 +651,7 @@ that panel. Run the relevant go test command plus go test ./internal/server.
 
 ### Slice UI-8: Accessibility, Security Headers, and Final Hardening
 
-**Status:** Partially implemented.
+**Status:** Partially implemented. Owner: roadmap step B1 (security-header tests) and B4 (accessibility, CSP without `'unsafe-inline'`). The Origin/Host guard already exists (`NewRequestGuard`, `TestRequestGuard`).
 
 **Goal:** Finish the browser UI without weakening the local-server security
 model.

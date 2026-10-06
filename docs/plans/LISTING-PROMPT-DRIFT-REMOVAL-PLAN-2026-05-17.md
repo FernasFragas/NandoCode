@@ -24,7 +24,7 @@ Still required:
 
 ## Implementation Status (2026-05-17)
 
-Status: ✅ Code implementation complete for the planned P0 and P1 drift-removal slices.
+Status: ✅ Code implementation complete for the planned P0 and P1 drift-removal slices. Live evidence pending in the Workstream CL/PA gate (`docs/plans/CONTEXT-LATENCY-OPTIMIZATION-PLAN.md`, end of document).
 
 Implemented in code and covered by tests:
 

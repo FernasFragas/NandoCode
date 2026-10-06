@@ -1,7 +1,7 @@
 # Performance Follow-Up Multi-Agent Plan
 
 Date: 2026-06-06
-Status: In progress
+Status: In progress; the remaining items feed the Phase 18 performance gates (decided 2026-10-06). **2026-10-05:** TUI render benchmark work is dropped (TUI in maintenance mode, [ADR-002](../adr/ADR-002-BROWSER-UI-PRIMARY-SURFACE.md)); replace it with browser transcript-render and SSE throughput benchmarks. Latency evidence, semantic benchmarks, `/trace` improvements, and fast-path/startup/hook tests still apply.
 Scope: finish the remaining performance follow-up after the response-time refactor landed on `performance_branch`
 
 ## Objective
@@ -13,7 +13,7 @@ Focus areas:
 - collect real latency evidence for small, medium, and large prompts;
 - extend semantic benchmarks to more production-like dimensions;
 - improve trace/debug output for slow runs;
-- strengthen TUI render benchmarks and caching-related tests;
+- add browser performance coverage: SSE event throughput/latency and long-transcript render budget (replaces TUI render benchmarks, ADR-002);
 - strengthen fast-path, startup, and hook validation coverage.
 
 ## Current Ground Truth
@@ -34,7 +34,7 @@ Still worth doing:
 - real-world latency evidence capture from the current app behavior;
 - production-like semantic benchmark dimensions and larger index shapes;
 - higher-signal `/trace last` diagnostics;
-- stronger TUI render benchmark coverage for long transcripts and active tails;
+- browser performance coverage: a Go benchmark in `internal/server` for SSE throughput/latency on a 500-event run, and a measured long-transcript render budget for the served page (no JS build tooling; measure in the browser or a headless check);
 - stronger tests for fast-path, startup, and hook behavior;
 - final focused verification and documentation of remaining risks.
 
@@ -59,10 +59,10 @@ Worker 2 ownership:
 - `internal/commands/registry_test.go`
 - optional narrow changes in `internal/observability/metrics.go`
 
-Worker 3 ownership:
+Worker 3 ownership (rescoped 2026-10-06 for ADR-002; the TUI render benchmarks below landed 2026-06-06 and stay as non-blocking regression checks):
 
-- `internal/tui/render_benchmark_test.go`
-- `internal/tui/app_test.go`
+- new `internal/server/*_bench_test.go` for SSE throughput/latency and ring-buffer replay
+- browser transcript render budget measurement procedure for `internal/server/web/`
 
 Worker 4 ownership:
 

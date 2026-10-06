@@ -1,6 +1,6 @@
 # Debug Breakpoints Guide
 
-This guide maps the critical execution paths in the system and tells you exactly where to place breakpoints to observe each stage of a request's lifecycle — from user keypress to terminal event.
+This guide maps the critical execution paths in the system and tells you exactly where to place breakpoints to observe each stage of a request's lifecycle — from user keypress (TUI) or HTTP request (browser) to terminal event.
 
 ---
 
@@ -237,6 +237,30 @@ Events drained async → TUI Update() re-renders
 
 ---
 
+## 12. Browser Request Path (Primary Surface)
+
+Since ADR-002 (2026-10-05) the browser UI is the primary surface. Stages 4-8 and 11 above (agent loop, LLM turn, Ollama client, tools, permission resolution, compaction) are shared; only the entry and the event drain differ from the TUI path.
+
+**Startup:** `internal/cli/server.go` → `newServerCmd()` → `server.RunUntilSignal()`; `internal/server/server.go` → `New()` (bootstrap, `state.DefaultApp`, runner wiring), `routes()` (route table, embedded UI), `securityHeaders()`, `sessionRoutes()` (dispatch on `/v1/sessions/{id}/...`).
+
+| Stage | Breakpoint | What to inspect |
+|-------|-----------|-----------------|
+| Session create | `internal/server/handler.go` → `handleCreateSession()` | Session ID, model, and state snapshot used for the new session |
+| Prompt submit | `handler.go` → `handlePostMessage()` | Request body, `message_id` dedupe, `requires_credential` for cloud models |
+| Run start | `internal/server/session.go` → `StartRun()`, `runAgent()` | Packed prompt, history, permission mode/rules, semantic retrieval decision |
+| Agent → session | `session.go` → `handleAgentEvent()` | Each `agent.Event` converted to a `SessionEvent` |
+| Event fan-out | `session.go` → `Emit()`, `Replay()` | Ring-buffer append, event IDs, replay from `Last-Event-ID` |
+| SSE write | `handler.go` → `handleEvents()`; `internal/server/sse.go` → `writeSSE()` | Frames sent to the browser, heartbeat, client disconnect |
+| Permission | `internal/server/permission.go` → `PromptFunc()`, `Resolve()`; `handler.go` → `handleResolvePermission()` | Pending request ID, decision from the browser, timeout |
+| Model switch | `handler.go` → `handleUpdateModel()` | Requested model vs `/v1/models` list (P0 cloud-model bug) |
+| File tree | `handler.go` → `handleGetTree()` | Root containment and walk limits |
+
+**Browser side** (`internal/server/web/index.html`, use the browser devtools debugger): `sendMessage()` (POST), `connectSSE()` (fetch-stream SSE and reconnect), `handleEvent()` (event dispatch), `showPermissionModal()` / `sendPermission()`, `handleDisconnect()`.
+
+**For "browser not updating":** break at `Session.Emit()`, then `writeSSE()`, then set a devtools breakpoint in `handleEvent()`; check the event `type` and `data` payload shape.
+
+---
+
 ## Quick Breakpoint Cheatsheet
 
 ```
@@ -251,6 +275,9 @@ Tool dispatch   internal/agent/tools.go           → executeToolCallsConcurrent
 Permissions     internal/permissions/resolver.go  → Resolve()
 TUI update      internal/tui/app.go               → handleAgentEvent()
 State mutation  internal/state/store.go           → Set()
+Browser submit  internal/server/handler.go        → handlePostMessage()
+Browser run     internal/server/session.go        → runAgent(), handleAgentEvent()
+SSE out         internal/server/sse.go            → writeSSE()
 ```
 
 ---
