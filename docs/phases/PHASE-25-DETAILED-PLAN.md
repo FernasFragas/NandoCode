@@ -21,6 +21,22 @@ The browser UI is now the primary surface and v0.1 is localhost only
 > restart. The agent keeps working while no tab is attached, and a returning
 > tab catches up without dropped or duplicated events.
 
+### Slice 0 - Reliable Event Log (added 2026-10-06)
+
+Do this first; detach/reattach and replay depend on it. Source: review P1-4 in `docs/reports/investigations/CODE-COMPLEXITY-AND-ARCHITECTURE-REVIEW-2026-10-06.md`.
+
+Today `Session.Emit` (`internal/server/session.go`) assigns IDs, appends to the ring buffer, and fans out in three separate critical sections. Events emitted between replay and subscribe are lost (`handler.go` `handleEvents`), slow subscribers silently drop events, and an unknown or evicted `Last-Event-ID` returns nothing.
+
+- An `eventLog` type with an atomic `SubscribeFrom(lastID)` (replay plus subscribe under one lock).
+- On overflow, close the slow subscriber's channel so the client reconnects instead of silently losing events.
+- Unknown or evicted `Last-Event-ID`: send a `replay_gap` event, then the available backlog.
+- Heartbeats as SSE comments, not events with IDs.
+- Typed event DTOs with JSON tags instead of `map[string]any` payloads (and JSON tags on `agent.Usage`).
+
+Tests first (all under `-race`): IDs stay monotonic with concurrent emitters; no event is lost between replay and subscribe; an unknown ID yields `replay_gap`; overflow closes the subscriber; golden JSON per event type.
+
+The browser side (send `Last-Event-ID`, drop already-seen IDs on reconnect) lands earlier, in B2 with the page split (`js/sse.js`).
+
 ### Kept (from the original plan)
 
 - Session state machine with detach/reattach (`running` → `detached` → `running`),

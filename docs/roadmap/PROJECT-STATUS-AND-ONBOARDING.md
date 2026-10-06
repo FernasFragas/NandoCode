@@ -15,7 +15,7 @@ Start with [engineers.md](../../engineers.md) or
 - **Code-complete or substantially implemented:** Phases 0-16, Phase 19, Phase 20, Phase 21, Phase 22 core, Phase 24, Ollama Cloud API key support, Phase 26, Phase 27, Phase 28, Phase 29, the response-time refactor, and the evaluation framework (`nandocodego eval`, 2026-06-25).
 - **CI:** `.github/workflows/ci.yml` and `security.yml` run on every push and PR (see `docs/architecture/ARCHITECTURE.md` § Security Boundaries).
 - **Implemented but still needing manual/live acceptance:** Phases 8-14 (Gate G0) and Workstream CL/PA evidence. Phase 22 was accepted as-is on 2026-10-05; the TUI is in maintenance mode ([ADR-002](../adr/ADR-002-BROWSER-UI-PRIMARY-SURFACE.md)). The 2026-06-23 launch-readiness pass closed the known code gaps for prompt/trace diagnostics, semantic routing/index-status handling, TUI follow-ups, and the served browser P0 UI.
-- **Remaining planned implementation:** browser-first steps B1-B2, Phase 25 (rescoped to browser session durability), B3-B4, the G0 and CL/PA evidence gates, then Phase 17 and Phase 18. Order: [NEXT-PHASES-IMPLEMENTATION-PLAN.md](NEXT-PHASES-IMPLEMENTATION-PLAN.md).
+- **Remaining planned implementation:** B1 (P0 bugs and security hardening), B1.5 (surface-neutral extraction), C1 (core cleanup, parallel with B2), B2 (browser parity), Phase 25 (browser session durability), B3-B4, B5 (Proof Mode run report), the G0 and CL/PA evidence gates, then Phase 17 and Phase 18. Order: [NEXT-PHASES-IMPLEMENTATION-PLAN.md](NEXT-PHASES-IMPLEMENTATION-PLAN.md).
 - **Release boundary:** Phase 17 and Phase 18 are last. Any new v0.1 feature or runtime requirement belongs before Phase 17, not after Phase 18.
 
 
@@ -47,7 +47,7 @@ Start with [engineers.md](../../engineers.md) or
 | 14 - Tasks | Core implementation landed, exit-gate pending | Task supervisor, task lifecycle, output streaming, and task tools exist. Remaining work is manual validation of lifecycle, stop/cleanup, and status rendering. |
 | 15 - Concurrency and speculative execution | Done | Tool partitioning, safe concurrent execution, speculative paths, tests, and phase-log closure exist. |
 | 16 - Observability and metrics | Done | Logging/metrics decorators, meter state, retry/done-reason diagnostics, `/cost` integration, and tests exist. |
-| 17 - Distribution and install | Planned; penultimate | Not started. Runs after B1-B4, Phase 25 (rescoped), and the G0/CL evidence gates. Also owns the default-command change: plain `nandocodego` opens the browser, the TUI moves to `nandocodego tui`. |
+| 17 - Distribution and install | Planned; penultimate | Not started. Runs after B1-B5 (including B1.5 and C1), Phase 25 (rescoped), and the G0/CL evidence gates. Also owns the default-command change: plain `nandocodego` opens the browser, the TUI moves to `nandocodego tui`. |
 | 18 - Hardening, eval suite, docs | Planned; final | The deterministic eval framework it needs landed early (2026-06-25, `docs/plans/EVALUATION-FRAMEWORK-DETAILED-PLAN.md`); the rest is not started. This is the final v0.1.0 hardening, eval, docs, and release-approval phase after Phase 17. |
 | 19 - Complete tool ecosystem | Done | Later tool ecosystem work is recorded as complete in `docs/phases/PHASE-LOG.md`; do not reimplement unless a regression is found. |
 | 20 - Content compaction | Done with caveat | Content compaction is complete; hook-dispatch caveats are documented in the phase plan/log. |

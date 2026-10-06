@@ -11,7 +11,8 @@ That loop sends the user's prompt plus packed project context to an Ollama model
 (local by default, Ollama Cloud when a user opts in with an API key). It executes
 the tool calls the model makes (files, grep, shell, sub-agents, MCP) only after
 the permission system approves them. The core runtime is built. What remains for
-v0.1 is browser-first parity (steps B1-B4), browser session durability (Phase 25),
+v0.1 is P0 security fixes and browser-first parity (roadmap steps B1-B4, with
+B1.5 and C1), browser session durability (Phase 25),
 validation evidence, packaging, and hardening.
 
 ## First Hour
@@ -33,8 +34,8 @@ make eval                               # deterministic coding-task evals (no mo
 ```
 
 The examples use the code default, `qwen3.6:35b`. It is a large download; if you
-use another installed model, pass it with `--model` (the default model is an open
-decision in [BACKLOG.md](docs/roadmap/BACKLOG.md) §2).
+use another installed model, pass it with `--model` (from Phase 17 the browser first run
+will ask users to pick a model; see ADR-002 "Follow-Up Decisions").
 
 Tests that need live services are opt-in, e.g.
 `NANDOCODEGO_RUN_OLLAMA_INTEGRATION=1 OLLAMA_MODEL=qwen3.6:35b make test-integration`.

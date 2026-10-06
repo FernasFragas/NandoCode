@@ -1,7 +1,7 @@
 # Performance Follow-Up Multi-Agent Plan
 
 Date: 2026-06-06
-Status: In progress. **2026-10-05:** TUI render benchmark work is dropped (TUI in maintenance mode, [ADR-002](../adr/ADR-002-BROWSER-UI-PRIMARY-SURFACE.md)); replace it with browser transcript-render and SSE throughput benchmarks. Latency evidence, semantic benchmarks, `/trace` improvements, and fast-path/startup/hook tests still apply.
+Status: In progress; the remaining items feed the Phase 18 performance gates (decided 2026-10-06). **2026-10-05:** TUI render benchmark work is dropped (TUI in maintenance mode, [ADR-002](../adr/ADR-002-BROWSER-UI-PRIMARY-SURFACE.md)); replace it with browser transcript-render and SSE throughput benchmarks. Latency evidence, semantic benchmarks, `/trace` improvements, and fast-path/startup/hook tests still apply.
 Scope: finish the remaining performance follow-up after the response-time refactor landed on `performance_branch`
 
 ## Objective

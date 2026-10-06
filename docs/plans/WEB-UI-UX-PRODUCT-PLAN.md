@@ -303,7 +303,7 @@ surface. Each item ships with backend tests and follows the Architecture Rules
 
 | ID | Requirement | Implementation notes |
 | --- | --- | --- |
-| BF-1 | Split the page into embedded static files | Move inline CSS/JS out of `index.html` into files under `internal/server/web/` (for example `app.css`, `app.js`, small ES modules). Plain JS, no build tools, no npm. Embed the directory with `//go:embed web` and keep the existing route/embed test. Tighten CSP once inline script/style is gone. |
+| BF-1 | Split the page into embedded static files | Move inline CSS/JS out of `index.html` into files under `internal/server/web/` (for example `app.css`, `app.js`, small ES modules). Plain JS, no build tools, no npm. Embed the directory with `//go:embed web` and keep the existing route/embed test. Tighten CSP once inline script/style is gone. The SSE module must send `Last-Event-ID` on reconnect and drop already-seen event IDs, which fixes today's duplicated transcript after a reconnect (server-side event-log fixes are Phase 25 slice 0). Keep the markdown, SSE-parser, and tree modules DOM-free and test them with `node --test` (no npm; decided 2026-10-06). |
 | BF-2 | Stop/cancel an active run | Add `POST /v1/sessions/{id}/cancel` that cancels the run context and emits the normal terminal event. Add a Stop button. Today the only option is deleting the session. |
 | BF-3 | Ollama Cloud API key entry | Server mode must not block on input, so add an explicit endpoint (for example `POST /v1/credentials/ollama-cloud` with use-once or save-to-keychain) and handle `requires_credential` in the model picker. The key must be provided before any project context is sent; never log or echo it. Follow `docs/plans/OLLAMA-CLOUD-API-KEY-PLAN.md`. |
 | BF-4 | Model list matches what can be selected | Fix the P0 bug: `/v1/models` must not advertise stale `:cloud` tags that the switch path rejects, or the switch must return a precise "not available in Ollama Cloud" error. The picker should mark cloud models and their credential state. |
@@ -315,14 +315,15 @@ surface. Each item ships with backend tests and follows the Architecture Rules
 
 Each slice must leave the repo testable. Do not mix later panels into P0 slices.
 
-Recommended next implementation order (2026-10-05, matches roadmap steps B1-B4):
+Recommended next implementation order (updated 2026-10-06; `docs/roadmap/NEXT-PHASES-IMPLEMENTATION-PLAN.md` is authoritative and also schedules C1 core cleanup in parallel with B2):
 
 1. B1: fix the cloud-model switch P0 bug, add security header tests (UI-8), and
    refactor the tree endpoint to use `tools.ResolvePath` and `dirwalk.Walk` (UI-5).
-2. B2: implement BF-1 through BF-6 from "Browser-First P0 Additions".
-3. Phase 25 (rescoped): session durability, which BF-6 builds on.
-4. B3: P1 sidebar panels (UI-7), one panel at a time.
-5. B4: remaining UI-8 accessibility and hardening.
+2. B1.5: surface-neutral extraction (`turnprep`, `bootstrap.ApplyConfig`, `modelruntime.Activate`, `runctl`, `ApplyTerminal`, agent event invariants); see `docs/roadmap/NEXT-PHASES-IMPLEMENTATION-PLAN.md`.
+3. B2: implement BF-1 through BF-6 from "Browser-First P0 Additions" on top of the B1.5 packages (BF-2 uses `runctl`, BF-3 uses `modelruntime.Activate`, BF-5 uses the extracted clear/compact operations).
+4. Phase 25 (rescoped): session durability, which BF-6 builds on.
+5. B3: P1 sidebar panels (UI-7), one panel at a time.
+6. B4: remaining UI-8 accessibility and hardening.
 
 The root `web/index.html` mirror was deleted on 2026-10-05; `internal/server/web/`
 is the only browser UI source.
@@ -627,9 +628,8 @@ Panel endpoint guidance:
 | --- | --- | --- |
 | Memory | `GET /v1/sessions/{id}/memory`, `GET /v1/sessions/{id}/memory/{name}`, optional promote endpoint | `internal/memory` |
 | Skills | `GET /v1/skills`, `GET /v1/skills/{name}` | `internal/skills` |
-| Hooks | `GET /v1/hooks`, optional reload with `{"confirm":"yes"}` | current hook snapshot/reload path |
-| Permissions | `GET /v1/sessions/{id}/permissions`, allow/deny session-rule endpoints | `internal/permissions`, `Session.permRules` |
-| Tasks | `GET /v1/sessions/{id}/tasks`, optional stop endpoint | `state.App.Tasks`, `tasks.Supervisor` |
+| Trust (decided 2026-10-06: merges permissions and hooks) | `GET /v1/sessions/{id}/permissions` plus allow/deny session-rule endpoints; `GET /v1/hooks` (optional reload with `{"confirm":"yes"}`); `GET /v1/trust` for MCP servers (read-only: trust, connection status), cloud credential status (never the key), network policy, writable roots | `internal/permissions`, `Session.permRules`, hook snapshot, `internal/mcp`, `internal/credentials` |
+| Activity (decided 2026-10-06: the "mission control" view) | `GET /v1/sessions/{id}/tasks`, optional stop endpoint; the rest from existing events (run phase, tools, sub-agents, queue, permission waits, index activity) | `state.App.Tasks`, `tasks.Supervisor`, agent events |
 | Trace/cost | Start with event-derived data; add endpoints only if event data is insufficient | terminal usage and observability data |
 | Prompt inspector | Add only after confirming prompt dump data is retained server-side | `agent/prompt_dump` and session state |
 

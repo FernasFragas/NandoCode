@@ -82,12 +82,12 @@ Rules that stay in force:
 - Cloud credentials are requested before any project context is sent.
 - Ollama-only provider scope; Phase 23 stays parked.
 
-## Open Questions
+## Follow-Up Decisions (2026-10-06)
 
-Tracked in [BACKLOG.md](../roadmap/BACKLOG.md) §2 until decided; record the answer here when it is made.
-
-- **TUI entry point name.** Proposed: `nandocodego tui`. Also decide whether `nandocodego --model X` with no subcommand should warn once the default command opens the browser. Must be settled before Phase 17 implements the default-command change.
-- **Default model.** The code default is `qwen3.6:35b`, a heavy first-run download for a browser-first install flow. Decide whether Phase 17's first-run experience keeps it, picks a smaller default, or prompts the user to choose.
+- **TUI entry point:** `nandocodego tui`. `nandocodego --model X` with no subcommand starts the browser with that model; no warning.
+- **Default model:** the browser first-run flow asks the user to pick an installed Ollama model (or suggests a small one to pull). `qwen3.6:35b` stays the config default. Phase 17 work.
+- **Browser JS tests:** CI may run Node's built-in test runner (`node --test`) on DOM-free ES modules under `internal/server/web/`. No npm, no `package.json`, no dependencies; the plain-JS, no-build-tools rule is unchanged.
+- **Permission-rule `*`:** matches any characters, including `/` (roadmap step B1).
 
 ## Owning Documents
 

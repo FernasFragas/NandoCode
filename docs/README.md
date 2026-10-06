@@ -29,6 +29,7 @@
 
 ## Keeping Docs Honest
 
+- Authority order: `roadmap/NEXT-PHASES-IMPLEMENTATION-PLAN.md` (what and when) > phase/plan docs (how) > `reports/` (evidence only). `roadmap/BACKLOG.md` is for unscheduled work only.
 - When code and a doc disagree, the code is right. Fix the doc.
 - Finishing a phase or slice means appending to `phases/PHASE-LOG.md` and updating `roadmap/NEXT-PHASES-IMPLEMENTATION-PLAN.md`.
 - New ideas go in `roadmap/BACKLOG.md`, not in new standalone files.

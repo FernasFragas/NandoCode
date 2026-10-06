@@ -1,6 +1,6 @@
 # Code Complexity And Architecture Review - 2026-10-06
 
-Status: Open. Findings are tracked in `docs/roadmap/BACKLOG.md` §5 ("Code review 2026-10-06"); nothing in this report has been fixed yet.
+Status: Evidence only; do not implement from this report directly. Scheduled work is in `docs/roadmap/NEXT-PHASES-IMPLEMENTATION-PLAN.md` (P0s in B1, extraction and event invariants in B1.5, event log in Phase 25 slice 0); unscheduled items are in `docs/roadmap/BACKLOG.md` §5.
 
 ## Scope And Method
 

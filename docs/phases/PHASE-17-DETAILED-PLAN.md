@@ -9,6 +9,7 @@ Status: Pre-implementation plan; penultimate implementation phase
 - The install smoke test must start the server and fetch `/` (embedded UI assets present) in addition to `--version`.
 - `doctor` reports the server defaults (bind, port) and whether the embedded UI is present.
 - `CHANGELOG.md` and the install docs lead with the browser flow.
+- Decided 2026-10-06 (ADR-002 "Follow-Up Decisions"): the TUI entry point is `nandocodego tui`; `nandocodego --model X` with no subcommand starts the browser with that model. The browser first run lists installed Ollama models (or suggests a small one to pull) and lets the user pick; `qwen3.6:35b` stays the config default. Pulling a suggested model shows progress in the browser: the server streams Ollama pull progress as SSE events, reusing the existing `/pull` logic.
 - Earlier statements below that "Phase 17 must not change the TUI entrypoint" are superseded by this note.
 Source plans and references:
 

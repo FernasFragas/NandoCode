@@ -22,7 +22,7 @@ The point is not to hide the engineer behind the tools. It is to show what one e
 
 ## Status
 
-**Current Version:** v0.0.0-dev (Phase 29 and the evaluation framework complete; next: browser-first parity steps B1-B4 and Phase 25 browser session durability, see [ADR-002](docs/adr/ADR-002-BROWSER-UI-PRIMARY-SURFACE.md))
+**Current Version:** v0.0.0-dev (Phase 29 and the evaluation framework complete; next: P0 security fixes (B1), then browser-first parity and Phase 25 browser session durability, see [ADR-002](docs/adr/ADR-002-BROWSER-UI-PRIMARY-SURFACE.md))
 
 This project is under active development. **Engineers** should start with [engineers.md](engineers.md); **product managers** with [product-managers.md](product-managers.md). The committed roadmap is in [Next Phases Implementation Plan](docs/roadmap/NEXT-PHASES-IMPLEMENTATION-PLAN.md) and everything else is in the [Backlog](docs/roadmap/BACKLOG.md).
 

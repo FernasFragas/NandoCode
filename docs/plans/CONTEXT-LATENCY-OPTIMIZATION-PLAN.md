@@ -784,6 +784,8 @@ Target outcomes:
 
 ## Workstream CL Gate - Notes, Evidence, Blockers, Exit Criteria
 
+Decided 2026-10-06: heuristic `BuildProjectAnalysisPrompt` summaries are an accepted v0.1 limitation (the "map/reduce summary workflow" blocker below is downgraded to a documented limitation). Summary-cache and evidence-ledger write errors must get a test and a logged warning before this gate passes.
+
 _Folded in on 2026-10-06 from the archived `REMAINING-PHASES-TASK-REVIEW.md` (2026-06-22 review) and updated for ADR-002 (browser-first, localhost only, no remote/JWT/`connect`)._
 
 #### Implementation Notes

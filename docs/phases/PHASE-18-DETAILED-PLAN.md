@@ -9,6 +9,8 @@ Status: Pre-implementation plan; final implementation phase
 - Add browser security work: tests for CSP, `X-Frame-Options`, and `Referrer-Policy`; keep the existing Origin/Host/JSON request guard (`NewRequestGuard`) under test; token never logged; file-tree traversal through `tools.ResolvePath` + `dirwalk.Walk`.
 - Manual exit gates (including the Phase 9 hook-blocking gate) run through the browser where the browser exposes the feature.
 - The docs site leads with the browser; the TUI is documented as a secondary, maintenance-mode surface.
+- Decided 2026-10-06: the remaining work in `docs/plans/PERFORMANCE-FOLLOW-UP-MULTI-AGENT-PLAN.md` (latency evidence, semantic benchmarks, `/trace` diagnostics, browser SSE/render benchmarks) feeds this phase's performance gates. Known limitations to document: heuristic (not LLM map/reduce) project-analysis summaries; token estimation is calibrated per model from Ollama counts, not tokenizer-exact; no workspace trust flow, so project/HTTP/agent hooks stay disabled.
+- Launch positioning (decided 2026-10-06): "the local agentic engineer", with Proof Mode (B5) as the differentiator. The README and docs site lead with it, and include an "ask the codebase" demo with cited answers (no new code needed).
 Source plans and references:
 
 - `.codex/go-ollama-plan-AGENTS.md`
