@@ -56,12 +56,17 @@ The full user reference is [USER_MANUAL.md](USER_MANUAL.md).
 
 Target: **v0.1.0**, the first public release. The remaining path, in order:
 
+Since 2026-10-05 the **browser app is the primary product surface**. The terminal app keeps shipping in maintenance mode, and v0.1 runs on your own machine only (localhost). Decision record: [ADR-002](docs/adr/ADR-002-BROWSER-UI-PRIMARY-SURFACE.md).
+
 | Step | What it means for users | Status |
 | --- | --- | --- |
-| 1. Validation evidence | Prove, with recorded manual runs, that memory, hooks, integrations, sub-agents, skills, commands, background tasks, and the terminal app behave as specified. Retest four known bugs. | Code done; evidence pending |
-| 2. **Remote / Bridge Mode** | Run the agent on a server, container, or dev box where the code lives, and drive it from your laptop. Disconnect and reconnect without losing the session. | **Next feature to build** |
-| 3. Distribution & install | One-command install on macOS/Linux/Windows, verified downloads, release notes | Not started |
-| 4. Hardening & release approval | Broader evals, security review, performance checks, docs site, go/no-go | Not started (eval framework already done) |
+| 1. Fix and harden | Fix the bug where a listed cloud model can't be selected in the browser; security checks | **Next** |
+| 2. Browser parity | Stop a run, enter a cloud API key, clear/compact/index/cost, list sessions | Not started |
+| 3. Sessions that last | Close the tab or restart the server without losing the session; the agent keeps working meanwhile | Not started |
+| 4. Browser panels | Memory, skills, hooks, permissions, tasks, prompt inspector; accessibility | Not started |
+| 5. Validation evidence | Recorded manual runs proving the features behave as specified, done in the browser | Code done; evidence pending |
+| 6. Distribution & install | One-command install; running `nandocodego` opens the browser | Not started |
+| 7. Hardening & release approval | Broader evals, security review, performance checks, docs site, go/no-go | Not started (eval framework already done) |
 
 Detail for engineers: [docs/roadmap/NEXT-PHASES-IMPLEMENTATION-PLAN.md](docs/roadmap/NEXT-PHASES-IMPLEMENTATION-PLAN.md).
 
@@ -80,17 +85,15 @@ Launch-relevant ideas that are not yet committed:
 | Context inspector | Shows what the model saw, so users can debug bad answers | P1 |
 | Code review board | Several specialist agents review a change together | P1 |
 | Issue-to-PR workflow | From a ticket to a reviewed patch | P1 |
-| Browser app panels | Memory, skills, permissions, tasks, and cost panels in the web UI | P1 |
 | IDE plugins, team memory sync, marketplace | Post-launch bets | P2–P3 |
 
 ## Decisions That Need A Product Call
 
 1. **Launch positioning.** Adopt "the local agentic engineer", or choose one of the alternatives in the brainstorm.
 2. **Proof Mode / Trust Center.** Pull them into v0.1 (before packaging) or ship right after.
-3. **Browser app at launch.** Polish it, or position the terminal app as the primary surface.
-4. **Default model.** The current default is a large 35B model. A smaller default would make first run easier.
-5. **Malformed config.** When config is broken, warn and continue, or stop?
-6. **Security reporting.** Set up a private vulnerability-reporting channel before going public.
+3. **Default model.** The current default is a large 35B model. A smaller default would make first run easier.
+4. **Malformed config.** When config is broken, warn and continue, or stop?
+5. **Security reporting.** Set up a private vulnerability-reporting channel before going public.
 
 ## Known Risks
 
@@ -107,5 +110,5 @@ Launch-relevant ideas that are not yet committed:
 - [README.md](README.md): public overview and quickstart.
 - [docs/product/](docs/product/): product thinking and brainstorms.
 - [docs/plans/WEB-UI-UX-PRODUCT-PLAN.md](docs/plans/WEB-UI-UX-PRODUCT-PLAN.md): browser app product plan.
-- [docs/reports/E2E-EXECUTIVE-SUMMARY-2026-06-07.md](docs/reports/E2E-EXECUTIVE-SUMMARY-2026-06-07.md): latest end-to-end quality run.
+- [docs/reports/e2e/2026-06-07/E2E-MASTER-REPORT-2026-06-07.md](docs/reports/e2e/2026-06-07/E2E-MASTER-REPORT-2026-06-07.md): latest end-to-end quality run.
 - [docs/architecture/ARCHITECTURE.md](docs/architecture/ARCHITECTURE.md): how it's built, if you want the technical picture.

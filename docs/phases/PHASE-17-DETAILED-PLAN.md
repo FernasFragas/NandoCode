@@ -2,6 +2,14 @@
 
 Date: 2026-05-07
 Status: Pre-implementation plan; penultimate implementation phase
+
+**Browser-first changes (2026-10-05, [ADR-002](../adr/ADR-002-BROWSER-UI-PRIMARY-SURFACE.md)):**
+
+- Plain `nandocodego` starts the server on loopback and opens the browser with the generated `#token=` URL. The TUI moves to `nandocodego tui`; `--print` and other subcommands are unchanged. Add CLI tests for the new default and for `--no-browser` / headless environments.
+- The install smoke test must start the server and fetch `/` (embedded UI assets present) in addition to `--version`.
+- `doctor` reports the server defaults (bind, port) and whether the embedded UI is present.
+- `CHANGELOG.md` and the install docs lead with the browser flow.
+- Earlier statements below that "Phase 17 must not change the TUI entrypoint" are superseded by this note.
 Source plans and references:
 
 - `.codex/go-ollama-plan-AGENTS.md`
@@ -13,11 +21,11 @@ Source plans and references:
 
 ## Roadmap Placement
 
-Phase 17 is intentionally one of the last two implementation phases. Do not start Phase 17 until all product, runtime, reliability, context-management, and agentic workflow phases that affect the shipped binary are implemented. Ollama Cloud API key support and Phase 24 multi-agent coordination are complete; Phase 25 remote/bridge mode remains required v0.1 work before Phase 17 begins.
+Phase 17 is intentionally one of the last two implementation phases. Do not start Phase 17 until all product, runtime, reliability, context-management, and agentic workflow phases that affect the shipped binary are implemented. Under the browser-first roadmap (ADR-002) Phase 17 starts only after steps B1-B4, Phase 25 (rescoped to browser session durability), Gate G0, and Workstream CL/PA are accepted; see `docs/roadmap/NEXT-PHASES-IMPLEMENTATION-PLAN.md`.
 
 The final implementation order is:
 
-1. Complete all feature and runtime reliability phases before release packaging, including Phase 25.
+1. Complete all feature and runtime reliability work before release packaging, including browser steps B1-B4 and Phase 25 (rescoped).
 2. Implement Phase 17: distribution, install, release workflow, and release-facing doctor checks.
 3. Implement Phase 18 last: final hardening, evals, docs, security review, and v0.1.0 release approval.
 
@@ -182,7 +190,7 @@ Implemented:
 Phase 17 implications:
 
 - No direct implications for distribution packaging.
-- `nandocodego doctor` is a CLI command that runs outside the TUI. Phase 17 must not change the TUI entrypoint.
+- `nandocodego doctor` is a CLI command that runs outside the TUI. (Superseded 2026-10-05: Phase 17 now moves the TUI behind `nandocodego tui`; see the browser-first note at the top.)
 
 ### Phase 8 - Memory
 
@@ -954,3 +962,57 @@ Phase 17 is complete only when:
 - `nandocodego doctor` output contains all documented fields and `doctor --ollama` behaves correctly;
 - all tests pass including the race detector;
 - the phase log records the implementation, binary build results, and any deviations from this plan.
+
+## Release Review - Evidence, Blockers, Exit Criteria
+
+_Folded in on 2026-10-06 from the archived `REMAINING-PHASES-TASK-REVIEW.md` (2026-06-22 review) and updated for ADR-002 (browser-first, localhost only, no remote/JWT/`connect`)._
+
+### Reviewed Gap
+
+Phase 17 should package the complete product surface only. It must not absorb unfinished feature work from the browser-first steps B1-B4, Phase 25 (rescoped), or Workstream CL/PA.
+
+### Required Slice Order
+
+1. Confirm all previous gates/phases are accepted.
+2. Add GoReleaser snapshot builds.
+3. Embed version metadata.
+4. Generate checksums for uploaded artifacts.
+5. Add direct installer with checksum verification before install.
+6. Add release workflow after CI/pre-release checks.
+7. Enhance `doctor` for release readiness.
+8. Make plain `nandocodego` start the server and open the browser; move the TUI behind `nandocodego tui` (see the browser-first note at the top).
+9. Update changelog through Phase 17.
+10. Add optional Homebrew/Scoop templates only if publishing prerequisites exist.
+
+### Implementation Notes
+
+- `doctor` must not do network probes by default.
+- `doctor --ollama` and `doctor --mcp` may perform opt-in network checks.
+- Do not fail releases because Homebrew/Scoop tokens are absent; gate those publishers.
+- Checksums must cover every uploaded artifact.
+- Release workflow must not call a non-reusable CI workflow unless `workflow_call` exists.
+
+### Evidence To Collect
+
+- Snapshot build output for target platforms.
+- Checksum file and verification.
+- Installer dry run or temp-dir install.
+- `nandocodego --version`.
+- Install smoke: start the server and fetch `/` (embedded UI assets present).
+- `nandocodego doctor`, `doctor --ollama`, `doctor --mcp`.
+- Release workflow syntax validation.
+
+### Blockers
+
+- Installer executes downloaded code before checksum verification.
+- Release artifacts lack checksums.
+- Default doctor fails because local network service is down.
+- Build misses server, embedded browser UI, or coordinator features.
+- CI release flow can publish without tests.
+
+### Exit Criteria
+
+- Five-platform snapshot builds run.
+- Installer verifies before install.
+- Doctor behavior is release-ready.
+- Changelog and Phase 17 log entry are complete.

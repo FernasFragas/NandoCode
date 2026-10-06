@@ -2,7 +2,7 @@
 
 Date: 2026-05-22
 
-Status: Implemented and reviewed on 2026-05-22. Phase 25 Remote / Bridge Mode is now unblocked.
+Status: Implemented and reviewed on 2026-05-22. Browser key entry is new work in roadmap step B2 (`docs/plans/WEB-UI-UX-PRODUCT-PLAN.md`); the credential-consent rules in this plan still apply to it.
 
 ## Runtime Error Boundaries - 2026-05-24
 

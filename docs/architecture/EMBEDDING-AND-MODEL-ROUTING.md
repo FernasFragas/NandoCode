@@ -1,6 +1,6 @@
 # Embedding And Model Routing Rules
 
-This document describes the current Go/Ollama implementation.
+This document describes the current Go/Ollama implementation. Last checked against code 2026-10-06; see "Known Gaps" at the end for places where code does not yet meet the rules below.
 
 ## Short Version
 
@@ -14,8 +14,9 @@ Current model paths:
   `http://localhost:11434`.
 - Direct Ollama Cloud chat: `https://ollama.com`, only after model resolution
   selects cloud and `OLLAMA_API_KEY` or a keychain credential is available.
-- Semantic embeddings: local Ollama embedding calls through `POST /api/embed`
-  using `semantic_index.model`, default `qwen3-embedding:8b`.
+- Semantic embeddings: intended to be local Ollama embedding calls through
+  `POST /api/embed` using `semantic_index.model`, default `qwen3-embedding:8b`
+  (see Known Gaps: today they follow the active runtime client).
 
 Generic OpenAI-compatible providers are not active in the v0.1 roadmap.
 
@@ -31,8 +32,8 @@ Important packages:
 - `internal/llm/ollama`: Ollama local/direct-cloud HTTP client.
 - `internal/llm/modelresolver`: local-first model origin resolution.
 - `internal/llm/modelruntime`: credential-gated model switching.
-- `internal/credentials`: session/env/keychain/TUI credential resolution for
-  Ollama Cloud API keys.
+- `internal/credentials`: session/env/keychain credential resolution for
+  Ollama Cloud API keys (interactive entry: TUI today, browser in roadmap step B2).
 
 Model resolution rules:
 
@@ -56,7 +57,9 @@ The response-time refactor keeps common prompts cheap:
 
 - general prompts can use a chat-only fast path,
 - semantic retrieval can be bypassed when route policy says it is unnecessary,
-- tool schemas are omitted when tools are not needed,
+- tool schemas are omitted (`ToolModeNone`) when `internal/retrievalroute` classifies
+  the prompt as general chat; this only happens when semantic retrieval is enabled
+  and in `auto` mode, and the classifier is a keyword list (see Known Gaps),
 - output budget defaults are larger, while length-retry behavior is preserved.
 
 When tools are needed, the agent loop still routes model tool calls through the
@@ -69,27 +72,31 @@ TUI progress visibility for long index operations.
 
 Current surfaces:
 
-- `nandocodego index build`
-- `nandocodego index refresh`
-- `nandocodego index status`
-- `nandocodego index clear`
-- `/semantic on|off|auto|explicit|status|deep`
-- `/index build|refresh|status|clear`
+- CLI: `nandocodego index build|refresh|status|clear`
+- TUI only: `/semantic on|off|auto|explicit|status|deep` and `/index build|refresh|status|clear`
+- Browser: semantic retrieval runs automatically per prompt (the server
+  emits semantic events); there are no index or semantic controls yet, and
+  `/semantic deep` has no browser equivalent. Index build/status endpoints are
+  roadmap step B2.
 
 The semantic index stores local cache data under the app cache directory. It
-records manifest, record, and vector files keyed by workspace/model/schema
-metadata. Index build/refresh scans workspace files, extracts records, embeds
+records manifest, record, and vector files keyed by workspace/model/schema/
+embedding-dimension metadata. Index build/refresh scans workspace files, extracts records, embeds
 batched text, and writes cache files atomically.
 
 Retrieval behavior:
 
 - `semantic_index.mode = "auto"` lets route policy decide when semantic
   evidence should be attached.
-- `semantic_index.mode = "explicit"` limits retrieval to explicit controls.
+- `semantic_index.mode = "explicit"` limits retrieval to explicit controls, but
+  prompts with explicit mentions and related-code wording still get light
+  semantic retrieval.
 - `/semantic deep` applies broader retrieval to the next prompt only.
-- Light-mode retrieval narrows candidates for latency-sensitive prompts.
-- Missing, stale, disabled, incompatible, or model-missing indexes degrade with
-  visible fallback messages instead of blocking normal prompts.
+- Light-mode retrieval narrows candidates when the route asks for current-path
+  weighting (related-context prompts).
+- Missing, disabled, incompatible (schema version), or model-missing indexes
+  degrade with visible fallback messages instead of blocking normal prompts.
+  The `stale` and `deadline` route reasons exist but are not produced yet.
 
 ## User-Facing Privacy Boundary
 
@@ -103,7 +110,17 @@ API keys are resolved in this order:
 1. session memory,
 2. `OLLAMA_API_KEY`,
 3. OS keychain (`service: nandocodego`, `account: ollama.com`),
-4. TUI masked prompt when interactive prompting is allowed.
+4. interactive entry when prompting is allowed: the TUI masked prompt today;
+   browser key entry is roadmap step B2.
 
 Keys are redacted from logs, telemetry, transcripts, prompt dumps, and config
 files.
+
+## Known Gaps (verified 2026-10-06)
+
+From the code review in `docs/reports/investigations/CODE-COMPLEXITY-AND-ARCHITECTURE-REVIEW-2026-10-06.md`. These are code bugs against the rules above, not doc choices.
+
+- **Embeddings follow the active model.** `semantic.LLMEmbedder` wraps the `llm.RuntimeClient` (`internal/server/server.go:229`, `internal/cli/repl.go:526`, `internal/cli/index.go:145`), and `RuntimeClient.Embed` delegates to the current client (`internal/llm/router.go:63`). After switching to a cloud model, semantic embedding calls go to Ollama Cloud, contradicting the local-embedding rule above (memory side-queries also use the active model, which matches the privacy boundary). Fix: bind the embedder to the local client.
+- **Tool-mode routing is a substring keyword list.** `isWorkspaceDiscoveryPrompt` (`internal/retrievalroute/route.go:244`) misses investigation wording ("where is the endpoint…", "explain the agent event loop"), so such prompts lose tools and the model can hallucinate; it also matches inside words ("capital" → "api"). See `BACKLOG.md` §5 (P0).
+- **Index refresh after an embedding-model change** relabels old vectors with the new model instead of re-embedding (`internal/semantic/service.go`).
+- **Light/full/deep limits** are defined twice with different defaults (`internal/semantic/config.go`, `internal/retrievalroute/route.go`).

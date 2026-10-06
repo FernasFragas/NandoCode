@@ -2,6 +2,8 @@
 
 Date: 2026-05-16
 
+Status: Pending evidence (Workstream CL/PA gate). Run it in the browser where possible (`nandocodego server`); `/analyze-project` and `continue`-style commands are TUI-only until their browser equivalents land. Record the surface used.
+
 ## Goal
 
 Verify that a project-scale analysis run does not leave the user with only a preamble such as `Let me write the summary:` and no final answer.

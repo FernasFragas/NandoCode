@@ -1,6 +1,6 @@
 # Backlog
 
-Last reviewed: 2026-09-28.
+Last reviewed: 2026-10-06 (docs cleanup after the browser-first re-plan, see [ADR-002](../adr/ADR-002-BROWSER-UI-PRIMARY-SURFACE.md)).
 
 This is the single list of work that is **not** on the committed v0.1 path.
 The committed path (what is being built next, in order) lives in
@@ -15,14 +15,12 @@ How to use this file:
 
 ## 1. Open Bugs
 
-From the 2026-06-07 E2E run ([master report](../reports/E2E-MASTER-REPORT-2026-06-07.md)). Status was checked against source on 2026-09-28; "fix in code" means the code path changed but the E2E retest has not been recorded.
+From the 2026-06-07 E2E run ([master report](../reports/e2e/2026-06-07/E2E-MASTER-REPORT-2026-06-07.md)). Status was re-verified against source on 2026-10-06. Resolved bugs are archived under [archive/reports/bugs/](../archive/reports/bugs/).
 
 | Bug | Severity | Status | Next step |
 | --- | --- | --- | --- |
-| [Server model endpoint rejects a listed cloud model](../reports/bugs/BUG-20260607-server-model-endpoint-rejects-listed-cloud-model.md) | sev2 high | Likely fixed in code: model switch now goes through `modelruntime.Switch` with a credential-required error | Rerun the bug's retest plan; close or reopen |
-| [`--print` cheap prompt includes tool schemas](../reports/bugs/BUG-20260607-print-cheap-prompt-includes-tool-schemas.md) | sev3 medium | Likely fixed in code: `print.go` now uses `retrievalroute.Decide` for tool mode | Rerun retest plan; add prompt-dump regression check |
-| [Smoke server script fails on empty auth array](../reports/bugs/BUG-20260607-smoke-server-script-fails-on-empty-auth-array.md) | sev4 low | Fixed in code (`curl_with_auth` helper) | Rerun `tools/smoke-server.sh` without `TOKEN` |
-| [Invalid config warning does not fail `--print`](../reports/bugs/BUG-20260607-invalid-config-warning-does-not-fail-print.md) | sev4 low | **Open. Needs a product decision:** warn-only or fail-fast | Decide, then fix code or update docs |
+| [Server model endpoint rejects a listed cloud model](../reports/bugs/BUG-20260607-server-model-endpoint-rejects-listed-cloud-model.md) | sev2 high, **P0** | **Still reproducible** (retest 2026-10-05): `kimi-k2.6:cloud` now switches, but a stale local `glm-5.1:cloud` tag is listed by `/v1/models` and rejected with `model not found` because Ollama Cloud retired `glm-5.1` | Fix in roadmap step B1 |
+| [Invalid config warning does not fail `--print`](../reports/bugs/BUG-20260607-invalid-config-warning-does-not-fail-print.md) | sev4 low | **Open. Decided 2026-10-06: fail fast** | Roadmap step B1: failing `--print` test with a malformed config first, then exit non-zero with actionable text. The browser should surface the same error. |
 
 Blocked E2E scenarios B007/B008 (cloud credential gate observability) are in [reports/blocks/](../reports/blocks/).
 
@@ -30,15 +28,17 @@ Blocked E2E scenarios B007/B008 (cloud credential gate observability) are in [re
 
 | Decision | Why it matters | Owner input needed |
 | --- | --- | --- |
-| Malformed config: warn or fail? | Bug above; affects scripting reliability of `--print` | Product |
-| Private vulnerability-reporting channel | `SECURITY.md` currently asks for reports via the public issue tracker; a private channel (e.g. GitHub private advisories) is needed before public release (P0) | Maintainer |
 | Default model | Code default is `qwen3.6:35b`, while many docs use `qwen3`. A 35B model is a heavy first-run default. | Product + engineering |
 | Launch positioning | [Product brainstorm](../product/PRODUCT-BRAINSTORM-DISRUPTIVE-LAUNCH.md) recommends "the local agentic engineer" plus Proof Mode | Product |
-| Browser UI at launch | Polish the browser UI for launch, or position the TUI as the primary surface | Product |
+| TUI entry point name | ADR-002 moves the TUI off plain `nandocodego`; proposed `nandocodego tui`. Confirm the name and whether `nandocodego --model X` without a subcommand should warn | Product + engineering |
+
+Resolved 2026-10-06: **Malformed config** - `--print` fails fast (bug above, B1). **Private vulnerability reporting** - `SECURITY.md` now points to GitHub private vulnerability reporting; the maintainer must enable it in the repository settings (Security → Private vulnerability reporting) before public release.
+
+Resolved 2026-10-05 ([ADR-002](../adr/ADR-002-BROWSER-UI-PRIMARY-SURFACE.md)): **Browser UI at launch** - the browser is the primary surface, the TUI stays in maintenance mode, plain `nandocodego` opens the browser, v0.1 is localhost only, and the frontend stays plain JS split into embedded files.
 
 ## 3. Product Features (Ideas)
 
-Source: [PRODUCT-BRAINSTORM-DISRUPTIVE-LAUNCH.md](../product/PRODUCT-BRAINSTORM-DISRUPTIVE-LAUNCH.md), which has the scoring rationale. Remote/Bridge Mode and 60-second install from that list are already committed (Phase 25, Phase 17) and are not repeated here.
+Source: [PRODUCT-BRAINSTORM-DISRUPTIVE-LAUNCH.md](../product/PRODUCT-BRAINSTORM-DISRUPTIVE-LAUNCH.md), which has the scoring rationale. 60-second install from that list is committed (Phase 17). Remote/Bridge Mode was removed from v0.1 by ADR-002 (localhost only; see §6).
 
 | Idea | Priority | Builds on |
 | --- | --- | --- |
@@ -64,29 +64,19 @@ Source: [PRODUCT-BRAINSTORM-DISRUPTIVE-LAUNCH.md](../product/PRODUCT-BRAINSTORM-
 
 ## 4. UX Follow-Ups
 
-### Terminal UI (deferred from Phase 22)
+### Terminal UI
 
-Source: [PHASE-22-DETAILED-PLAN.md](../phases/PHASE-22-DETAILED-PLAN.md), [TASKS-TUI.md](../plans/TASKS-TUI.md), [ADR-001](../adr/ADR-001-TUI-USER-EXPERIENCE-IMPROVEMENTS.md).
+The TUI is in maintenance mode (ADR-002): bug and regression fixes only. The deferred Phase 22 features are now in §6 Parked.
 
-- Collapsible hierarchical activity tree (agent turn → tool calls → sub-agents).
-- Click-to-expand tool panels.
-- Mouse lost-release recovery.
-- Full textarea-integrated Vim: mutations, dot-repeat, find-repeat, registers, paste/yank.
-- True concurrent `/btw` side runs (today they queue behind the active run).
-- `/btw` read-only tool manifest restriction and context-stack modal priority fix (listed as remaining gaps in the project status).
+### Browser UI
 
-### Browser UI (P1 panels)
+Promoted to the committed roadmap on 2026-10-05 (steps B2, B3, B4 in [NEXT-PHASES](NEXT-PHASES-IMPLEMENTATION-PLAN.md); detail in [WEB-UI-UX-PRODUCT-PLAN.md](../plans/WEB-UI-UX-PRODUCT-PLAN.md)). Still not committed:
 
-Source: [WEB-UI-UX-PRODUCT-PLAN.md](../plans/WEB-UI-UX-PRODUCT-PLAN.md) slice UI-7. Each panel should ship on its own:
-
-- Session history and clear (sessions are in memory only today).
-- Prompt inspector.
-- Memory panel (list/show/promote).
-- Skills panel.
-- Hooks panel (reload needs explicit confirmation).
-- Permissions table (must go through `permissions.Resolve`).
-- Tasks, trace, and cost panels.
-- Transcript search, security-header tests, remaining accessibility gaps.
+- Mobile-first responsive layout.
+- Theme engine beyond a basic light/dark toggle.
+- MCP server manager panel.
+- Model pull progress UI.
+- Multi-user collaboration and cloud hosting.
 
 ## 5. Engineering And Tech Debt
 
@@ -96,13 +86,33 @@ Source: [WEB-UI-UX-PRODUCT-PLAN.md](../plans/WEB-UI-UX-PRODUCT-PLAN.md) slice UI
 | `BuildProjectAnalysisPrompt` uses heuristic signal lines, not true LLM map/reduce summarization | [NEXT-PHASES](NEXT-PHASES-IMPLEMENTATION-PLAN.md) CL/PA notes | Upgrade or accept as a documented limitation |
 | Analysis workflow ignores summary-cache and ledger write errors | Same | Surface, test, or explicitly accept |
 | Workspace trust flow, so project/HTTP/agent hooks can execute | [PHASE-9-DETAILED-PLAN.md](../phases/PHASE-9-DETAILED-PLAN.md) | Security-sensitive |
-| Token estimation is character-based (4 chars/token), not tokenizer-aware | [Context-packing review](../reports/investigations/CONTEXT-PACKING-LARGE-FILE-REVIEW-2026-05-20.md) | Fine for now; revisit if budgets misfire |
-| Stray files: `create_dirs.go` (a `package main` scaffolding script at repo root) and `internal/server/test.txt` | Repo review 2026-09-28 | Delete; `create_dirs.go` also makes `go build ./...` build an extra binary |
-| Two copies of the browser UI: `web/index.html` (older) and the served `internal/server/web/index.html` (newer, 2026-06-25) have diverged | Repo review 2026-09-28 | Delete `web/` or add a sync check |
-| `PHASE-LOG.md` has old "Next Steps" text with pre-renumbering phase numbers | Project status | Historical. Don't use it for ordering. |
+| **P0** Retrieval route misclassifies codebase-investigation prompts as general, so the model answers with no tools (`ToolModeNone`) and hallucinates paths: expand `isWorkspaceDiscoveryPrompt` vocabulary (server, route, endpoint, session, verify, behavior, ...) and never use `ToolModeNone` for "find/verify current behavior" prompts, with a table-driven regression test | [Hallucinated server path investigation](../reports/investigations/MODEL-HALLUCINATED-SERVER-PATH-INVESTIGATION-2026-06-08.md) | Not implemented (checked 2026-10-06, `internal/retrievalroute/route.go`) |
+| **P1** Grounding for normal runs: default grounding system prompt, local-search fallback profile for uncertain code questions, and visible evidence state in answers | Same investigation | Not implemented |
+| `PreCompact` / `PostCompact` hook events are defined in `internal/hooks/events.go` but never dispatched by compaction | [Phase 20 plan](../archive/phases/PHASE-20-DETAILED-PLAN.md) ("hook dispatch deferred") | Wire through `hooks.Dispatcher`; a `PreCompact` deny should skip compaction |
+| Token estimation is character-based (4 chars/token), not tokenizer-aware | [Context-packing review](../archive/reports/investigations/CONTEXT-PACKING-LARGE-FILE-REVIEW-2026-05-20.md) | Fine for now; revisit if budgets misfire |
+
+### Code review 2026-10-06
+
+From [CODE-COMPLEXITY-AND-ARCHITECTURE-REVIEW-2026-10-06.md](../reports/investigations/CODE-COMPLEXITY-AND-ARCHITECTURE-REVIEW-2026-10-06.md); IDs refer to that report. Fix test-first (RED reproduction, then fix). Recommended: fold the P0 items into roadmap step B1.
+
+| Item | Priority | Notes |
+| --- | --- | --- |
+| P0-1 Browser session drops earlier turns (history replaced by each run's added messages) | **P0** | `server/session.go` Terminal handling; needs a multi-turn server test |
+| P0-2 XSS in browser markdown (`href` and quotes unescaped, CSP `unsafe-inline`) | **P0** | `internal/server/web/index.html` `renderMarkdown` |
+| P0-3 One model runtime shared by all server sessions | **P0** | per-session runtime; switch only when the model changes |
+| P0-4 `@dir/` evidence follows symlinks outside the workspace | **P0** | `contextpack.selectDirectoryEvidence`: per-file `tools.ResolvePath` |
+| P0-6 Bash read-only classification ignores destructive arguments | **P0** | `tools/bash/classify.go` |
+| P0/P1-7 Sub-agent permission mode can exceed parent's; project MCP config can self-trust; `*` in rules does not cross `/` | **P0/P1** | `agenttool`, `mcp/config.go`, `permissions/match.go` |
+| P1-2 Agent event invariants (start before result, call order, exactly one Terminal, progress events) | P1 | shared `assertEventInvariants` helper first |
+| P1-4 Server event log: replay/subscribe gap, silent drops, no gap event, browser never sends `Last-Event-ID` | P1 | base for Phase 25 |
+| P1-5 Embeddings follow the active (cloud) model | P1 | bind embedder to local client |
+| P1-6 Browser "Always Allow" works only once | P1 | `*(*)` rule never matches |
+| Extract surface-neutral logic before B2 (`turnprep`, `modelruntime.Activate`, `runctl`, `ApplyTerminal`, `bootstrap.ApplyConfig`) | P1 | removes 3-4 drifted copies |
+| Remaining P1 bugs (watchdog leak, supervisor rollback, Refresh model change, Status full read, smaller bugs) and test hygiene (sleep-based tests; the memory-test home-dir leak was fixed 2026-10-06; two tests that cannot fail) | P1/P2 | see report |
 
 ## 6. Parked / Out Of Scope For v0.1
 
 - **Phase 23: OpenAI-compatible / generic multi-provider adapter.** Explicitly removed from v0.1 (its plan was deleted 2026-09-28; recover it from git history if the decision is reversed). Ollama Cloud support must stay Ollama-only.
-- **Server session persistence across restarts.** Not promised for v0.1.
 - **Homebrew/Scoop publishing.** Optional in Phase 17, and only if publishing credentials exist.
+- **Remote access, JWT auth, and `nandocodego connect` (former Phase 25 bridge).** Removed by ADR-002; v0.1 is localhost only. The bridge UDS listener for `SendMessage` is parked with it.
+- **Deferred TUI features (from Phase 22):** collapsible hierarchical activity tree, click-to-expand tool panels, mouse lost-release recovery, full textarea-integrated Vim (mutations, dot-repeat, find-repeat, registers, paste/yank), true concurrent `/btw`, `/btw` read-only tool manifest restriction and context-stack modal priority fix.

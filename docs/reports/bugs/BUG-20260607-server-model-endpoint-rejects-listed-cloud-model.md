@@ -1,5 +1,7 @@
 # BUG-20260607-server-model-endpoint-rejects-listed-cloud-model
 
+> **Owner: roadmap step B1 (P0).** See `docs/roadmap/NEXT-PHASES-IMPLEMENTATION-PLAN.md` and `docs/plans/WEB-UI-UX-PRODUCT-PLAN.md` BF-4.
+
 ## Summary
 
 The server advertises `kimi-k2.6:cloud` in `GET /v1/models`, but `POST /v1/sessions/{id}/model` rejects that same model with `400 model not found`. This makes server-side cloud model selection inconsistent with the published model catalog.
@@ -102,3 +104,39 @@ Unify the listing and model-switch validation paths so a model listed by `/v1/mo
 ## Closure Criteria
 
 - Server-listed cloud models are selectable through the session model endpoint, or the API contract is updated so `/v1/models` does not advertise models that cannot be selected.
+
+## Retest - 2026-10-05
+
+- Result: **still reproducible (partially fixed)**. Priority raised to **P0** by
+  [ADR-002](../../adr/ADR-002-BROWSER-UI-PRIMARY-SURFACE.md) because the browser
+  model picker is driven by `/v1/models`.
+- Build: `update-documentation` branch at `088a677`, `make build`, server on
+  `127.0.0.1:18082` with temporary `NANDOCODEGO_*_HOME` dirs and `OLLAMA_API_KEY` set.
+- `GET /v1/models` listed `glm-5.1:cloud`, `glm-5.3:cloud`, `kimi-k2.6:cloud`.
+
+| Requested model | Result |
+| --- | --- |
+| `kimi-k2.6:cloud` | `200` `{"base_url":"https://ollama.com","model":"kimi-k2.6","provider":"ollama_cloud_api"}` (original repro now passes) |
+| `glm-5.1:cloud` | `400 model not found` (listed, but rejected) |
+| `not-a-real-model:latest` | `400 model not found` (expected) |
+
+Root cause (confirmed):
+
+- `/v1/models` lists the **local** Ollama tags, which include `:cloud` stub
+  entries pulled earlier (`glm-5.1:cloud`, remote host `https://ollama.com:443`).
+- `modelresolver.Resolve` treats any name ending in `:cloud` as cloud-only
+  (`trimColonCloudSuffix` → `resolveCloudOnly`), strips the suffix, and checks
+  the **live** `https://ollama.com/api/tags` catalog. It never consults the local list.
+- Ollama Cloud has retired `glm-5.1` (the catalog lists `glm-5.2`, `glm-5.3`,
+  `glm-5.3-flash`), so the stale local stub is advertised but cannot be selected.
+
+Fix direction (pick one, both acceptable under the closure criteria):
+
+1. `/v1/models` cross-checks `:cloud` stubs against the cloud catalog and
+   omits or flags entries the cloud no longer serves; or
+2. the switch path returns a precise error such as
+   `model glm-5.1 is no longer available in Ollama Cloud` (not `model not found`),
+   and the browser picker shows it as unavailable.
+
+Add a `modelresolver` unit test with a local `:cloud` stub that is missing from
+the cloud catalog, and a server handler test for the error contract.

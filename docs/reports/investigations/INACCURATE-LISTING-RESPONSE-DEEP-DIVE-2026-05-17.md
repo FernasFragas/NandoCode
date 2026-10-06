@@ -1,5 +1,7 @@
 # Inaccurate Listing Response Deep Dive
 
+Status: Fixes implemented (`docs/plans/LISTING-PROMPT-DRIFT-REMOVAL-PLAN-2026-05-17.md`); live evidence pending in the Workstream CL/PA gate.
+
 Date: 2026-05-17
 Observed prompt: `list all the files in @docs/`
 

@@ -1,7 +1,7 @@
 # Agent E2E Test And Bug Report Plan
 
 Date: 2026-06-07
-Status: Reviewed and strengthened for execution
+Status: Reviewed and strengthened for execution. **2026-10-05:** the next E2E run should treat the browser UI as the primary surface ([ADR-002](../adr/ADR-002-BROWSER-UI-PRIMARY-SURFACE.md)) and the TUI as a maintenance surface.
 Project: `nandocodego`
 Purpose: provide a detailed, agent-executable end-to-end test plan for the currently implemented application surface, with strict evidence capture and detailed bug reporting.
 
@@ -67,26 +67,25 @@ Those items should be recorded as `out_of_scope_future_phase` if encountered.
 The agent test program must produce all of the following artifacts:
 
 1. A master execution report:
-   - `docs/reports/E2E-MASTER-REPORT-YYYY-MM-DD.md`
+   - `docs/reports/e2e/YYYY-MM-DD/E2E-MASTER-REPORT-YYYY-MM-DD.md`
 2. A scenario matrix:
-   - `docs/reports/E2E-SCENARIO-MATRIX-YYYY-MM-DD.md`
+   - `docs/reports/e2e/YYYY-MM-DD/E2E-SCENARIO-MATRIX-YYYY-MM-DD.md`
 3. One report per agent lane:
-   - `docs/reports/E2E-AGENT-<lane>-REPORT-YYYY-MM-DD.md`
+   - `docs/reports/e2e/YYYY-MM-DD/E2E-AGENT-<lane>-REPORT-YYYY-MM-DD.md`
 4. One report per confirmed defect:
    - `docs/reports/bugs/BUG-YYYYMMDD-<slug>.md`
 5. One report per blocked scenario:
    - `docs/reports/blocks/BLOCK-YYYYMMDD-<slug>.md`
-6. A final summary for leadership triage:
-   - `docs/reports/E2E-EXECUTIVE-SUMMARY-YYYY-MM-DD.md`
+6. A final summary for leadership triage, as the "Executive Summary" section at the top of the master report (since 2026-10-06 it is no longer a separate file).
 
 Screenshots, logs, and command outputs should be stored under:
 
-- `docs/reports/artifacts/YYYY-MM-DD/<lane>/`
+- `docs/reports/e2e/YYYY-MM-DD/artifacts/<lane>/`
 
 The coordinator must create these directories before execution:
 
 ```sh
-mkdir -p docs/reports/bugs docs/reports/blocks docs/reports/artifacts/$(date +%F)
+mkdir -p docs/reports/bugs docs/reports/blocks docs/reports/e2e/$(date +%F)/artifacts
 ```
 
 ## Execution Principles
@@ -131,7 +130,7 @@ Required sample workspaces:
 
 Fixture rules:
 
-- Keep fixtures under a temporary directory or `docs/reports/artifacts/YYYY-MM-DD/fixtures/`.
+- Keep fixtures under a temporary directory or `docs/reports/e2e/YYYY-MM-DD/artifacts/fixtures/`.
 - Do not write generated fixtures into source directories unless the lane is testing source-tree behavior.
 - Record fixture creation commands or include a fixture manifest in the lane report.
 - If a scenario uses this repository itself as the target workspace, state that clearly because results may change as files change.

@@ -1,5 +1,7 @@
 # BLOCK-20260607-b007-cloud-credential-gate-not-observable-with-preconfigured-cloud-access
 
+> **Status: Blocked (2026-10-06).** Unblock via a credential test seam added with the browser cloud-key entry in roadmap step B2 (`docs/plans/WEB-UI-UX-PRODUCT-PLAN.md` BF-3), so the missing-credential path can be exercised without mutating user credential state. Retest then.
+
 ## Scenario
 
 `B-007` cloud-only model selection requests credentials before sending context.

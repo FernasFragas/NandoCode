@@ -2,6 +2,8 @@ package memory
 
 import (
 	"context"
+	"os"
+	"path/filepath"
 	"testing"
 	"time"
 
@@ -52,6 +54,9 @@ func (blockingExtractClient) PullModel(context.Context, string, chan<- llm.PullP
 }
 
 func TestRunnerDoesNotWaitForExtractionAfterTerminal(t *testing.T) {
+	// Keep memory writes out of the real user data directory.
+	dataHome := t.TempDir()
+	t.Setenv("NANDOCODEGO_DATA_HOME", dataHome)
 	cfg := DefaultConfig("test")
 	cfg.RecallTimeout = time.Second
 	cfg.ExtractTimeout = time.Second
@@ -92,5 +97,8 @@ func TestRunnerDoesNotWaitForExtractionAfterTerminal(t *testing.T) {
 		}
 	case <-time.After(100 * time.Millisecond):
 		t.Fatal("runner waited for detached extraction")
+	}
+	if _, err := os.Stat(filepath.Join(dataHome, "projects")); err != nil {
+		t.Fatalf("memory dir was not created under the test data home %s: %v", dataHome, err)
 	}
 }

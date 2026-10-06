@@ -2,13 +2,11 @@
 
 Date: 2026-05-09
 
-Status: Accepted for v0.1 roadmap
+Status: Accepted for v0.1 roadmap; **partially superseded on 2026-10-05 by [ADR-002](../adr/ADR-002-BROWSER-UI-PRIMARY-SURFACE.md)**. The browser UI is now the primary surface and the TUI is in maintenance mode. Slices that already landed stay valid; unimplemented slices (notably UI-6 hierarchical activity) are parked.
 
 ## Roadmap Placement
 
-This ADR is required input for Phase 22. The local TUI must expose clear run-state visibility, progress, retry/compaction state, tool activity, queue state, and permission context before Phase 21 server work and before Phase 25 remote/bridge mode. Otherwise the same unclear ask/response experience would be replicated into browser and remote workflows.
-
-Use `docs/plans/TASKS-TUI.md` as the agent-readable implementation breakdown for this ADR. Phase 22 owns the required implementation slices.
+Updated 2026-10-06. This ADR was Phase 22 input, written when the TUI was the primary surface and was expected to land before Phase 21 server work and Phase 25 remote/bridge mode. [ADR-002](ADR-002-BROWSER-UI-PRIMARY-SURFACE.md) (2026-10-05) made the browser UI the primary surface and put the TUI in maintenance mode. Phase 22 was accepted as-is: the slices that landed stay valid, and the unimplemented ones (including UI-6 hierarchical activity) are parked in `docs/roadmap/BACKLOG.md` §6. The agent-readable breakdown for this ADR is archived at `docs/archive/plans/TASKS-TUI.md`. The run-state ideas here (phases, status priority, visible progress) remain a useful reference for the browser status UI.
 
 ## Context
 
@@ -884,7 +882,7 @@ UI-1 lands:
 
 ```text
   Read docs/adr/ADR-001-TUI-USER-EXPERIENCE-IMPROVEMENTS.md (750 lines)
-  Read docs/plans/THINKING-VISIBILITY-PLAN.md (603 lines)
+  Read docs/archive/plans/THINKING-VISIBILITY-PLAN.md (603 lines)
 
   Listed 1 directory (ctrl+o to expand)
 

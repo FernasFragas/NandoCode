@@ -1,6 +1,6 @@
 # Application Architecture Flowchart
 
-Date: 2026-06-23
+Date: 2026-06-23 (server flow re-checked against code 2026-10-06)
 
 Module path: `github.com/FernasFragas/Nandocode`
 
@@ -247,6 +247,8 @@ flowchart TD
 
 ## 4. Browser And HTTP Server Flow
 
+The browser is the primary v0.1 surface (ADR-002). Known gaps in this flow (2026-10-06 review): server prompt preparation duplicates the TUI's instead of sharing it, the session replaces its history with each run's added messages, the model runtime is shared across sessions, and the file tree uses its own walk instead of `tools.ResolvePath` + `dirwalk.Walk`. See `docs/reports/investigations/CODE-COMPLEXITY-AND-ARCHITECTURE-REVIEW-2026-10-06.md`.
+
 ```mermaid
 flowchart TD
   Browser[Browser]
@@ -271,15 +273,16 @@ flowchart TD
   Browser --> ModelsGet
 
   subgraph ServerGuards["Server guards"]
-    Auth[Bearer token middleware<br/>when --token set]
+    Guard[NewRequestGuard<br/>loopback Host, same Origin, JSON bodies]
+    Auth[Bearer token on /v1/*<br/>generated at startup when --token unset]
     BindPolicy[Non-loopback bind requires token]
     RateLimit[Rate limiter + max sessions]
     RecentIDs[Duplicate message_id guard]
     SessionLimit[Idle sweep + delete session]
   end
 
-  StaticUI --> Auth
-  CreateSession --> RateLimit
+  StaticUI --> Guard
+  CreateSession --> Guard --> Auth --> RateLimit
   PostPrompt --> RecentIDs
   SessionRegistry --> SessionLimit
 
@@ -307,7 +310,7 @@ flowchart TD
 
   RunAgent --> AgentEvent --> SessionEvent --> Ring --> Subscribers --> WebRender
   PermissionPost -->|resolve request| Session
-  ModelPost --> modelruntime[modelruntime.Switch]
+  ModelPost --> modelruntime[modelruntime.Switch<br/>one RuntimeClient shared by all sessions]
   TreeGet --> filepathwalk[file tree response]
   ModelsGet --> modelruntimeList[modelruntime.ListLocal]
 ```

@@ -1,15 +1,10 @@
 # Context & Latency Optimization Plan
 
+Status: Foundations implemented for CL-0 to CL-8 (CL-6 uses heuristic signal-line summaries rather than LLM map/reduce; CL-8 controls are mostly complete; see `docs/phases/PHASE-LOG.md`). Live evidence is pending in the Workstream CL/PA gate.
+
 ## Roadmap Placement
 
-This plan is required v0.1 work before new transport surfaces. Complete the latency/context foundation before Phase 21 server mode, and carry the TUI-facing render/status pieces into Phase 22.
-
-Implementation relationship to the roadmap:
-
-- Phases 0-3 and 5-8 of this plan belong to the pre-Phase-22 context/latency reliability step.
-- Phase 4 streaming render optimization belongs to Phase 22 and should be implemented alongside ADR-001/TASKS-TUI run visibility work.
-- The project-scale analysis workflow and retrieval phases must be complete before Phase 17 packaging.
-- Do not solve latency by globally lowering `num_ctx`; use adaptive context, token-aware packing, trace data, and workflow-based analysis.
+Updated 2026-10-06 for ADR-002: the implementation slices of this plan have landed. What remains is the Workstream CL/PA evidence gate, which runs after browser-first steps B1-B4 and before Phase 17 (see `docs/roadmap/NEXT-PHASES-IMPLEMENTATION-PLAN.md`). Capture evidence through the browser where it exposes the feature and through the TUI/`--print` otherwise. Gate notes, evidence, blockers, and exit criteria are at the end of this document. The rule still stands: do not solve latency by globally lowering `num_ctx`.
 
 ## Goal
 
@@ -786,3 +781,43 @@ Target outcomes:
 - Memory recall no longer performs a blocking LLM call by default.
 - Large `@dir` prompt produces a context report.
 - Full project analysis has a workflow path with cached summaries.
+
+## Workstream CL Gate - Notes, Evidence, Blockers, Exit Criteria
+
+_Folded in on 2026-10-06 from the archived `REMAINING-PHASES-TASK-REVIEW.md` (2026-06-22 review) and updated for ADR-002 (browser-first, localhost only, no remote/JWT/`connect`)._
+
+#### Implementation Notes
+
+- CL-0 must land first. Without trace data, later latency changes are guesswork.
+- CL-1 must preserve explicit user overrides. `auto` context mode should be default; `fixed` or explicit CLI/config should remain respected.
+- CL-2 must model prompt parts explicitly. Avoid string-concatenation heuristics that cannot explain why content was included or skipped.
+- CL-3 should default to non-LLM recall but keep `llm` mode available for quality comparison.
+- CL-5 should build on the existing latest-checkpoint foundation but store enough state to resume a promised report, not merely conversation text.
+- CL-6 should use cache files under cache/state dirs, never project source files, and should not require every source file to fit into one prompt.
+- CL-7 should remain lexical/frecency first for v0.1. Do not introduce a vector database before the cache/evidence workflow works.
+- CL-8 should expose controls through slash commands and config, but defaults must remain quality-preserving.
+
+#### Evidence To Collect
+
+- Before/after timing for a small prompt.
+- Before/after timing for a medium prompt with memory and hooks enabled.
+- Effective `num_ctx`, estimated input tokens, prompt bytes, and first visible render time.
+- Large `@dir` expansion report showing included/summarized/skipped files.
+- Full project-analysis run showing cached summaries and cited final answer.
+
+#### Blockers
+
+- Trace cannot be generated without leaking prompt/file content.
+- Adaptive context breaks explicit large-context prompts.
+- Explicit files are silently dropped.
+- `continue` cannot resume the promised final artifact.
+- Project analysis still requires too much raw prompt context because the map/reduce summary workflow is not implemented.
+
+#### Exit Criteria
+
+- `/trace last` or equivalent shows stage timings and context budget.
+- Small prompts use smaller context tiers.
+- Large prompts preserve context up to model limit.
+- Default memory recall avoids a pre-run LLM call.
+- Large project analysis has a workflow path with cached summaries.
+- Final-answer quality gate catches preamble-only completions.
