@@ -2,7 +2,7 @@ module github.com/FernasFragas/Nandocode
 
 go 1.26.2
 
-toolchain go1.26.6
+toolchain go1.26.9
 
 require (
 	github.com/cenkalti/backoff/v4 v4.3.0
@@ -17,8 +17,8 @@ require (
 	github.com/knadh/koanf/v2 v2.3.5
 	github.com/spf13/cobra v1.10.2
 	github.com/zalando/go-keyring v0.2.8
-	golang.org/x/net v0.56.0
-	golang.org/x/sync v0.21.0
+	golang.org/x/net v0.60.0
+	golang.org/x/sync v0.23.0
 	gopkg.in/yaml.v3 v3.0.1
 	mvdan.cc/sh/v3 v3.13.1
 )
@@ -61,7 +61,7 @@ require (
 	github.com/xo/terminfo v0.0.0-20220910002029-abceb7e1c41e // indirect
 	github.com/yuin/goldmark v1.7.17 // indirect
 	github.com/yuin/goldmark-emoji v1.0.6 // indirect
-	golang.org/x/sys v0.46.0 // indirect
-	golang.org/x/term v0.44.0 // indirect
-	golang.org/x/text v0.39.0 // indirect
+	golang.org/x/sys v0.48.0 // indirect
+	golang.org/x/term v0.46.0 // indirect
+	golang.org/x/text v0.42.0 // indirect
 )
