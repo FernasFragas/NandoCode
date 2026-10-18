@@ -8,6 +8,41 @@ This file is the implementation history and acceptance-evidence log, ordered **n
 
 For current routing read [`docs/roadmap/NEXT-PHASES-IMPLEMENTATION-PLAN.md`](../roadmap/NEXT-PHASES-IMPLEMENTATION-PLAN.md) first, then [`docs/roadmap/PROJECT-STATUS-AND-ONBOARDING.md`](../roadmap/PROJECT-STATUS-AND-ONBOARDING.md). Use this log to verify what shipped, what checks ran, and which manual gates still need evidence. Finished phase specs are in `docs/archive/phases/`.
 
+## BV-0 — Browser Visual Revamp: Spec, Tokens, Icons (2026-10-18)
+
+**Date:** 2026-10-18
+**Status:** BV-0 done; BV-1 waits for B1-1
+**Scope:** Plan and visual spec for making the browser UI match `docs/plans/UX/*.png` with real data only; design tokens and icon sprite. No runtime behaviour change.
+
+### Completed
+
+- New roadmap step BV (step 6) with a Read-Next row; BV added to the Phase 17 gate. Plan: `docs/plans/BROWSER-VISUAL-REVAMP-PLAN.md`; one-pager: `docs/ideas/browser-visual-revamp.md`.
+- `docs/plans/UX/DESIGN-SPEC.md`: tokens, layout, breakpoints, nav mapping, component inventory with data sources, empty states, mockup noise.
+- `internal/server/web/css/tokens.css`: colours are the median of a 5x5 patch from the Agents mockup; system font stack. Not linked yet (BV-2).
+- `internal/server/web/icons.svg`: 35 hand-drawn 24x24 line icons. Not linked yet.
+- `WEB-UI-UX-PRODUCT-PLAN.md`: UI-6 superseded by BV-3/BV-4; UI-7 note about rendering inside the BV shell.
+- `BACKLOG.md`: user "Add task", "Add agent" presets, worker ↔ skill link, light theme.
+
+### Findings recorded during planning
+
+- An agent todo list exists (`internal/tools/todo`, `TodoWrite`/`TodoRead`), but only `internal/cli/repl.go` creates a `TodoList`; server sessions do not (BV-3 fixes this).
+- Sub-agents: name, task, model, status, timing and mailbox exist; current step, usage and files touched are not forwarded to SSE (BV-8a); agent types and per-worker skills do not exist.
+- `agent.Usage` matches the mockup's Usage fields but is only emitted on `terminal` (BV-3 adds `usage_update`).
+- The agent's write tool is named `FileWrite`.
+- `tools/check-network-policy.sh` does not scan `.svg`/`.css`; the SVG namespace string in JS (BV-1) will need an explicit allowlist entry.
+
+### Checks Run
+
+- `go test ./internal/server/` — pass (embed unchanged: still `web/index.html` only).
+- `tools/check-network-policy.sh` — pass. `tools/check-allowed-deps.sh` — pass.
+- `xmllint --noout internal/server/web/icons.svg` — valid; preview of all 35 icons rendered and inspected.
+- No Go or browser JS behaviour changed, so no RED/GREEN test applies to BV-0.
+
+### Known Constraints
+
+- `--border` (`#0d1823`) is almost the same as the backgrounds; recheck in the BV-1 gallery.
+- Text, agent and syntax colours are set by eye (too anti-aliased to sample); tune in BV-1.
+
 ## Evaluation Framework — Deterministic Fixture Runner (2026-06-25)
 
 **Date:** 2026-06-25

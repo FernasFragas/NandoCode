@@ -66,6 +66,11 @@ Promoted to the committed roadmap on 2026-10-05 (steps B2, B3, B4 in [NEXT-PHASE
 - Mobile-first responsive layout (post-launch).
 - Theme engine beyond a basic light/dark toggle (post-launch).
 - Editing MCP servers from the browser (post-launch; v0.1 shows them read-only in the B3 Trust panel).
+- Visual revamp promoted 2026-10-18 as roadmap step BV ([plan](../plans/BROWSER-VISUAL-REVAMP-PLAN.md)). Left out of BV:
+  - User "Add task": the user appends a todo that the agent sees on its next `TodoRead` (P2; BV-3 shows the agent's todos read-only).
+  - "Add agent": named worker presets (prompt, tools, model) shown as an agent-type registry, as in the mockup (P2).
+  - Worker ↔ skill link ("Skill: retrieval" on agent nodes) (P3).
+  - Light theme from the BV tokens (post-launch; folds into the theme item above).
 
 Scheduled 2026-10-06: model pull progress in the browser is part of the Phase 17 first run.
 
