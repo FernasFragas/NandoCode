@@ -1,7 +1,7 @@
 # Documentation
 
 **Start with the guide for your role:** [engineers.md](../engineers.md) or
-[product-managers.md](../product-managers.md). Both are at the repo root.
+[product-managers.md](../product-managers.md). Both are at the repo root. Coding agents follow [AGENTS.md](../AGENTS.md).
 
 ## The Four Documents That Answer Most Questions
 
