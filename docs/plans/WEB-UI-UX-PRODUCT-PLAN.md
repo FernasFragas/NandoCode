@@ -3,7 +3,7 @@
 **Date reviewed:** 2026-05-24  
 **Implementation audit:** 2026-05-28  
 **Re-planned:** 2026-10-05 - the browser UI is now the **primary v0.1 surface** ([ADR-002](../adr/ADR-002-BROWSER-UI-PRIMARY-SURFACE.md)). The P1 panels are committed roadmap work and new browser-first P0 items were added; see "Browser-First P0 Additions (2026-10-05)".  
-**Status:** Original P0 chat scope implemented as of 2026-06-23. Browser-first P0 additions, P1 management panels (UI-7), and UI-8 hardening remain.
+**Status:** Original P0 chat scope implemented as of 2026-06-23. Browser-first P0 additions, P1 management panels (UI-7), and UI-8 hardening remain. The visual layer and UI-6 moved to [`BROWSER-VISUAL-REVAMP-PLAN.md`](BROWSER-VISUAL-REVAMP-PLAN.md) on 2026-10-18.
 **Scope:** Make the Phase 21 browser page the primary local product surface.  
 **Module path:** `github.com/FernasFragas/Nandocode`
 
@@ -578,8 +578,9 @@ tools.ResolvePath and dirwalk.Walk instead of raw filepath.WalkDir. Keep plain
 
 ### Slice UI-6: Status, Tasks, and Diagnostics From Existing Events
 
-**Status:** Partially implemented in the served UI; event payload shape is
-normalized and transcript search is still missing (not yet scheduled on the roadmap).
+**Status:** **Superseded 2026-10-18** by slices BV-3 (right rail) and BV-4
+(transcript) of [`BROWSER-VISUAL-REVAMP-PLAN.md`](BROWSER-VISUAL-REVAMP-PLAN.md).
+Transcript search moves to the BV-2 "Transcript" nav view. Kept below for history only.
 
 **Goal:** Make the UI useful for long runs without adding management endpoints.
 
@@ -615,6 +616,11 @@ endpoints in this slice. Run go test ./internal/server.
 ### Slice UI-7: P1 Sidebar Panels
 
 **Status:** Not implemented. Owner: roadmap step B3.
+
+**Note (2026-10-18):** panels render inside the BV shell and use its tokens and
+render modules ([`BROWSER-VISUAL-REVAMP-PLAN.md`](BROWSER-VISUAL-REVAMP-PLAN.md)).
+The Activity panel's tasks and sub-agent data also feed the BV-3 right rail and
+the BV-8 Agents tab; build them on the same events instead of a second source.
 
 **Goal:** Add management panels after P0 browser chat is stable.
 

@@ -123,16 +123,17 @@ Implement remaining work in this order:
    - Browser session bugs: "New Session" deletes or reuses the old session (no hitting the 10-session cap); the permission modal closes when the broker times out.
    - With the index endpoints: `semantic.Refresh` re-embeds after an embedding-model change (P1-9); `Status` reads only the manifest (P1-8).
    - Small parser bugs, each with a RED test: `@main.go?` resolves the file; skill bodies with lines over 4 KB load; excerpts stay valid UTF-8.
-6. **Phase 25 (rescoped) - Browser Session Durability:** slice 0 reliable server event log (atomic replay+subscribe, gap event, typed event DTOs), then detach/reattach, replay with gap detection, persisted session metadata, detached-session cleanup. No JWT, no `connect`, no TUI bridge.
-7. **B3 - Browser management panels:** permissions, tasks, memory, prompt inspector, skills, hooks (one at a time, each with backend tests).
+6. **BV - Browser visual revamp (decided 2026-10-18):** make the browser look like the mockups in `docs/plans/UX/` and work as the agent control room, with real data only. Plan: `docs/plans/BROWSER-VISUAL-REVAMP-PLAN.md`; visual spec: `docs/plans/UX/DESIGN-SPEC.md`. Slices wait for the step that delivers their backend: BV-0 spec and tokens (done 2026-10-18); BV-1 component gallery after B1-1; BV-2 shell inside the B2 page split; BV-3 right rail and BV-4 transcript after BV-2; BV-5 sessions after B2; BV-6 files API and read-only viewer (replaces `/tree`); BV-7 Save; BV-8a sub-agent events after the B1.5 event invariants; BV-8b Agents tab. BV supersedes WEB-UI-UX slice UI-6; the B3 panels render inside the BV shell.
+7. **Phase 25 (rescoped) - Browser Session Durability:** slice 0 reliable server event log (atomic replay+subscribe, gap event, typed event DTOs), then detach/reattach, replay with gap detection, persisted session metadata, detached-session cleanup. No JWT, no `connect`, no TUI bridge.
+8. **B3 - Browser management panels:** permissions, tasks, memory, prompt inspector, skills, hooks (one at a time, each with backend tests).
    - Decided 2026-10-06: the permissions and hooks panels form one **Trust** panel (permission mode and rules, hook sources, MCP servers read-only with trust and connection status, cloud credential status, network policy, writable roots; summary also in `doctor`). The tasks panel becomes an **Activity** view (run phase, tools, sub-agents, tasks, queue, permission waits, index activity) together with the status bar. MCP server editing from the browser is post-launch.
    - First split `internal/commands` into typed query functions plus text formatters (a pure-move file split first, over 500 lines), so panels JSON-encode the same data the TUI prints.
-8. **B4 - Browser accessibility and hardening:** ARIA roles, keyboard support, reduced motion, and a CSP without `'unsafe-inline'` once the page is split. (The Host/Origin/JSON request guard already exists in `internal/server/auth.go` `NewRequestGuard`, covered by `TestRequestGuard`.)
-9. **B5 - Proof Mode / shareable run report (launch differentiator, decided 2026-10-06).** Export a redacted Markdown record of a run (prompt, plan, tools, files changed, tests run, permission decisions, open risks) from the browser and via `/run-report last`, built on prompt dumps, the run trace, and the B1.5 event invariants. **Write `docs/plans/PROOF-MODE-RUN-REPORT-PLAN.md` before starting** (scope, report contents, redaction rules, test-first slices, acceptance).
-10. **Carry-forward validation evidence:** Gate G0 and Workstream CL/PA, run through the browser where the browser exposes the feature; TUI/CLI only where it does not.
+9. **B4 - Browser accessibility and hardening:** ARIA roles, keyboard support, reduced motion, and a CSP without `'unsafe-inline'` once the page is split. (The Host/Origin/JSON request guard already exists in `internal/server/auth.go` `NewRequestGuard`, covered by `TestRequestGuard`.)
+10. **B5 - Proof Mode / shareable run report (launch differentiator, decided 2026-10-06).** Export a redacted Markdown record of a run (prompt, plan, tools, files changed, tests run, permission decisions, open risks) from the browser and via `/run-report last`, built on prompt dumps, the run trace, and the B1.5 event invariants. **Write `docs/plans/PROOF-MODE-RUN-REPORT-PLAN.md` before starting** (scope, report contents, redaction rules, test-first slices, acceptance).
+11. **Carry-forward validation evidence:** Gate G0 and Workstream CL/PA, run through the browser where the browser exposes the feature; TUI/CLI only where it does not.
    - CL/PA also records two analysis decisions (2026-10-06): heuristic `BuildProjectAnalysisPrompt` summaries are an accepted v0.1 limitation (documented in Phase 18), and summary-cache/ledger write errors get a test and a logged warning instead of being ignored.
-11. **Phase 17 - Distribution and Install** (includes the default-command change to the browser with the TUI at `nandocodego tui`, and a browser first run that asks the user to pick a model).
-12. **Phase 18 - Hardening, Eval Suite, and Docs.**
+12. **Phase 17 - Distribution and Install** (includes the default-command change to the browser with the TUI at `nandocodego tui`, and a browser first run that asks the user to pick a model).
+13. **Phase 18 - Hardening, Eval Suite, and Docs.**
 
 Phase 22 is accepted as-is: the TUI is in maintenance mode, and its remaining deep-interaction follow-ups are parked in the backlog.
 
@@ -149,6 +150,7 @@ Use this table to decide what to read after this file. The detailed plan column 
 | B1.5 - Surface-neutral extraction | Not started; after B1 | `docs/reports/investigations/CODE-COMPLEXITY-AND-ARCHITECTURE-REVIEW-2026-10-06.md` (Composition Roots And Duplication; P1-2) | `internal/tui/app.go`, `internal/server/session.go`, `internal/cli/{repl,print}.go`, `internal/agent` |
 | C1 - Core cleanup | Not started; after B1.5, before Phase 25 | `docs/reports/investigations/CODE-COMPLEXITY-AND-ARCHITECTURE-REVIEW-2026-10-06.md` (P1-1; context pipeline) | `internal/agent`, `internal/contextpack`, `internal/mentions`, `internal/eval` |
 | B2 - Browser parity blockers | Not started; after B1.5 | `docs/plans/WEB-UI-UX-PRODUCT-PLAN.md` section "Browser-First P0 Additions (2026-10-05)" | `docs/plans/OLLAMA-CLOUD-API-KEY-PLAN.md` for credential consent rules |
+| BV - Browser visual revamp | BV-0 done (2026-10-18); BV-1 next after B1-1 | `docs/plans/BROWSER-VISUAL-REVAMP-PLAN.md` | `docs/plans/UX/DESIGN-SPEC.md`; mockups in `docs/plans/UX/`; `internal/server/web/`; `internal/tools/todo`, `internal/tasks`, `internal/agent/coordinator.go` (BV-3, BV-8a) |
 | Phase 25 - Browser Session Durability (rescoped) | Not implemented | `docs/phases/PHASE-25-DETAILED-PLAN.md` (read the 2026-10-05 rescope section first) | `internal/server/ringbuffer.go`, `recentids.go`, `session.go` |
 | B3 - Browser management panels | Not started | `docs/plans/WEB-UI-UX-PRODUCT-PLAN.md` slice UI-7 | Owning packages per panel |
 | B4 - Browser accessibility and hardening | Partially implemented | `docs/plans/WEB-UI-UX-PRODUCT-PLAN.md` slice UI-8 | `internal/server/server.go` `securityHeaders` |
@@ -174,7 +176,7 @@ Use this table to decide what to read after this file. The detailed plan column 
 - When you modify a test file, replace its `time.Sleep` synchronization and wall-clock assertions with channels or the existing wait helpers (`waitForStatus`, `blockingRunner`).
 - Do not start Phase 25 until C1 is accepted.
 - Do not start B2 until B1.5 is accepted: B2 endpoints call the extracted packages instead of copying TUI logic.
-- Do not start Phase 17 until B1-B5 (including B1.5 and C1), Phase 25 (rescoped), Gate G0, and Workstream CL/PA are complete and accepted.
+- Do not start Phase 17 until B1-B5 (including B1.5 and C1), BV, Phase 25 (rescoped), Gate G0, and Workstream CL/PA are complete and accepted.
 - Do not start Phase 18 until Phase 17 is complete and accepted.
 - Do not add Phase 23/OpenAI-compatible adapter work unless the roadmap explicitly changes.
 - Do not generalize the Ollama Cloud workstream into a multi-provider adapter. It is Ollama-only and must keep local models as the default.

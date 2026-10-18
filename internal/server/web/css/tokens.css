@@ -1,0 +1,94 @@
+/*
+ * Design tokens for the browser UI (BV-0, docs/plans/UX/DESIGN-SPEC.md).
+ * Colours are median samples from docs/plans/UX/Local AI Coding Agents Dashboard.png
+ * (the canonical mockup). Do not edit values without re-checking the gallery
+ * against the PNG. Dark theme only; a light theme is post-v0.1 (BACKLOG.md).
+ * Not linked from index.html yet: BV-2 wires it in during the B2 page split.
+ */
+:root {
+  color-scheme: dark;
+
+  /* Backgrounds */
+  --bg: #0b1520;            /* header, nav, footer */
+  --bg-center: #0a141d;     /* transcript, editor, agent canvas */
+  --bg-rail: #0b141f;       /* right status rail */
+  --surface: #0e1a26;       /* project tree */
+  --card: #111e2e;          /* thinking, tool, chip cards */
+  --card-raised: #142235;   /* tool results, code blocks, inputs */
+  --chip: #101c2a;          /* stage / retrieval / pack chips */
+  --border: #0d1823;        /* 1px dividers; recheck visibility in BV-1 */
+
+  /* Text (not sampled: mockup text is anti-aliased; tune in BV-1) */
+  --text: #e6edf5;
+  --text-muted: #9aa8b8;
+  --text-faint: #6b7a8c;
+
+  /* Accent and state */
+  --primary: #0067fe;
+  --primary-pressed: #0061fc;
+  --primary-soft: #032a65;  /* active nav item, active session */
+  --info: #006aff;          /* running, info event dot */
+  --success: #1efb82;
+  --success-soft: #06221e;
+  --warning: #ffb201;
+  --danger: #ff181d;
+  --danger-soft: #281720;
+
+  /* One colour per agent node (BV-8); assigned by spawn order */
+  --agent-1: #8b5cf6;
+  --agent-2: #0067fe;
+  --agent-3: #22c55e;
+  --agent-4: #f59e0b;
+  --agent-5: #ec4899;
+  --agent-6: #a855f7;
+
+  /* Syntax (BV-6 highlighter) */
+  --syn-keyword: #c792ea;
+  --syn-string: #f3a35c;
+  --syn-comment: #6b7a8c;
+  --syn-number: #b5cea8;
+  --syn-func: #82aaff;
+  --syn-type: #4ec9b0;
+
+  /* Typography: system stack, no web fonts (network policy) */
+  --font-ui: -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+  --fs-xs: 11px;    /* chip labels, graph node detail, activity log */
+  --fs-sm: 12px;    /* card body, rail values */
+  --fs-md: 13px;    /* default UI text, code */
+  --fs-lg: 15px;    /* nav items, section titles */
+  --fs-brand: 22px; /* "nandocodego" */
+  --fw-regular: 400;
+  --fw-medium: 500;
+  --fw-semibold: 600;
+  --lh: 1.45;
+
+  /* Spacing (4px grid) */
+  --sp-1: 4px;
+  --sp-2: 8px;
+  --sp-3: 12px;
+  --sp-4: 16px;
+  --sp-5: 20px;
+  --sp-6: 24px;
+
+  /* Radii */
+  --r-sm: 4px;   /* chips, inline code */
+  --r-md: 6px;   /* buttons, inputs, tool cards */
+  --r-lg: 8px;   /* cards, popovers */
+  --r-pill: 999px;
+
+  /* Layout (measured at 1448px) */
+  --header-h: 68px;
+  --footer-h: 34px;
+  --nav-w: 252px;
+  --nav-w-collapsed: 56px;
+  --tree-w: 258px;
+  --rail-w: 278px;
+
+  /* Breakpoints are documented here; CSS custom properties cannot be used in
+     media queries, so BV-2 repeats them literally:
+     < 1440px nav -> icon rail; < 1200px tree -> toggle; < 960px rail -> drawer. */
+
+  --shadow-popover: 0 10px 30px rgba(0, 0, 0, 0.5);
+  --focus-ring: 0 0 0 2px var(--primary);
+}
