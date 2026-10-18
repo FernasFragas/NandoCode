@@ -3,7 +3,7 @@
 **Date reviewed:** 2026-05-24  
 **Implementation audit:** 2026-05-28  
 **Re-planned:** 2026-10-05 - the browser UI is now the **primary v0.1 surface** ([ADR-002](../adr/ADR-002-BROWSER-UI-PRIMARY-SURFACE.md)). The P1 panels are committed roadmap work and new browser-first P0 items were added; see "Browser-First P0 Additions (2026-10-05)".  
-**Status:** Original P0 chat scope implemented as of 2026-06-23. Browser-first P0 additions, P1 management panels (UI-7), and UI-8 hardening remain.
+**Status:** Original P0 chat scope implemented as of 2026-06-23. Browser-first P0 additions, P1 management panels (UI-7), and UI-8 hardening remain. The visual layer and UI-6 moved to [`BROWSER-VISUAL-REVAMP-PLAN.md`](BROWSER-VISUAL-REVAMP-PLAN.md) on 2026-10-18.
 **Scope:** Make the Phase 21 browser page the primary local product surface.  
 **Module path:** `github.com/FernasFragas/Nandocode`
 
@@ -303,7 +303,7 @@ surface. Each item ships with backend tests and follows the Architecture Rules
 
 | ID | Requirement | Implementation notes |
 | --- | --- | --- |
-| BF-1 | Split the page into embedded static files | Move inline CSS/JS out of `index.html` into files under `internal/server/web/` (for example `app.css`, `app.js`, small ES modules). Plain JS, no build tools, no npm. Embed the directory with `//go:embed web` and keep the existing route/embed test. Tighten CSP once inline script/style is gone. The SSE module must send `Last-Event-ID` on reconnect and drop already-seen event IDs, which fixes today's duplicated transcript after a reconnect (server-side event-log fixes are Phase 25 slice 0). Keep the markdown, SSE-parser, and tree modules DOM-free and test them with `node --test` (no npm; decided 2026-10-06). |
+| BF-1 | Split the page into embedded static files (B1 extracts `web/js/markdown.js`, embeds `web/`, and adds the `node --test` CI job; B2 moves the rest) | Move inline CSS/JS out of `index.html` into files under `internal/server/web/` (for example `app.css`, `app.js`, small ES modules). Plain JS, no build tools, no npm. Embed the directory with `//go:embed web` and keep the existing route/embed test. Tighten CSP once inline script/style is gone. The SSE module must send `Last-Event-ID` on reconnect and drop already-seen event IDs, which fixes today's duplicated transcript after a reconnect (server-side event-log fixes are Phase 25 slice 0). Keep the markdown, SSE-parser, and tree modules DOM-free and test them with `node --test` (no npm; decided 2026-10-06). |
 | BF-2 | Stop/cancel an active run | Add `POST /v1/sessions/{id}/cancel` that cancels the run context and emits the normal terminal event. Add a Stop button. Today the only option is deleting the session. |
 | BF-3 | Ollama Cloud API key entry | Server mode must not block on input, so add an explicit endpoint (for example `POST /v1/credentials/ollama-cloud` with use-once or save-to-keychain) and handle `requires_credential` in the model picker. The key must be provided before any project context is sent; never log or echo it. Follow `docs/plans/OLLAMA-CLOUD-API-KEY-PLAN.md`. |
 | BF-4 | Model list matches what can be selected | Fix the P0 bug: `/v1/models` must not advertise stale `:cloud` tags that the switch path rejects, or the switch must return a precise "not available in Ollama Cloud" error. The picker should mark cloud models and their credential state. |
@@ -317,8 +317,7 @@ Each slice must leave the repo testable. Do not mix later panels into P0 slices.
 
 Recommended next implementation order (updated 2026-10-06; `docs/roadmap/NEXT-PHASES-IMPLEMENTATION-PLAN.md` is authoritative and also schedules C1 core cleanup in parallel with B2):
 
-1. B1: fix the cloud-model switch P0 bug, add security header tests (UI-8), and
-   refactor the tree endpoint to use `tools.ResolvePath` and `dirwalk.Walk` (UI-5).
+1. B1: the full list (13 items, each with its failing test) is in `docs/roadmap/NEXT-PHASES-IMPLEMENTATION-PLAN.md`. The browser/server items this plan owns: the cloud-model switch bug (BF-4), the markdown XSS fix, a per-session model runtime, keeping the conversation across turns, a persistent "Always Allow", the tree endpoint on `tools.ResolvePath` and `dirwalk.Walk` (UI-5), and security-header tests (UI-8).
 2. B1.5: surface-neutral extraction (`turnprep`, `bootstrap.ApplyConfig`, `modelruntime.Activate`, `runctl`, `ApplyTerminal`, agent event invariants); see `docs/roadmap/NEXT-PHASES-IMPLEMENTATION-PLAN.md`.
 3. B2: implement BF-1 through BF-6 from "Browser-First P0 Additions" on top of the B1.5 packages (BF-2 uses `runctl`, BF-3 uses `modelruntime.Activate`, BF-5 uses the extracted clear/compact operations).
 4. Phase 25 (rescoped): session durability, which BF-6 builds on.
@@ -579,8 +578,9 @@ tools.ResolvePath and dirwalk.Walk instead of raw filepath.WalkDir. Keep plain
 
 ### Slice UI-6: Status, Tasks, and Diagnostics From Existing Events
 
-**Status:** Partially implemented in the served UI; event payload shape is
-normalized and transcript search is still missing (not yet scheduled on the roadmap).
+**Status:** **Superseded 2026-10-18** by slices BV-3 (right rail) and BV-4
+(transcript) of [`BROWSER-VISUAL-REVAMP-PLAN.md`](BROWSER-VISUAL-REVAMP-PLAN.md).
+Transcript search moves to the BV-2 "Transcript" nav view. Kept below for history only.
 
 **Goal:** Make the UI useful for long runs without adding management endpoints.
 
@@ -616,6 +616,11 @@ endpoints in this slice. Run go test ./internal/server.
 ### Slice UI-7: P1 Sidebar Panels
 
 **Status:** Not implemented. Owner: roadmap step B3.
+
+**Note (2026-10-18):** panels render inside the BV shell and use its tokens and
+render modules ([`BROWSER-VISUAL-REVAMP-PLAN.md`](BROWSER-VISUAL-REVAMP-PLAN.md)).
+The Activity panel's tasks and sub-agent data also feed the BV-3 right rail and
+the BV-8 Agents tab; build them on the same events instead of a second source.
 
 **Goal:** Add management panels after P0 browser chat is stable.
 

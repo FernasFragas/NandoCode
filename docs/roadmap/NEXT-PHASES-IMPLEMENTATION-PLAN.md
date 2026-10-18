@@ -76,7 +76,11 @@ Implement remaining work in this order:
    - Cloud-model switch bug (`/v1/models` lists a model the switch rejects).
    - Per-session model runtime (P0-3): each server session gets its own `llm.RuntimeClient` and switches only when its model changes. Test: two sessions on different models.
    - Browser keeps the conversation across turns (P0-1): append each run's messages, including the user prompt, instead of replacing history. Test: two `StartRun` calls; the second sees `[Q1, A1, Q2]`.
-   - Markdown XSS (P0-2): escape quotes, allow only http/https/mailto links. Test: rendered output has no `on*=` attributes and no other link schemes. This needs the renderer as a DOM-free module tested with `node --test`; add that CI step here (no npm, decided 2026-10-06).
+   - Markdown XSS (P0-2): escape quotes, allow only http/https/mailto links. Test: rendered output has no `on*=` attributes and no other link schemes. Setup, decided 2026-10-06 (this is the first piece of BF-1; B2 finishes the page split):
+     1. Move `renderMarkdown` and `escapeHtml` out of `index.html` into `internal/server/web/js/markdown.js`, a DOM-free ES module that `index.html` imports.
+     2. Embed the whole `web/` folder (`//go:embed web` in `internal/server/server.go`, today `web/index.html` only) and serve `js/` with a JavaScript content type. Update `TestRoutesServeRichEmbeddedUI` to check the module is served.
+     3. Write the RED test as `internal/server/web/js/markdown.test.js` for Node's built-in runner.
+     4. Add a new `ci.yml` job on ubuntu: `actions/setup-node` with a pinned Node version, then `node --test internal/server/web/js/`. No npm, no `package.json`, no dependencies.
    - Embeddings stay local (P1-5): bind `semantic.LLMEmbedder` to the local Ollama client, not the runtime router. Test: after a switch to a fake cloud client, zero cloud embed calls.
    - Browser "Always Allow" persists (P1-6): add a rule that `permissions` actually matches (shared `permissions.SessionAllowRule` with the TUI). Test: a second run with the same tool and target emits no `permission_request`.
    - `@dir/` evidence cannot follow symlinks outside the workspace (P0-4): per-file `tools.ResolvePath` in `contextpack`. Test: `TestPackCurrentTurnPromptDirectoryMentionDoesNotFollowSymlinkOutsideRoots`.
@@ -87,6 +91,16 @@ Implement remaining work in this order:
    - Codebase questions keep their tools (P0-5): split the tool-mode decision from the retrieval decision in `retrievalroute`, match whole words. Test: the 11-row `TestDecideToolModeAndAction` table plus the never-`ToolModeNone` invariant.
    - Shared `internal/netguard` for outbound HTTP safety: block `0.0.0.0` and unmapped IPv6 forms, dial the validated IP (no DNS rebinding), re-check redirects, block `localhost` names, cap HTML bodies; used by MCP, HTTP hooks, and webfetch (removes the `hooks` → `mcp` dependency). Test: `0.0.0.0`, a redirect to `127.0.0.1`, and a `localhost` URL are all rejected.
    - Security-header tests; file-tree endpoint onto `tools.ResolvePath` + `dirwalk.Walk`; `--print` fails fast on a malformed config (decided 2026-10-06).
+   - **B1 exit extras** (on top of the Step Exit Check): `USER_MANUAL.md`'s permission-rule section documents that `*` matches any characters including `/`, and what `**` means; both open bug reports (cloud-model switch, malformed config) are closed and archived; E2E blocks B007/B008 stay open (they wait for B2's credential test seam).
+   - **Slices and order** (decided 2026-10-06; risk first, one PR per slice, each closed with the Step Exit Check for its items; B1-2 to B1-6 may run in parallel once B1-1 has merged):
+     1. **B1-1 XSS:** `markdown.js` extraction, `web/` embed, `node --test` CI job, the fix.
+     2. **B1-2 Permissions and agents:** Bash argument checks; `*` matches `/` (with the `USER_MANUAL.md` update); sub-agent mode clamp with the parent's rules and hooks; MCP project trust.
+     3. **B1-3 Network guard:** `internal/netguard`, used by MCP, HTTP hooks, and webfetch.
+     4. **B1-4 Browser sessions:** per-session runtime together with the cloud-model switch bug (same code); history across turns; Always Allow; security-header tests; file-tree walk.
+     5. **B1-5 Context and routing:** `@dir/` symlink containment; routing tool-mode split; local-only embeddings.
+     6. **B1-6 CLI:** `--print` fails fast on a malformed config.
+
+     B1 is accepted when B1-6 has merged and the B1 exit extras hold.
 3. **B1.5 - Surface-neutral extraction.** Move the logic B2 needs out of the TUI and the duplicated composition roots, so B2 endpoints are thin. Characterization tests first for every move; behavior must not change. Details: review report, "Composition Roots And Duplication".
    - `internal/turnprep`: one turn-preparation function (pack, route, semantic retrieval, `agent.Input`) used by the TUI, server, `--print`, and eval. Test first: a prompt table capturing today's `agent.Input` from each path.
    - `bootstrap.ApplyConfig`: one config-to-runtime mapping for all surfaces (the server maps 13 of 26 fields today). Test: every config field lands.
@@ -109,16 +123,17 @@ Implement remaining work in this order:
    - Browser session bugs: "New Session" deletes or reuses the old session (no hitting the 10-session cap); the permission modal closes when the broker times out.
    - With the index endpoints: `semantic.Refresh` re-embeds after an embedding-model change (P1-9); `Status` reads only the manifest (P1-8).
    - Small parser bugs, each with a RED test: `@main.go?` resolves the file; skill bodies with lines over 4 KB load; excerpts stay valid UTF-8.
-6. **Phase 25 (rescoped) - Browser Session Durability:** slice 0 reliable server event log (atomic replay+subscribe, gap event, typed event DTOs), then detach/reattach, replay with gap detection, persisted session metadata, detached-session cleanup. No JWT, no `connect`, no TUI bridge.
-7. **B3 - Browser management panels:** permissions, tasks, memory, prompt inspector, skills, hooks (one at a time, each with backend tests).
+6. **BV - Browser visual revamp (decided 2026-10-18):** make the browser look like the mockups in `docs/plans/UX/` and work as the agent control room, with real data only. Plan: `docs/plans/BROWSER-VISUAL-REVAMP-PLAN.md`; visual spec: `docs/plans/UX/DESIGN-SPEC.md`. Slices wait for the step that delivers their backend: BV-0 spec and tokens (done 2026-10-18); BV-1 component gallery after B1-1; BV-2 shell inside the B2 page split; BV-3 right rail and BV-4 transcript after BV-2; BV-5 sessions after B2; BV-6 files API and read-only viewer (replaces `/tree`); BV-7 Save; BV-8a sub-agent events after the B1.5 event invariants; BV-8b Agents tab. BV supersedes WEB-UI-UX slice UI-6; the B3 panels render inside the BV shell.
+7. **Phase 25 (rescoped) - Browser Session Durability:** slice 0 reliable server event log (atomic replay+subscribe, gap event, typed event DTOs), then detach/reattach, replay with gap detection, persisted session metadata, detached-session cleanup. No JWT, no `connect`, no TUI bridge.
+8. **B3 - Browser management panels:** permissions, tasks, memory, prompt inspector, skills, hooks (one at a time, each with backend tests).
    - Decided 2026-10-06: the permissions and hooks panels form one **Trust** panel (permission mode and rules, hook sources, MCP servers read-only with trust and connection status, cloud credential status, network policy, writable roots; summary also in `doctor`). The tasks panel becomes an **Activity** view (run phase, tools, sub-agents, tasks, queue, permission waits, index activity) together with the status bar. MCP server editing from the browser is post-launch.
    - First split `internal/commands` into typed query functions plus text formatters (a pure-move file split first, over 500 lines), so panels JSON-encode the same data the TUI prints.
-8. **B4 - Browser accessibility and hardening:** ARIA roles, keyboard support, reduced motion, and a CSP without `'unsafe-inline'` once the page is split. (The Host/Origin/JSON request guard already exists in `internal/server/auth.go` `NewRequestGuard`, covered by `TestRequestGuard`.)
-9. **B5 - Proof Mode / shareable run report (launch differentiator, decided 2026-10-06).** Export a redacted Markdown record of a run (prompt, plan, tools, files changed, tests run, permission decisions, open risks) from the browser and via `/run-report last`, built on prompt dumps, the run trace, and the B1.5 event invariants. **Write `docs/plans/PROOF-MODE-RUN-REPORT-PLAN.md` before starting** (scope, report contents, redaction rules, test-first slices, acceptance).
-10. **Carry-forward validation evidence:** Gate G0 and Workstream CL/PA, run through the browser where the browser exposes the feature; TUI/CLI only where it does not.
+9. **B4 - Browser accessibility and hardening:** ARIA roles, keyboard support, reduced motion, and a CSP without `'unsafe-inline'` once the page is split. (The Host/Origin/JSON request guard already exists in `internal/server/auth.go` `NewRequestGuard`, covered by `TestRequestGuard`.)
+10. **B5 - Proof Mode / shareable run report (launch differentiator, decided 2026-10-06).** Export a redacted Markdown record of a run (prompt, plan, tools, files changed, tests run, permission decisions, open risks) from the browser and via `/run-report last`, built on prompt dumps, the run trace, and the B1.5 event invariants. **Write `docs/plans/PROOF-MODE-RUN-REPORT-PLAN.md` before starting** (scope, report contents, redaction rules, test-first slices, acceptance).
+11. **Carry-forward validation evidence:** Gate G0 and Workstream CL/PA, run through the browser where the browser exposes the feature; TUI/CLI only where it does not.
    - CL/PA also records two analysis decisions (2026-10-06): heuristic `BuildProjectAnalysisPrompt` summaries are an accepted v0.1 limitation (documented in Phase 18), and summary-cache/ledger write errors get a test and a logged warning instead of being ignored.
-11. **Phase 17 - Distribution and Install** (includes the default-command change to the browser with the TUI at `nandocodego tui`, and a browser first run that asks the user to pick a model).
-12. **Phase 18 - Hardening, Eval Suite, and Docs.**
+12. **Phase 17 - Distribution and Install** (includes the default-command change to the browser with the TUI at `nandocodego tui`, and a browser first run that asks the user to pick a model).
+13. **Phase 18 - Hardening, Eval Suite, and Docs.**
 
 Phase 22 is accepted as-is: the TUI is in maintenance mode, and its remaining deep-interaction follow-ups are parked in the backlog.
 
@@ -131,10 +146,11 @@ Use this table to decide what to read after this file. The detailed plan column 
 | Step | Status | Detailed plan to use | Extra required inputs |
 | --- | --- | --- | --- |
 | B0 - Browser-first docs | Done (2026-10-05) | `docs/adr/ADR-002-BROWSER-UI-PRIMARY-SURFACE.md` | This file; `docs/roadmap/BACKLOG.md` |
-| B1 - P0 bugs and security hardening | Next | `docs/reports/investigations/CODE-COMPLEXITY-AND-ARCHITECTURE-REVIEW-2026-10-06.md` (P0 section); `docs/reports/bugs/BUG-20260607-server-model-endpoint-rejects-listed-cloud-model.md`; `docs/plans/WEB-UI-UX-PRODUCT-PLAN.md` slices UI-5 and UI-8 | `internal/server`, `internal/llm/modelresolver`, `internal/modelruntime`, `internal/tools/dirwalk` |
+| B1 - P0 bugs and security hardening | Next | `docs/reports/investigations/CODE-COMPLEXITY-AND-ARCHITECTURE-REVIEW-2026-10-06.md` (P0 section); `docs/reports/bugs/BUG-20260607-server-model-endpoint-rejects-listed-cloud-model.md`; `docs/plans/WEB-UI-UX-PRODUCT-PLAN.md` slices UI-5 and UI-8 | Browser/server: `internal/server` (including `web/`), `internal/llm/modelresolver`, `internal/llm/modelruntime`, `internal/semantic` (embedder wiring). Permissions and agents: `internal/permissions`, `internal/tools/bash`, `internal/tools/agenttool`, `internal/mcp`. Network: `internal/mcp/http_validate.go`, `internal/hooks/http.go`, `internal/tools/webfetch` (new `internal/netguard`). Context and routing: `internal/contextpack`, `internal/retrievalroute`, `internal/tools/dirwalk`. CLI: `internal/cli/print.go`. CI: `.github/workflows/ci.yml` (`node --test` job). |
 | B1.5 - Surface-neutral extraction | Not started; after B1 | `docs/reports/investigations/CODE-COMPLEXITY-AND-ARCHITECTURE-REVIEW-2026-10-06.md` (Composition Roots And Duplication; P1-2) | `internal/tui/app.go`, `internal/server/session.go`, `internal/cli/{repl,print}.go`, `internal/agent` |
 | C1 - Core cleanup | Not started; after B1.5, before Phase 25 | `docs/reports/investigations/CODE-COMPLEXITY-AND-ARCHITECTURE-REVIEW-2026-10-06.md` (P1-1; context pipeline) | `internal/agent`, `internal/contextpack`, `internal/mentions`, `internal/eval` |
 | B2 - Browser parity blockers | Not started; after B1.5 | `docs/plans/WEB-UI-UX-PRODUCT-PLAN.md` section "Browser-First P0 Additions (2026-10-05)" | `docs/plans/OLLAMA-CLOUD-API-KEY-PLAN.md` for credential consent rules |
+| BV - Browser visual revamp | BV-0 done (2026-10-18); BV-1 next after B1-1 | `docs/plans/BROWSER-VISUAL-REVAMP-PLAN.md` | `docs/plans/UX/DESIGN-SPEC.md`; mockups in `docs/plans/UX/`; `internal/server/web/`; `internal/tools/todo`, `internal/tasks`, `internal/agent/coordinator.go` (BV-3, BV-8a) |
 | Phase 25 - Browser Session Durability (rescoped) | Not implemented | `docs/phases/PHASE-25-DETAILED-PLAN.md` (read the 2026-10-05 rescope section first) | `internal/server/ringbuffer.go`, `recentids.go`, `session.go` |
 | B3 - Browser management panels | Not started | `docs/plans/WEB-UI-UX-PRODUCT-PLAN.md` slice UI-7 | Owning packages per panel |
 | B4 - Browser accessibility and hardening | Partially implemented | `docs/plans/WEB-UI-UX-PRODUCT-PLAN.md` slice UI-8 | `internal/server/server.go` `securityHeaders` |
@@ -160,7 +176,7 @@ Use this table to decide what to read after this file. The detailed plan column 
 - When you modify a test file, replace its `time.Sleep` synchronization and wall-clock assertions with channels or the existing wait helpers (`waitForStatus`, `blockingRunner`).
 - Do not start Phase 25 until C1 is accepted.
 - Do not start B2 until B1.5 is accepted: B2 endpoints call the extracted packages instead of copying TUI logic.
-- Do not start Phase 17 until B1-B5 (including B1.5 and C1), Phase 25 (rescoped), Gate G0, and Workstream CL/PA are complete and accepted.
+- Do not start Phase 17 until B1-B5 (including B1.5 and C1), BV, Phase 25 (rescoped), Gate G0, and Workstream CL/PA are complete and accepted.
 - Do not start Phase 18 until Phase 17 is complete and accepted.
 - Do not add Phase 23/OpenAI-compatible adapter work unless the roadmap explicitly changes.
 - Do not generalize the Ollama Cloud workstream into a multi-provider adapter. It is Ollama-only and must keep local models as the default.
@@ -168,6 +184,16 @@ Use this table to decide what to read after this file. The detailed plan column 
 - Do not add listing-only answer constraints to listing prompts. The current prompt-fidelity decision is to preserve the user's request and attach tree/content context accurately.
 - Every phase must update `docs/phases/PHASE-LOG.md` with files changed, tests run, manual checks, known constraints, and exit-gate status.
 - If a detailed phase plan conflicts with the current source code, inspect the implementation and update the docs. Do not hallucinate missing behavior.
+
+## Step Exit Check
+
+A roadmap step is accepted only when all of these hold (decided 2026-10-06). Steps may add extras; B1's are listed under B1.
+
+- Every item has its named test. The test failed before the fix (record the RED output) and passes after.
+- `go test ./...` and `go test -race ./...` pass; `make check`, `tools/check-allowed-deps.sh`, and `tools/check-network-policy.sh` pass; `make eval` passes for agent-loop changes; `node --test internal/server/web/js/` passes for browser JS changes.
+- `docs/phases/PHASE-LOG.md` has an entry: files changed, tests, RED/GREEN evidence, known constraints.
+- Docs affected by behavior changes are updated; bug reports the step closes get a status line and move to `docs/archive/reports/bugs/`; `docs/roadmap/BACKLOG.md` is updated.
+- The step's row in the Read-Next Map says `Done (YYYY-MM-DD)`.
 
 ## Current Blockers And Carry-Forward Notes
 
