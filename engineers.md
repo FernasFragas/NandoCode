@@ -98,12 +98,12 @@ Everything else (ideas, UX follow-ups, tech debt, open decisions) is in
 
 ## How Work Gets Done Here
 
-1. Find the owning spec. Every phase has `docs/phases/PHASE-N-DETAILED-PLAN.md`; cross-cutting work has a plan in `docs/plans/`. Reviewed task breakdowns and blockers are in [REMAINING-PHASES-TASK-REVIEW.md](docs/archive/roadmap/REMAINING-PHASES-TASK-REVIEW.md).
-2. Check the spec against the code. If they disagree, the code is the truth; update the doc.
-3. Keep changes inside the owning phase. If you find a dependency gap, fix it first or record it as a blocker.
-4. Run `make check` (it includes race tests), and `make eval` for agent-loop changes.
-5. Append an entry to [docs/phases/PHASE-LOG.md](docs/phases/PHASE-LOG.md) with files changed, checks run, manual evidence, and known constraints.
-6. If you close or add a backlog item, update [BACKLOG.md](docs/roadmap/BACKLOG.md).
+1. Start at [NEXT-PHASES-IMPLEMENTATION-PLAN.md](docs/roadmap/NEXT-PHASES-IMPLEMENTATION-PLAN.md): take the next step and open the plan its Read-Next row names. Authority order: roadmap (what and when) > plan or phase doc (how) > reports (evidence only).
+2. Check the plan against the code. If they disagree, the code is the truth; fix the doc.
+3. Test first: write the failing test the roadmap names (or a reproduction test for a bug), see it fail, then fix. Refactors need characterization tests first and go in separate commits.
+4. Keep changes inside the step. Record dependency gaps as blockers.
+5. Run `make check` (race tests included), `make eval` for agent-loop changes, and the step's exit check.
+6. Append an entry to [docs/phases/PHASE-LOG.md](docs/phases/PHASE-LOG.md) with files changed, checks run, evidence, and known constraints; update [BACKLOG.md](docs/roadmap/BACKLOG.md) and the status of any bug report you closed.
 
 ## Rules That Are Easy To Break
 

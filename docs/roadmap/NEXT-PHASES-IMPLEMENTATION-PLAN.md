@@ -76,7 +76,11 @@ Implement remaining work in this order:
    - Cloud-model switch bug (`/v1/models` lists a model the switch rejects).
    - Per-session model runtime (P0-3): each server session gets its own `llm.RuntimeClient` and switches only when its model changes. Test: two sessions on different models.
    - Browser keeps the conversation across turns (P0-1): append each run's messages, including the user prompt, instead of replacing history. Test: two `StartRun` calls; the second sees `[Q1, A1, Q2]`.
-   - Markdown XSS (P0-2): escape quotes, allow only http/https/mailto links. Test: rendered output has no `on*=` attributes and no other link schemes. This needs the renderer as a DOM-free module tested with `node --test`; add that CI step here (no npm, decided 2026-10-06).
+   - Markdown XSS (P0-2): escape quotes, allow only http/https/mailto links. Test: rendered output has no `on*=` attributes and no other link schemes. Setup, decided 2026-10-06 (this is the first piece of BF-1; B2 finishes the page split):
+     1. Move `renderMarkdown` and `escapeHtml` out of `index.html` into `internal/server/web/js/markdown.js`, a DOM-free ES module that `index.html` imports.
+     2. Embed the whole `web/` folder (`//go:embed web` in `internal/server/server.go`, today `web/index.html` only) and serve `js/` with a JavaScript content type. Update `TestRoutesServeRichEmbeddedUI` to check the module is served.
+     3. Write the RED test as `internal/server/web/js/markdown.test.js` for Node's built-in runner.
+     4. Add a new `ci.yml` job on ubuntu: `actions/setup-node` with a pinned Node version, then `node --test internal/server/web/js/`. No npm, no `package.json`, no dependencies.
    - Embeddings stay local (P1-5): bind `semantic.LLMEmbedder` to the local Ollama client, not the runtime router. Test: after a switch to a fake cloud client, zero cloud embed calls.
    - Browser "Always Allow" persists (P1-6): add a rule that `permissions` actually matches (shared `permissions.SessionAllowRule` with the TUI). Test: a second run with the same tool and target emits no `permission_request`.
    - `@dir/` evidence cannot follow symlinks outside the workspace (P0-4): per-file `tools.ResolvePath` in `contextpack`. Test: `TestPackCurrentTurnPromptDirectoryMentionDoesNotFollowSymlinkOutsideRoots`.
@@ -87,6 +91,16 @@ Implement remaining work in this order:
    - Codebase questions keep their tools (P0-5): split the tool-mode decision from the retrieval decision in `retrievalroute`, match whole words. Test: the 11-row `TestDecideToolModeAndAction` table plus the never-`ToolModeNone` invariant.
    - Shared `internal/netguard` for outbound HTTP safety: block `0.0.0.0` and unmapped IPv6 forms, dial the validated IP (no DNS rebinding), re-check redirects, block `localhost` names, cap HTML bodies; used by MCP, HTTP hooks, and webfetch (removes the `hooks` → `mcp` dependency). Test: `0.0.0.0`, a redirect to `127.0.0.1`, and a `localhost` URL are all rejected.
    - Security-header tests; file-tree endpoint onto `tools.ResolvePath` + `dirwalk.Walk`; `--print` fails fast on a malformed config (decided 2026-10-06).
+   - **B1 exit extras** (on top of the Step Exit Check): `USER_MANUAL.md`'s permission-rule section documents that `*` matches any characters including `/`, and what `**` means; both open bug reports (cloud-model switch, malformed config) are closed and archived; E2E blocks B007/B008 stay open (they wait for B2's credential test seam).
+   - **Slices and order** (decided 2026-10-06; risk first, one PR per slice, each closed with the Step Exit Check for its items; B1-2 to B1-6 may run in parallel once B1-1 has merged):
+     1. **B1-1 XSS:** `markdown.js` extraction, `web/` embed, `node --test` CI job, the fix.
+     2. **B1-2 Permissions and agents:** Bash argument checks; `*` matches `/` (with the `USER_MANUAL.md` update); sub-agent mode clamp with the parent's rules and hooks; MCP project trust.
+     3. **B1-3 Network guard:** `internal/netguard`, used by MCP, HTTP hooks, and webfetch.
+     4. **B1-4 Browser sessions:** per-session runtime together with the cloud-model switch bug (same code); history across turns; Always Allow; security-header tests; file-tree walk.
+     5. **B1-5 Context and routing:** `@dir/` symlink containment; routing tool-mode split; local-only embeddings.
+     6. **B1-6 CLI:** `--print` fails fast on a malformed config.
+
+     B1 is accepted when B1-6 has merged and the B1 exit extras hold.
 3. **B1.5 - Surface-neutral extraction.** Move the logic B2 needs out of the TUI and the duplicated composition roots, so B2 endpoints are thin. Characterization tests first for every move; behavior must not change. Details: review report, "Composition Roots And Duplication".
    - `internal/turnprep`: one turn-preparation function (pack, route, semantic retrieval, `agent.Input`) used by the TUI, server, `--print`, and eval. Test first: a prompt table capturing today's `agent.Input` from each path.
    - `bootstrap.ApplyConfig`: one config-to-runtime mapping for all surfaces (the server maps 13 of 26 fields today). Test: every config field lands.
@@ -131,7 +145,7 @@ Use this table to decide what to read after this file. The detailed plan column 
 | Step | Status | Detailed plan to use | Extra required inputs |
 | --- | --- | --- | --- |
 | B0 - Browser-first docs | Done (2026-10-05) | `docs/adr/ADR-002-BROWSER-UI-PRIMARY-SURFACE.md` | This file; `docs/roadmap/BACKLOG.md` |
-| B1 - P0 bugs and security hardening | Next | `docs/reports/investigations/CODE-COMPLEXITY-AND-ARCHITECTURE-REVIEW-2026-10-06.md` (P0 section); `docs/reports/bugs/BUG-20260607-server-model-endpoint-rejects-listed-cloud-model.md`; `docs/plans/WEB-UI-UX-PRODUCT-PLAN.md` slices UI-5 and UI-8 | `internal/server`, `internal/llm/modelresolver`, `internal/modelruntime`, `internal/tools/dirwalk` |
+| B1 - P0 bugs and security hardening | Next | `docs/reports/investigations/CODE-COMPLEXITY-AND-ARCHITECTURE-REVIEW-2026-10-06.md` (P0 section); `docs/reports/bugs/BUG-20260607-server-model-endpoint-rejects-listed-cloud-model.md`; `docs/plans/WEB-UI-UX-PRODUCT-PLAN.md` slices UI-5 and UI-8 | Browser/server: `internal/server` (including `web/`), `internal/llm/modelresolver`, `internal/llm/modelruntime`, `internal/semantic` (embedder wiring). Permissions and agents: `internal/permissions`, `internal/tools/bash`, `internal/tools/agenttool`, `internal/mcp`. Network: `internal/mcp/http_validate.go`, `internal/hooks/http.go`, `internal/tools/webfetch` (new `internal/netguard`). Context and routing: `internal/contextpack`, `internal/retrievalroute`, `internal/tools/dirwalk`. CLI: `internal/cli/print.go`. CI: `.github/workflows/ci.yml` (`node --test` job). |
 | B1.5 - Surface-neutral extraction | Not started; after B1 | `docs/reports/investigations/CODE-COMPLEXITY-AND-ARCHITECTURE-REVIEW-2026-10-06.md` (Composition Roots And Duplication; P1-2) | `internal/tui/app.go`, `internal/server/session.go`, `internal/cli/{repl,print}.go`, `internal/agent` |
 | C1 - Core cleanup | Not started; after B1.5, before Phase 25 | `docs/reports/investigations/CODE-COMPLEXITY-AND-ARCHITECTURE-REVIEW-2026-10-06.md` (P1-1; context pipeline) | `internal/agent`, `internal/contextpack`, `internal/mentions`, `internal/eval` |
 | B2 - Browser parity blockers | Not started; after B1.5 | `docs/plans/WEB-UI-UX-PRODUCT-PLAN.md` section "Browser-First P0 Additions (2026-10-05)" | `docs/plans/OLLAMA-CLOUD-API-KEY-PLAN.md` for credential consent rules |
@@ -168,6 +182,16 @@ Use this table to decide what to read after this file. The detailed plan column 
 - Do not add listing-only answer constraints to listing prompts. The current prompt-fidelity decision is to preserve the user's request and attach tree/content context accurately.
 - Every phase must update `docs/phases/PHASE-LOG.md` with files changed, tests run, manual checks, known constraints, and exit-gate status.
 - If a detailed phase plan conflicts with the current source code, inspect the implementation and update the docs. Do not hallucinate missing behavior.
+
+## Step Exit Check
+
+A roadmap step is accepted only when all of these hold (decided 2026-10-06). Steps may add extras; B1's are listed under B1.
+
+- Every item has its named test. The test failed before the fix (record the RED output) and passes after.
+- `go test ./...` and `go test -race ./...` pass; `make check`, `tools/check-allowed-deps.sh`, and `tools/check-network-policy.sh` pass; `make eval` passes for agent-loop changes; `node --test internal/server/web/js/` passes for browser JS changes.
+- `docs/phases/PHASE-LOG.md` has an entry: files changed, tests, RED/GREEN evidence, known constraints.
+- Docs affected by behavior changes are updated; bug reports the step closes get a status line and move to `docs/archive/reports/bugs/`; `docs/roadmap/BACKLOG.md` is updated.
+- The step's row in the Read-Next Map says `Done (YYYY-MM-DD)`.
 
 ## Current Blockers And Carry-Forward Notes
 
