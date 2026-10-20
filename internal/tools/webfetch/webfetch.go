@@ -2,19 +2,19 @@
 package webfetch
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
-	"net"
 	"net/http"
-	"net/url"
 	"strings"
 	"time"
 
 	"golang.org/x/net/html"
 
+	"github.com/FernasFragas/Nandocode/internal/netguard"
 	"github.com/FernasFragas/Nandocode/internal/tools"
 )
 
@@ -22,6 +22,7 @@ const (
 	defaultMaxLength = 50_000
 	fetchTimeout     = 30 * time.Second
 	maxRedirects     = 3
+	maxHTMLBytes     = 2 << 20 // cap on HTML parsed per fetch
 	userAgent        = "nandocodego/0.1"
 )
 
@@ -109,65 +110,31 @@ func call(ctx tools.Context, input any, _ chan<- tools.ProgressEvent) (tools.Res
 	if maxLen <= 0 {
 		maxLen = defaultMaxLength
 	}
-	out, err := fetchURL(ctx.EffectiveContext(), in.URL, maxLen)
+	out, err := fetchURL(ctx.EffectiveContext(), in.URL, maxLen, ctx.AllowLocalFetch)
 	if err != nil {
 		return tools.Result{}, err
 	}
 	return tools.Result{Data: out, Display: buildDisplay(out)}, nil
 }
 
+func policy(allowLocal bool) netguard.Policy {
+	return netguard.Policy{
+		AllowLoopback: allowLocal,
+		AllowPrivate:  allowLocal,
+		Timeout:       fetchTimeout,
+		MaxRedirects:  maxRedirects,
+	}
+}
+
 func validateURL(rawURL string, allowLocal bool) error {
-	u, err := url.Parse(rawURL)
-	if err != nil {
-		return fmt.Errorf("invalid URL: %w", err)
-	}
-	if u.Scheme != "http" && u.Scheme != "https" {
-		return fmt.Errorf("unsupported URL scheme %q; only http:// and https:// are allowed", u.Scheme)
-	}
-	if !allowLocal {
-		host := u.Hostname()
-		if ip := net.ParseIP(host); ip != nil {
-			if isPrivateIP(ip) {
-				return fmt.Errorf("URL host %q is a private/loopback address; use AllowLocalFetch to permit", host)
-			}
-		}
+	if err := netguard.ValidateURL(rawURL, policy(allowLocal)); err != nil {
+		return fmt.Errorf("%w; use AllowLocalFetch to permit local addresses", err)
 	}
 	return nil
 }
 
-func isPrivateIP(ip net.IP) bool {
-	privateRanges := []string{
-		"127.0.0.0/8",
-		"10.0.0.0/8",
-		"172.16.0.0/12",
-		"192.168.0.0/16",
-		"::1/128",
-		"fc00::/7",
-	}
-	for _, cidr := range privateRanges {
-		_, network, err := net.ParseCIDR(cidr)
-		if err != nil {
-			continue
-		}
-		if network.Contains(ip) {
-			return true
-		}
-	}
-	return false
-}
-
-func fetchURL(ctx context.Context, rawURL string, maxLen int) (Output, error) {
-	redirectCount := 0
-	client := &http.Client{
-		Timeout: fetchTimeout,
-		CheckRedirect: func(req *http.Request, via []*http.Request) error {
-			redirectCount++
-			if redirectCount > maxRedirects {
-				return fmt.Errorf("too many redirects (max %d)", maxRedirects)
-			}
-			return nil
-		},
-	}
+func fetchURL(ctx context.Context, rawURL string, maxLen int, allowLocal bool) (Output, error) {
+	client := netguard.NewClient(policy(allowLocal))
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, rawURL, nil)
 	if err != nil {
@@ -187,9 +154,19 @@ func fetchURL(ctx context.Context, rawURL string, maxLen int) (Output, error) {
 	baseCT = strings.TrimSpace(baseCT)
 
 	var text string
+	htmlCapped := false
 	switch {
 	case strings.Contains(baseCT, "text/html"):
-		text = stripHTML(resp.Body)
+		// Read one byte past the cap so an over-cap body is detectable.
+		body, readErr := io.ReadAll(io.LimitReader(resp.Body, maxHTMLBytes+1))
+		if readErr != nil {
+			return Output{}, fmt.Errorf("failed to read response body: %w", readErr)
+		}
+		if len(body) > maxHTMLBytes {
+			body = body[:maxHTMLBytes]
+			htmlCapped = true
+		}
+		text = stripHTML(bytes.NewReader(body))
 	case strings.Contains(baseCT, "application/json"), strings.Contains(baseCT, "text/plain"), strings.Contains(baseCT, "text/"):
 		raw, readErr := io.ReadAll(io.LimitReader(resp.Body, int64(maxLen*4)))
 		if readErr != nil {
@@ -200,7 +177,7 @@ func fetchURL(ctx context.Context, rawURL string, maxLen int) (Output, error) {
 		return Output{}, fmt.Errorf("unsupported content type %q", baseCT)
 	}
 
-	truncated := false
+	truncated := htmlCapped
 	if len(text) > maxLen {
 		text = text[:maxLen]
 		truncated = true

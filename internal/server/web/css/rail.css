@@ -1,0 +1,4 @@
+.bv-rail__permission-link { display: block; width: 100%; padding: 0; border: 0; background: transparent; color: inherit; font: inherit; text-align: left; cursor: pointer; }
+.bv-rail__permission-link:disabled { cursor: default; }
+.bv-rail__permission-link:not(:disabled):hover .bv-status-row__label { color: var(--text); }
+.bv-rail__permission-link:focus-visible { outline: none; box-shadow: var(--focus-ring); border-radius: var(--r-sm); }

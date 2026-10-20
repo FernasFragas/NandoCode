@@ -1,0 +1,16 @@
+/* The session rail keeps its New session icon available below 1440px. */
+.bv-sessions__actions { display: flex; gap: var(--sp-2); padding: 0 var(--sp-3) var(--sp-3); }
+.bv-sessions__actions button { display: inline-flex; align-items: center; gap: var(--sp-1); padding: var(--sp-2); color: var(--text-muted); border: 1px solid var(--border); border-radius: var(--r-md); }
+.bv-sessions__actions button:hover { background: var(--card); color: var(--text); }
+.bv-sessions__actions button:disabled { opacity: .45; cursor: default; }
+.bv-sessions__delete { display: inline-flex; }
+.bv-sessions__row:focus-visible { outline: 2px solid var(--primary); }
+.bv-app[data-nav="rail"] .bv-app__sessions { display: block; }
+.bv-app[data-nav="rail"] .bv-sessions { padding: var(--sp-2); }
+.bv-app[data-nav="rail"] .bv-sessions__head { justify-content: center; }
+.bv-app[data-nav="rail"] .bv-sessions__heading,
+.bv-app[data-nav="rail"] .bv-sessions__list,
+.bv-app[data-nav="rail"] .bv-sessions__empty,
+.bv-app[data-nav="rail"] .bv-sessions__actions { display: none; }
+.bv-app[data-nav="rail"] .bv-sessions__new { width: 40px; height: 40px; padding: 0; justify-content: center; font-size: 0; }
+.bv-app[data-nav="rail"] .bv-sessions__new .icon { width: 20px; height: 20px; }

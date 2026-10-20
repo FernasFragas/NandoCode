@@ -233,16 +233,41 @@ func ExpandPromptDetailed(input string, ctx tools.Context) (string, []ResolvedFi
 func resolveMentions(paths []parsedMention, ctx tools.Context) ([]resolvedMention, error) {
 	out := make([]resolvedMention, 0, len(paths))
 	for _, p := range paths {
-		abs, err := tools.ResolvePath(ctx, p.Path, tools.PathRead)
-		if err != nil {
-			return nil, fmt.Errorf("resolve @%s: %w", p.RawPath, err)
+		// A trailing "?" is usually sentence punctuation (@main.go?), so prefer
+		// the trimmed path and fall back to the literal name (a file named "what?").
+		candidates := []string{p.Path}
+		if trimmed := strings.TrimRight(p.Path, "?"); trimmed != p.Path && trimmed != "" {
+			candidates = []string{trimmed, p.Path}
 		}
-		info, err := os.Stat(abs)
-		if err != nil {
-			return nil, fmt.Errorf("stat @%s: %w", p.RawPath, err)
+		var (
+			abs     string
+			info    os.FileInfo
+			usePath string
+			err     error
+		)
+		for i, cand := range candidates {
+			var rerr, serr error
+			abs, rerr = tools.ResolvePath(ctx, cand, tools.PathRead)
+			if rerr == nil {
+				info, serr = os.Stat(abs)
+			}
+			if rerr == nil && serr == nil {
+				usePath, err = cand, nil
+				break
+			}
+			if i == 0 {
+				if rerr != nil {
+					err = fmt.Errorf("resolve @%s: %w", p.RawPath, rerr)
+				} else {
+					err = fmt.Errorf("stat @%s: %w", p.RawPath, serr)
+				}
+			}
+		}
+		if usePath == "" {
+			return nil, err
 		}
 		out = append(out, resolvedMention{
-			Path:  p.Path,
+			Path:  usePath,
 			Abs:   abs,
 			IsDir: info.IsDir(),
 			Mode:  p.Mode,
@@ -468,7 +493,7 @@ func expandDirectory(ctx tools.Context, m resolvedMention, budget *promptBudget,
 			continue
 		}
 
-		content, readErr := os.ReadFile(resolved)
+		content, readErr := os.ReadFile(resolved) // #nosec G304 -- resolved by tools.ResolvePath, inside the workspace roots
 		if readErr != nil {
 			if os.IsPermission(readErr) {
 				skippedCount++

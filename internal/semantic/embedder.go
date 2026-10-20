@@ -18,6 +18,13 @@ func (e LLMEmbedder) Embed(ctx context.Context, req EmbedRequest) (EmbedResult, 
 	if e.Client == nil {
 		return EmbedResult{}, fmt.Errorf("semantic embedder: nil llm client")
 	}
+	// Embeddings carry project text, so they must stay on the local Ollama
+	// even when the chat runtime is switched to a cloud model.
+	if rt, ok := e.Client.(interface{ Snapshot() llm.RuntimeSnapshot }); ok {
+		if p := rt.Snapshot().Provider; p != llm.ProviderOllamaLocal {
+			return EmbedResult{}, fmt.Errorf("semantic embedder: refusing non-local provider %q; embeddings stay on local Ollama", p)
+		}
+	}
 	if strings.TrimSpace(req.Model) == "" {
 		return EmbedResult{}, fmt.Errorf("semantic embedder: model is required")
 	}

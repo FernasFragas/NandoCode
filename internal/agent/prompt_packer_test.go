@@ -124,3 +124,39 @@ func BenchmarkPackPromptHistory_LargeHistory(b *testing.B) {
 		_ = packPromptHistory(history, 4096)
 	}
 }
+
+func packToolPairHistory() []llm.Message {
+	big := strings.Repeat("x", 4000)
+	return []llm.Message{
+		{Role: llm.RoleSystem, Content: "sys"},
+		{Role: llm.RoleUser, Content: big},
+		{Role: llm.RoleAssistant, Content: big, ToolCalls: []llm.ToolCall{{}}},
+		{Role: llm.RoleTool, ToolName: "Read", Content: "small result"},
+		{Role: llm.RoleUser, Content: "next"},
+	}
+}
+
+func TestPackPromptHistory_NeverKeepsToolResultWithoutCall(t *testing.T) {
+	packed := packPromptHistory(packToolPairHistory(), 200).Messages
+	for i, m := range packed {
+		if m.Role != llm.RoleTool {
+			continue
+		}
+		if i == 0 || packed[i-1].Role != llm.RoleAssistant || len(packed[i-1].ToolCalls) == 0 {
+			t.Fatalf("tool result at %d kept without its assistant tool call: %+v", i, packed)
+		}
+	}
+}
+
+func TestPackPromptHistory_ForcedToolResultKeepsItsCall(t *testing.T) {
+	h := packToolPairHistory()[:4]
+	packed := packPromptHistory(h, 50).Messages
+	last := packed[len(packed)-1]
+	if last.Role != llm.RoleTool {
+		t.Fatalf("expected the newest message to be kept, got %s", last.Role)
+	}
+	prev := packed[len(packed)-2]
+	if prev.Role != llm.RoleAssistant || len(prev.ToolCalls) == 0 {
+		t.Fatalf("forced tool result lost its assistant tool call: %+v", packed)
+	}
+}

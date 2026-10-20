@@ -1,4 +1,4 @@
-.PHONY: build test test-race test-integration test-e2e lint fmt fmt-check vet security verify-phase-0 tidy install clean vendor check help docker-build docker-run docker-run-daemon docker-stop docker-clean docker-shell docker-compose-up docker-compose-down docker-compose-logs regression-fast regression-full load-suite regression-report eval eval-ci eval-validate
+.PHONY: build test test-race test-integration test-e2e lint fmt fmt-check vet security verify-phase-0 tidy install clean vendor check help docker-build docker-run docker-run-daemon docker-stop docker-clean docker-shell docker-compose-up docker-compose-down docker-compose-logs regression-fast regression-full load-suite regression-report eval eval-ci eval-validate visual-check
 
 # Variables
 BINARY_NAME=nandocodego
@@ -57,6 +57,7 @@ help:
 	@echo "  eval             Run deterministic eval fixtures"
 	@echo "  eval-ci          Run deterministic eval fixtures and write CI artifacts"
 	@echo "  eval-validate    Validate eval fixtures without executing them"
+	@echo "  visual-check     Compare a local gallery screenshot with its approved baseline"
 	@echo ""
 	@echo "Docker targets:"
 	@echo "  docker-build     Build Docker image"
@@ -234,6 +235,10 @@ eval-ci: build
 ## eval-validate: Validate eval fixtures without executing them
 eval-validate: build
 	./bin/nandocodego eval validate ./evals
+
+## visual-check: Compare the running dev gallery with its approved PNG baseline
+visual-check:
+	@GOCACHE=$(CURDIR)/.gocache go run ./tools/visualdiff -cache-dir $(CURDIR)/.gocache $(VISUAL_CHECK_ARGS)
 
 ## docker-build: Build Docker image
 docker-build:

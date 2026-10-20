@@ -12,6 +12,7 @@ import (
 
 	"github.com/FernasFragas/Nandocode/internal/agent"
 	"github.com/FernasFragas/Nandocode/internal/bootstrap"
+	"github.com/FernasFragas/Nandocode/internal/bootstrap/applyconfig"
 	"github.com/FernasFragas/Nandocode/internal/config"
 	"github.com/FernasFragas/Nandocode/internal/credentials"
 	"github.com/FernasFragas/Nandocode/internal/hooks"
@@ -193,48 +194,13 @@ func runREPL(ctx context.Context, cmd *cobra.Command, opts replOptions) error {
 		for _, warning := range cfgRes.Warnings {
 			startupNotices = append(startupNotices, "Config warning: "+warning)
 		}
-		initial.DefaultModel = cfgRes.Config.DefaultModel
-		initial.OllamaBaseURL = cfgRes.Config.OllamaBaseURL
-		initial.LLMBaseURL = cfgRes.Config.OllamaBaseURL
-		initial.OllamaCloudEnabled = cfgRes.Config.OllamaCloudEnabled
-		initial.KeepAlive = cfgRes.Config.ChatKeepAlive
-		initial.LLMStreamIdleTimeout = cfgRes.Config.LLMStreamIdleTimeout
-		initial.CloudLLMStreamIdleTimeout = cfgRes.Config.CloudLLMStreamIdleTimeout
-		initial.PermissionMode = cfgRes.Config.PermissionMode
-		initial.MaxTurns = cfgRes.Config.MaxTurns
-		initial.MaxConcurrentTools = cfgRes.Config.MaxConcurrentTools
-		initial.BashTimeout = cfgRes.Config.BashTimeout
-		initial.MaxReadChars = cfgRes.Config.MaxReadChars
-		initial.MaxResultChars = cfgRes.Config.MaxResultChars
-		initial.MaxDirFiles = cfgRes.Config.MaxDirFiles
-		initial.MaxPromptFiles = cfgRes.Config.MaxPromptFiles
-		initial.MaxDirBytes = cfgRes.Config.MaxDirBytes
-		initial.MaxPromptBytes = cfgRes.Config.MaxPromptBytes
-		initial.MaxDirDepth = cfgRes.Config.MaxDirDepth
-		initial.MentionDirectorySource = cfgRes.Config.MentionDirectorySource
-		initial.MentionIncludeGitignoredOnExplicit = cfgRes.Config.MentionIncludeGitignoredOnExplicit
-		initial.PromptDumpMode = cfgRes.Config.PromptDumpMode
-		initial.PromptDumpKeep = cfgRes.Config.PromptDumpKeep
-		initial.PromptPreviewChars = cfgRes.Config.PromptPreviewChars
-		initial.SlowStageNoticeThreshold = cfgRes.Config.SlowStageNoticeThreshold
-		initial.SlowStageNoticeThresholdSource = cfgRes.Sources.SlowStageNoticeThreshold
-		initial.ContextMode = cfgRes.Config.ContextMode
-		initial.MemoryRecallMode = cfgRes.Config.MemoryRecallMode
+		applyconfig.ApplyConfig(&initial, cfgRes.Config, cfgRes.Sources.SlowStageNoticeThreshold)
 	} else {
 		startupNotices = append(startupNotices, "Config warning: failed to load config.toml, using defaults ("+cfgErr.Error()+")")
 	}
 
 	// Apply CLI flag overrides
-	if opts.model != "" {
-		initial.DefaultModel = opts.model
-	}
-	if opts.ollamaURL != "" {
-		initial.OllamaBaseURL = opts.ollamaURL
-		initial.LLMBaseURL = opts.ollamaURL
-	}
-	if opts.numCtx > 0 {
-		initial.NumCtx = opts.numCtx
-	}
+	bootstrap.ApplyOverrides(&initial, bootstrap.Overrides{Model: opts.model, OllamaURL: opts.ollamaURL, NumCtx: opts.numCtx})
 
 	// Initialize bootstrap before any Global call so config and flag overrides apply.
 	bootstrap.InitGlobal(initial)
@@ -523,7 +489,7 @@ func runREPL(ctx context.Context, cmd *cobra.Command, opts replOptions) error {
 		semanticCfg = cfgRes.Config.SemanticIndex
 	}
 	semanticStore := semantic.NewLocalStore(paths.CacheDir())
-	semanticSvc := semantic.NewLocalService(semanticStore, semantic.LLMEmbedder{Client: client})
+	semanticSvc := semantic.NewLocalService(semanticStore, semantic.LLMEmbedder{Client: localClient})
 
 	// Build TUI model
 	tuiModel, err := tui.New(store, observedRunner, nil, skillLoader, client, &hookSnapshot, hookDispatcher.SetSnapshot, memDir, hookUserPath, hookProjectPath, startupNotices)
@@ -542,6 +508,7 @@ func runREPL(ctx context.Context, cmd *cobra.Command, opts replOptions) error {
 			},
 		)
 	}
+	tuiModel.SetCompactHooks(hookDispatcher, snap.SessionID)
 	tuiModel.SetMeter(meter)
 	tuiModel.SetModelRuntime(modelRuntimeSvc)
 	tuiModel.SetSemanticService(semanticSvc, semanticCfg)

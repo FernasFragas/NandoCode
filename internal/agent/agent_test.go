@@ -447,35 +447,23 @@ func TestAgentInjectsPendingMessagesBetweenTurns(t *testing.T) {
 }
 
 func TestAgentRunProgressEvents(t *testing.T) {
-	reg, _ := builtin.NewRegistry()
-	client := newFakeClient([]fakeTurn{
-		toolCallTurn("Bash", map[string]any{"command": "echo hello"}),
+	reg := invariantRegistry(t, probeTool("Probe"))
+	events := runInvariantAgent(t, reg,
+		multiToolCallTurn("Probe"),
 		textTurn("Done."),
-	})
+	)
+	assertEventInvariants(t, events)
 
-	agent, _ := New(client, reg)
-	ctx := context.Background()
-
-	events := agent.Run(ctx, Input{
-		Model: "test-model",
-		ToolContext: tools.Context{
-			Context:        ctx,
-			WorkingDir:     t.TempDir(),
-			PermissionMode: tools.PermissionBypassPermissions,
-		},
-	})
-
-	var progressEvents []ToolUseProgress
-
-	for evt := range events {
-		if e, ok := evt.(ToolUseProgress); ok {
-			progressEvents = append(progressEvents, e)
+	var messages []string
+	for _, evt := range events {
+		if p, ok := evt.(ToolUseProgress); ok {
+			if pe, ok := p.Data.(tools.ProgressEvent); ok {
+				messages = append(messages, pe.Message)
+			}
 		}
 	}
-
-	// Bash tool emits progress for stdout/stderr
-	if len(progressEvents) == 0 {
-		t.Log("Note: progress events depend on tool implementation")
+	if got, want := strings.Join(messages, ","), "one,two"; got != want {
+		t.Fatalf("progress messages=%q want=%q", got, want)
 	}
 }
 

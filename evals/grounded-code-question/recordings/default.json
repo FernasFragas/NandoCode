@@ -1,0 +1,69 @@
+{
+  "version": 1,
+  "model": "recorded/grounded-code-question",
+  "strict": true,
+  "turns": [
+    {
+      "match": {
+        "latest_user_contains": "server path that updates a session's model",
+        "required_tools": ["Grep", "FileRead"]
+      },
+      "events": [
+        {
+          "message": {
+            "role": "assistant",
+            "tool_calls": [
+              {
+                "function": {
+                  "name": "Grep",
+                  "arguments": {
+                    "pattern": "model",
+                    "include": "*.go"
+                  }
+                }
+              }
+            ]
+          }
+        },
+        { "done": true, "done_reason": "stop" }
+      ]
+    },
+    {
+      "match": {
+        "latest_user_contains": "server path that updates a session's model"
+      },
+      "events": [
+        {
+          "message": {
+            "role": "assistant",
+            "tool_calls": [
+              {
+                "function": {
+                  "name": "FileRead",
+                  "arguments": {
+                    "path": "server/model.go"
+                  }
+                }
+              }
+            ]
+          }
+        },
+        { "done": true, "done_reason": "stop" }
+      ]
+    },
+    {
+      "match": {
+        "latest_user_contains": "server path that updates a session's model"
+      },
+      "events": [
+        {
+          "message": {
+            "role": "assistant",
+            "content": "Verified in the code: the route is POST /v1/sessions/{id}/model (server/routes.go), handled by handleUpdateModel in server/model.go. A local model is accepted directly. A cloud-listed model is accepted only when cloud is enabled and a cloud credential is present; otherwise the handler answers 403. Unknown models get 404. I did not run the server; this comes from reading routes.go and model.go."
+          }
+        },
+        { "done": true, "done_reason": "stop" }
+      ]
+    }
+  ]
+}

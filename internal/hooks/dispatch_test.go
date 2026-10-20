@@ -323,12 +323,22 @@ func (f *timedResponseHookClient) PullModel(context.Context, string, chan<- llm.
 
 func waitUntil(t *testing.T, timeout time.Duration, ready func() bool) {
 	t.Helper()
-	deadline := time.Now().Add(timeout)
-	for time.Now().Before(deadline) {
+	deadline := time.NewTimer(timeout)
+	defer deadline.Stop()
+	tick := time.NewTicker(5 * time.Millisecond)
+	defer tick.Stop()
+	for {
 		if ready() {
 			return
 		}
-		time.Sleep(5 * time.Millisecond)
+		select {
+		case <-deadline.C:
+			if ready() {
+				return
+			}
+			t.Fatal("condition not met before timeout")
+			return
+		case <-tick.C:
+		}
 	}
-	t.Fatal("condition not met before timeout")
 }

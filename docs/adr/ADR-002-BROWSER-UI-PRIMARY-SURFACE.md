@@ -47,8 +47,9 @@ Browser gaps found in a source review on 2026-10-05:
    modules) under `internal/server/web/` so it is easier to maintain and test.
    No npm toolchain; the dependency allowlist policy is unchanged.
 6. **The cloud-model switch bug is P0.** See
-   [BUG-20260607-server-model-endpoint-rejects-listed-cloud-model](../reports/bugs/BUG-20260607-server-model-endpoint-rejects-listed-cloud-model.md);
+   BUG-20260607-server-model-endpoint-rejects-listed-cloud-model;
    retest on 2026-10-05 showed it is still reproducible for stale `:cloud` tags.
+   (Fixed in B1-4, 2026-10-20; see `docs/phases/PHASE-LOG.md`.)
 
 ## Consequences
 

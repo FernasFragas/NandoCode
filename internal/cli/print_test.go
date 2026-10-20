@@ -12,7 +12,51 @@ import (
 	"github.com/FernasFragas/Nandocode/internal/agent"
 	"github.com/FernasFragas/Nandocode/internal/mentions"
 	"github.com/FernasFragas/Nandocode/internal/tools"
+	"github.com/spf13/cobra"
 )
+
+func TestRunPrintFailsFastOnMalformedConfig(t *testing.T) {
+	for _, layer := range []string{"user", "project"} {
+		t.Run(layer, func(t *testing.T) {
+			root := t.TempDir()
+			t.Chdir(root)
+			t.Setenv("NANDOCODEGO_CONFIG_HOME", filepath.Join(root, "config"))
+			t.Setenv("NANDOCODEGO_DATA_HOME", filepath.Join(root, "data"))
+			t.Setenv("NANDOCODEGO_CACHE_HOME", filepath.Join(root, "cache"))
+			t.Setenv("NANDOCODEGO_STATE_HOME", filepath.Join(root, "state"))
+			configPath := filepath.Join(root, "config", "config.toml")
+			if layer == "project" {
+				configPath = filepath.Join(root, ".nandocodego", "config.toml")
+			}
+			if err := os.MkdirAll(filepath.Dir(configPath), 0o755); err != nil {
+				t.Fatal(err)
+			}
+			if err := os.WriteFile(configPath, []byte("default_model = ["), 0o644); err != nil {
+				t.Fatal(err)
+			}
+
+			ctx, cancel := context.WithCancel(context.Background())
+			cancel() // A malformed config must fail before model resolution.
+			cmd := &cobra.Command{}
+			var stdout, stderr bytes.Buffer
+			cmd.SetOut(&stdout)
+			cmd.SetErr(&stderr)
+			err := runPrint(ctx, cmd, printOptions{input: "hello", ollamaURL: "http://127.0.0.1:11434"})
+			if err == nil || !strings.Contains(err.Error(), "config parse error") || !strings.Contains(err.Error(), configPath) {
+				t.Fatalf("expected actionable config error for %s, got %v", configPath, err)
+			}
+			if got := ExitCode(err); got != 3 {
+				t.Fatalf("exit code=%d, want 3", got)
+			}
+			if stdout.Len() != 0 {
+				t.Fatalf("unexpected stdout: %q", stdout.String())
+			}
+			if stderr.Len() != 0 {
+				t.Fatalf("unexpected stderr before returning config error: %q", stderr.String())
+			}
+		})
+	}
+}
 
 func TestCollectPrintOutputAndTextWrite(t *testing.T) {
 	t.Parallel()

@@ -1,6 +1,6 @@
 # Project Status
 
-Date: 2026-06-23 (last reviewed 2026-10-06, after the ADR-002 browser-first re-plan)
+Date: 2026-06-23 (last reviewed 2026-10-20, after the browser revamp batch: B1, B1.5, B2, BV-1 to BV-8b)
 
 A snapshot of what is built, what is validated, and what is missing. For the
 committed order of upcoming work see
@@ -13,9 +13,10 @@ Start with [engineers.md](../../engineers.md) or
 ## Current Implementation Reality Snapshot
 
 - **Code-complete or substantially implemented:** Phases 0-16, Phase 19, Phase 20, Phase 21, Phase 22 core, Phase 24, Ollama Cloud API key support, Phase 26, Phase 27, Phase 28, Phase 29, the response-time refactor, and the evaluation framework (`nandocodego eval`, 2026-06-25).
+- **Browser revamp batch (2026-10-20, uncommitted until merged to `web-ui-v2`):** B1 (P0 bugs and security hardening), B1.5 (surface-neutral extraction), B2 (browser parity: run cancel, `/clear` and `/compact`, session list, cloud key entry, cost and index status) and BV-1 to BV-8b (component system, new browser shell, rail, transcript, sessions, file tree and code view, editable files, sub-agent view) are implemented, reviewed and integrated. Evidence and per-step entries: [PHASE-LOG.md](../phases/PHASE-LOG.md). Pending: commit, and a human Chrome pass that approves the component-gallery baseline.
 - **CI:** `.github/workflows/ci.yml` and `security.yml` run on every push and PR (see `docs/architecture/ARCHITECTURE.md` § Security Boundaries).
 - **Implemented but still needing manual/live acceptance:** Phases 8-14 (Gate G0) and Workstream CL/PA evidence. Phase 22 was accepted as-is on 2026-10-05; the TUI is in maintenance mode ([ADR-002](../adr/ADR-002-BROWSER-UI-PRIMARY-SURFACE.md)). The 2026-06-23 launch-readiness pass closed the known code gaps for prompt/trace diagnostics, semantic routing/index-status handling, TUI follow-ups, and the served browser P0 UI.
-- **Remaining planned implementation:** B1 (P0 bugs and security hardening), B1.5 (surface-neutral extraction), C1 (core cleanup, parallel with B2), B2 (browser parity), Phase 25 (browser session durability), B3-B4, B5 (Proof Mode run report), the G0 and CL/PA evidence gates, then Phase 17 and Phase 18. Order: [NEXT-PHASES-IMPLEMENTATION-PLAN.md](NEXT-PHASES-IMPLEMENTATION-PLAN.md).
+- **Remaining planned implementation:** C1 (core cleanup, next), Phase 25 (browser session durability), B3 (management panels), the rest of B4 (ARIA, keyboard, reduced motion; the strict CSP landed in BV-2), B5 (Proof Mode run report), the G0 and CL/PA evidence gates, then Phase 17 and Phase 18. Order: [NEXT-PHASES-IMPLEMENTATION-PLAN.md](NEXT-PHASES-IMPLEMENTATION-PLAN.md).
 - **Release boundary:** Phase 17 and Phase 18 are last. Any new v0.1 feature or runtime requirement belongs before Phase 17, not after Phase 18.
 
 
@@ -23,7 +24,8 @@ Start with [engineers.md](../../engineers.md) or
 
 - `docs/phases/PHASE-LOG.md` records passing validation for each completed slice: `go test ./...`, dependency allowlist, network policy checks, targeted race tests, and benchmarks where applicable.
 - The 2026-06-23 launch-readiness pass ran targeted tests across TUI, server, commands, semantic retrieval, routing, analysis, agent, and context packing; `go test ./...`; `tools/run-load-suite.sh`; and a live local server smoke.
-- CI now runs build, vet, race tests on three OSes, lint, security scans, and the deterministic eval suite on every push.
+- CI now runs build, vet, race tests on three OSes, lint, security scans, the deterministic eval suite, and the browser JS tests (`node --test 'internal/server/web/js/**/*.test.js' 'internal/server/web/dev/*.test.js'`, no npm) on every push.
+- The 2026-10-20 browser revamp batch passed `go test ./...`, `go test -race ./...`, `make check`, `make eval` (6/6, score 1.00), both policy scripts, 349 browser JS tests, and a real-binary smoke (assets under a CSP without `'unsafe-inline'`, sessions, files read/save/conflict, cancel, clear, compact, `/dev/` only with `--dev`). The owner ran a manual smoke of the running app the same day. The component-gallery visual baseline is not approved yet (`make visual-check` needs Chrome and `internal/server/web/dev/baselines/gallery.png`).
 - Inside restricted sandboxes, listener-binding tests in `internal/llm/ollama`, `internal/tools/sendmessage`, and `internal/tools/webfetch` can fail; they pass on a normal machine.
 
 ## Current Phase Status
@@ -51,11 +53,11 @@ Start with [engineers.md](../../engineers.md) or
 | 18 - Hardening, eval suite, docs | Planned; final | The deterministic eval framework it needs landed early (2026-06-25, `docs/plans/EVALUATION-FRAMEWORK-DETAILED-PLAN.md`); the rest is not started. This is the final v0.1.0 hardening, eval, docs, and release-approval phase after Phase 17. |
 | 19 - Complete tool ecosystem | Done | Later tool ecosystem work is recorded as complete in `docs/phases/PHASE-LOG.md`; do not reimplement unless a regression is found. |
 | 20 - Content compaction | Done with caveat | Content compaction is complete; hook-dispatch caveats are documented in the phase plan/log. |
-| 21 - Web interface and HTTP API | Complete | `nandocodego server`, HTTP/SSE sessions, browser UI, and HTTP permission broker are implemented and validated with automated checks, `gosec`, Docker runtime, and live in-container API checks. |
+| 21 - Web interface and HTTP API | Complete; UI rebuilt by BV (2026-10-20) | `nandocodego server`, HTTP/SSE sessions, browser UI, and HTTP permission broker are implemented and validated with automated checks, `gosec`, Docker runtime, and live in-container API checks. The browser UI is now plain ES modules under `internal/server/web/js/` (one feature module per panel) behind a strict CSP. |
 | 22 - Enhanced TUI and input handling | Accepted as-is 2026-10-05; TUI in maintenance mode | Run visibility, status details, transcript performance, bracketed paste preprocessing, keybinding context primitives, chord handling, status snapshots, `/queue`, `/bg`, `/btw`, activity/tip lines, and automated verification are implemented. Unfinished deep-interaction items are parked in [BACKLOG.md](BACKLOG.md) §6; only the P22-A safety slice still needs manual REPL checks. |
 | 23 - OpenAI-compatible LLM adapter | Removed from active v0.1 plan | No longer wanted for this roadmap. The plan document was deleted; recover it from git history if this decision changes. |
 | 24 - Multi-agent coordination | Complete | Coordinator mode, `SendMessage`, bounded mailboxes, worker name registration, auto-resume hooks, dream lifecycle, restricted worker/coordinator registries, TUI coordinator status, and server coordinator runtime are implemented and validated. |
-| 25 - Browser session durability (rescoped from Remote / bridge mode) | Planned; required for v0.1 | Rescoped by ADR-002: detach/reattach, replay with gap detection, persisted session metadata. Runs after B2, before B3. `connect`, JWT, and the TUI bridge are out of scope. |
+| 25 - Browser session durability (rescoped from Remote / bridge mode) | Planned; required for v0.1 | Rescoped by ADR-002: detach/reattach, replay with gap detection, persisted session metadata. Runs after C1, before B3. `connect`, JWT, and the TUI bridge are out of scope. |
 | 26 - Inline completion in TUI input | Done | Inline completion is complete and should not be treated as future work. |
 | 27 - Directory mention expansion | Done | Directory mention expansion is complete and should not be treated as future work. |
 | 28 - Semantic workspace index and embedding retrieval | Implemented MVP | `internal/semantic`, `nandocodego index`, TUI `/semantic` and `/index`, prompt/server semantic retrieval injection, local cache store, and embedding API modernization are implemented. |
@@ -69,7 +71,7 @@ The highest-impact missing product features are:
 - Exit-gate closure for Phases 8-14: memory, hooks, MCP, sub-agents, skills, command/config UX, and tasks need live/manual validation recorded against their phase docs.
 - Manual evidence capture for context, latency, project-scale analysis, and listing prompt accuracy: `/trace last`, `/prompt last`, effective context mode, retrieval/checkpoint behavior, final-answer completeness, and listing/tree-mode prompt shape need recorded live evidence before release packaging.
 - Phase 25 (rescoped 2026-10-05 by ADR-002): browser session durability: detached sessions, reconnect/replay with gap detection, session persistence across restarts. `connect`, JWT, and the remote TUI bridge are out of scope.
-- Browser-first parity (roadmap steps B1-B4): run cancel, cloud key entry, command endpoints, session list, management panels, accessibility.
+- Browser-first remainder: B3 management panels and the rest of B4 accessibility (B1, B2 and the BV revamp landed 2026-10-20, pending commit and visual approval).
 - Phase 17: release builds, installer, checksums, release workflow, changelog, and release-facing `doctor`.
 - Phase 18: final eval suite, realistic REPL smoke tests, model matrix testing, end-to-end permission scenarios, docs, performance gates, and security review.
 
@@ -84,5 +86,6 @@ The current code is test-green, but an engineer should account for these risks:
 - Model switching validates through the model runtime when that service is wired. Release validation should cover the browser model picker, the TUI, and `--print`.
 - Hook core is implemented, but project-controlled hook config is deliberately parsed and reported without execution because there is no workspace trust flow or full config provenance model yet.
 - Project-scale analysis can still fail by spending too much context on raw file contents and then stopping before the promised final report. Use the reliability roadmap before reducing `num_ctx`.
-- The browser lacks run cancel, cloud key entry, command endpoints, a session list, and management panels until B2/B3 land; until then some validation must fall back to the TUI.
-- Open P0 bug: the server model switch rejects a listed stale `:cloud` model (owner: B1).
+- The browser lacks management panels until B3 lands; until then some validation must fall back to the TUI.
+- Known limitations from the browser revamp (tracked in [BACKLOG.md](BACKLOG.md)): permission globs are case-sensitive, so `secrets/*` does not match `SECRETS/k.txt` on a case-insensitive filesystem (the agent's own check has the same gap); files written through Bash are not detected by the browser save-conflict check; the browser editor saves only existing UTF-8 files; the cost view shows the last run only; `/v1/models` still lists stale local `:cloud` stubs (selecting one returns a precise error).
+- MCP servers and HTTP hooks may target loopback by design (local servers and receivers); private ranges, `0.0.0.0`, DNS rebinding and redirects to blocked hosts are refused by `internal/netguard`.

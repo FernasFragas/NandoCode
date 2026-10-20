@@ -2,7 +2,6 @@ package permissions
 
 import (
 	"encoding/json"
-	"path"
 	"path/filepath"
 	"strings"
 )
@@ -117,8 +116,10 @@ func matches(pattern, toolName, target string) bool {
 	}
 
 	// Normalize path separators for consistent matching.
+	// Only the target is normalized. The rule glob is left alone because "\\"
+	// is its escape character; rewriting it to "/" would break escapes on
+	// Windows. Windows users write "/" in rules.
 	target = normalizePathSeparators(target)
-	argGlob = normalizePathSeparators(argGlob)
 
 	// Match using the recursive glob matcher.
 	return globMatch(argGlob, target)
@@ -131,71 +132,156 @@ func normalizePathSeparators(s string) string {
 }
 
 // globMatch matches a glob pattern against a target string.
-// It handles * and ? as standard glob wildcards, and ** as a recursive directory matcher.
-// Uses path.Match for non-** segments.
+//
+// Semantics (decided 2026-10-06):
+//   - "*" matches any run of characters, including "/" and the empty run.
+//   - "?" matches exactly one character (including "/").
+//   - "[abc]", "[a-z]" and "[!abc]" / "[^abc]" match one character from the class.
+//   - "\x" matches the literal character x.
+//   - "**" is the same as "*", with one addition: a "**" that forms a whole
+//     path segment also matches zero directories, so "src/**/x.go" matches
+//     "src/x.go", "**/x.go" matches "x.go", and "docs/**" matches "docs".
 func globMatch(pattern, target string) bool {
-	// If no ** segments, use path.Match directly.
+	for _, variant := range doubleStarVariants(pattern) {
+		if wildcardMatch([]rune(variant), []rune(target)) {
+			return true
+		}
+	}
+	return false
+}
+
+// maxDoubleStarSegments caps the 2^n expansion of "**" path segments.
+const maxDoubleStarSegments = 12
+
+// doubleStarVariants returns the pattern itself plus the forms where each
+// whole-segment "**" has been collapsed away (matching zero directories).
+func doubleStarVariants(pattern string) []string {
 	if !strings.Contains(pattern, "**") {
-		ok, _ := path.Match(pattern, target)
-		return ok
+		return []string{pattern}
 	}
-
-	// Handle ** by splitting into segments and matching recursively.
-	return globMatchRecursive(pattern, target)
+	segs := strings.Split(pattern, "/")
+	// Adjacent "**" segments are equivalent to one.
+	dedup := segs[:0:0]
+	for _, seg := range segs {
+		if seg == "**" && len(dedup) > 0 && dedup[len(dedup)-1] == "**" {
+			continue
+		}
+		dedup = append(dedup, seg)
+	}
+	segs = dedup
+	var starIdx []int
+	for i, seg := range segs {
+		if seg == "**" {
+			starIdx = append(starIdx, i)
+		}
+	}
+	if len(starIdx) == 0 {
+		return []string{pattern}
+	}
+	if len(starIdx) > maxDoubleStarSegments {
+		starIdx = starIdx[:maxDoubleStarSegments]
+	}
+	variants := make([]string, 0, 1<<len(starIdx))
+	for mask := 0; mask < 1<<len(starIdx); mask++ {
+		drop := map[int]bool{}
+		for bit, idx := range starIdx {
+			if mask&(1<<bit) != 0 {
+				drop[idx] = true
+			}
+		}
+		kept := make([]string, 0, len(segs))
+		for i, seg := range segs {
+			if !drop[i] {
+				kept = append(kept, seg)
+			}
+		}
+		variants = append(variants, strings.Join(kept, "/"))
+	}
+	return variants
 }
 
-// globMatchRecursive handles ** segments in glob patterns.
-// It splits the pattern and target by "/" and handles ** as matching zero or more segments.
-func globMatchRecursive(pattern, target string) bool {
-	// Split by "/" but track whether the pattern/target end with "/" for edge cases.
-	patternParts := strings.Split(pattern, "/")
-	targetParts := strings.Split(target, "/")
-
-	return matchParts(patternParts, targetParts)
+// wildcardMatch matches p against s with "*", "?", classes and escapes.
+// It uses the iterative backtracking algorithm, so it is O(len(p)*len(s)) at worst.
+func wildcardMatch(p, s []rune) bool {
+	pi, si := 0, 0
+	star, mark := -1, 0
+	for si < len(s) {
+		if pi < len(p) && p[pi] == '*' {
+			star, mark = pi, si
+			pi++
+			continue
+		}
+		if pi < len(p) {
+			if next, ok := matchOne(p, pi, s[si]); ok {
+				pi = next
+				si++
+				continue
+			}
+		}
+		if star >= 0 {
+			mark++
+			si = mark
+			pi = star + 1
+			continue
+		}
+		return false
+	}
+	for pi < len(p) && p[pi] == '*' {
+		pi++
+	}
+	return pi == len(p)
 }
 
-// matchParts recursively matches pattern parts against target parts.
-// Handles ** as matching zero or more directory segments.
-func matchParts(patternParts, targetParts []string) bool {
-	for len(patternParts) > 0 && len(targetParts) > 0 {
-		p := patternParts[0]
-		t := targetParts[0]
-
-		if p == "**" {
-			// ** can match zero or more segments.
-			// Try matching the rest of the pattern starting from this position,
-			// as well as consuming one target segment and trying again.
-
-			// Try zero segments: skip ** in pattern and continue.
-			if matchParts(patternParts[1:], targetParts) {
-				return true
-			}
-
-			// Try one or more segments: consume a target segment and stay on **.
-			if matchParts(patternParts, targetParts[1:]) {
-				return true
-			}
-
-			return false
+// matchOne matches the single pattern element at p[pi] against c and returns
+// the index just past that element. ok is false when it does not match.
+func matchOne(p []rune, pi int, c rune) (int, bool) {
+	switch p[pi] {
+	case '?':
+		return pi + 1, true
+	case '\\':
+		if pi+1 < len(p) {
+			return pi + 2, p[pi+1] == c
 		}
-
-		// Regular glob match for non-** segment.
-		ok, _ := path.Match(p, t)
-		if !ok {
-			return false
+		return pi + 1, c == '\\'
+	case '[':
+		if next, matched, valid := matchClass(p, pi, c); valid {
+			return next, matched
 		}
-
-		patternParts = patternParts[1:]
-		targetParts = targetParts[1:]
+		return pi + 1, c == '['
+	default:
+		return pi + 1, p[pi] == c
 	}
+}
 
-	// If there are remaining pattern parts, check if they're all **.
-	for _, p := range patternParts {
-		if p != "**" && p != "" {
-			return false
-		}
+// matchClass parses the class starting at p[pi] == '['. valid is false when the
+// class is not terminated, in which case '[' is treated as a literal.
+func matchClass(p []rune, pi int, c rune) (next int, matched, valid bool) {
+	i := pi + 1
+	negate := false
+	if i < len(p) && (p[i] == '!' || p[i] == '^') {
+		negate = true
+		i++
 	}
-
-	// Both must be exhausted.
-	return len(patternParts) == 0 && len(targetParts) == 0
+	first := true
+	for i < len(p) {
+		if p[i] == ']' && !first {
+			return i + 1, matched != negate, true
+		}
+		first = false
+		lo := p[i]
+		if lo == '\\' && i+1 < len(p) {
+			i++
+			lo = p[i]
+		}
+		hi := lo
+		if i+2 < len(p) && p[i+1] == '-' && p[i+2] != ']' {
+			hi = p[i+2]
+			i += 2
+		}
+		if lo <= c && c <= hi {
+			matched = true
+		}
+		i++
+	}
+	return 0, false, false
 }

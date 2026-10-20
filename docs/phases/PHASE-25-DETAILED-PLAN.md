@@ -4,12 +4,9 @@ Date: 2026-05-07
 Status: **Rescoped 2026-10-05 by [ADR-002](../adr/ADR-002-BROWSER-UI-PRIMARY-SURFACE.md).** Read "Rescope - 2026-10-05" first; it overrides the rest of this document wherever they conflict.
 Source plans:
 
-- `.codex/go-ollama-plan-AGENTS.md`
-- `.codex/go-ollama-plan-HUMANS.md`
 - `docs/phases/PHASE-LOG.md`
 - `docs/roadmap/PROJECT-STATUS-AND-ONBOARDING.md`
 - `docs/phases/PHASE-8-DETAILED-PLAN.md`
-- `docs/archive/phases/PHASE-24-DETAILED-PLAN.md`
 - `book/ch16-remote.md`
 
 ## Rescope - 2026-10-05
@@ -84,7 +81,7 @@ Treat them as background only.
 
 ## Roadmap Precondition - 2026-05-22
 
-`docs/plans/OLLAMA-CLOUD-API-KEY-PLAN.md` is complete. Phase 25 should build on the resulting provider/runtime-client shape instead of introducing a second model-routing path.
+Ollama Cloud API key support is complete (2026-05-22; browser key entry in B2, 2026-10-20). Phase 25 should build on the resulting provider/runtime-client shape instead of introducing a second model-routing path.
 
 ## Implementation Readiness Review - 2026-05-21
 

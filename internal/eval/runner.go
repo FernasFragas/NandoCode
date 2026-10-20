@@ -233,7 +233,11 @@ func runFixture(parent context.Context, runID, runDir string, target runTarget, 
 		return finalizeFixtureResult(result)
 	}
 	result.ModelUsed = bundle.model
-	input, prompt := buildAgentInput(runCtx, fixture, workspace.Path, fixture.Config, bundle.model)
+	input, prompt, err := buildAgentInput(runCtx, fixture, workspace.Path, fixture.Config, bundle.model)
+	if err != nil {
+		result.FailureReason = logging.Redact(err.Error())
+		return finalizeFixtureResult(result)
+	}
 	metrics := newRunMetrics(fixture.Config.Execution.MaxToolCalls, stopRun)
 	input.PermissionPrompt = metrics.wrapPrompt(prompt)
 	bundle.agentCfg.PermissionObserver = metrics.permissionObserver()

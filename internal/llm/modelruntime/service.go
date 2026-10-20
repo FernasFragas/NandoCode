@@ -15,6 +15,7 @@ import (
 var (
 	ErrModelNotFound       = modelresolver.ErrModelNotFound
 	ErrCloudDisabled       = modelresolver.ErrCloudDisabled
+	ErrCloudModelRetired   = modelresolver.ErrCloudModelRetired
 	ErrCredentialRequired  = credentials.ErrCredentialRequired
 	ErrCredentialCanceled  = credentials.ErrCredentialCanceled
 	ErrUnauthorized        = errors.New("ollama cloud unauthorized")
@@ -46,6 +47,19 @@ type SwitchResult struct {
 	CredentialSrc credentials.KeySource
 	UsedCloud     bool
 	Message       string
+}
+
+// WithRuntime returns a copy of the service that switches the given runtime
+// client instead of the shared one. The resolver, credentials and local client
+// are shared. The browser server calls this once per session so that one
+// session's model choice cannot reroute another's.
+func (s *Service) WithRuntime(rc *llm.RuntimeClient) *Service {
+	if s == nil {
+		return nil
+	}
+	cp := *s
+	cp.Runtime = rc
+	return &cp
 }
 
 // Resolve resolves the requested model to a provider without switching.

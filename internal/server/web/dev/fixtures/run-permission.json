@@ -1,0 +1,114 @@
+[
+  {
+    "id": "1",
+    "type": "session_ready",
+    "time": "2026-01-02T03:04:05Z",
+    "session_id": "gallery-permission"
+  },
+  {
+    "id": "2",
+    "type": "run_started",
+    "time": "2026-01-02T03:04:06Z",
+    "session_id": "gallery-permission",
+    "data": {
+      "message_id": "message-1"
+    }
+  },
+  {
+    "id": "3",
+    "type": "assistant_thinking_delta",
+    "time": "2026-01-02T03:04:07Z",
+    "session_id": "gallery-permission",
+    "data": {
+      "thinking": "Checking the project."
+    }
+  },
+  {
+    "id": "4",
+    "type": "tool_use_start",
+    "time": "2026-01-02T03:04:08Z",
+    "session_id": "gallery-permission",
+    "data": {
+      "id": "tool-1",
+      "input": {
+        "path": "src/main.go",
+        "pattern": "TODO"
+      },
+      "name": "Grep"
+    }
+  },
+  {
+    "id": "5",
+    "type": "tool_use_result",
+    "time": "2026-01-02T03:04:09Z",
+    "session_id": "gallery-permission",
+    "data": {
+      "error": "",
+      "id": "tool-1",
+      "result": "src/main.go:1: TODO"
+    }
+  },
+  {
+    "id": "6",
+    "type": "tool_use_start",
+    "time": "2026-01-02T03:04:10Z",
+    "session_id": "gallery-permission",
+    "data": {
+      "id": "tool-2",
+      "input": {
+        "command": "printf ok"
+      },
+      "name": "Bash"
+    }
+  },
+  {
+    "id": "7",
+    "type": "permission_request",
+    "time": "2026-01-02T03:04:11Z",
+    "session_id": "gallery-permission",
+    "data": {
+      "reason": "Run project checks",
+      "request_id": "permission-1",
+      "target": "printf ok",
+      "tool_name": "Bash"
+    }
+  },
+  {
+    "id": "8",
+    "type": "tool_use_result",
+    "time": "2026-01-02T03:04:12Z",
+    "session_id": "gallery-permission",
+    "data": {
+      "error": "",
+      "id": "tool-2",
+      "result": "ok"
+    }
+  },
+  {
+    "id": "9",
+    "type": "assistant_text_delta",
+    "time": "2026-01-02T03:04:13Z",
+    "session_id": "gallery-permission",
+    "data": {
+      "content": "Done."
+    }
+  },
+  {
+    "id": "10",
+    "type": "terminal",
+    "time": "2026-01-02T03:04:14Z",
+    "session_id": "gallery-permission",
+    "data": {
+      "detail": "",
+      "reason": "completed",
+      "usage": {
+        "PromptEvalCount": 0,
+        "EvalCount": 0,
+        "TotalDuration": 0,
+        "Turns": 3,
+        "ToolCalls": 2,
+        "DoneReason": "stop"
+      }
+    }
+  }
+]

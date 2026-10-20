@@ -14,6 +14,9 @@ import (
 var (
 	ErrModelNotFound = errors.New("model not found")
 	ErrCloudDisabled = errors.New("ollama cloud disabled")
+	// ErrCloudModelRetired reports a model that is still listed locally as a
+	// ":cloud" stub but is no longer served by the Ollama Cloud catalog.
+	ErrCloudModelRetired = errors.New("ollama cloud model retired")
 )
 
 // Resolver resolves model origin between local Ollama and direct Ollama Cloud.
@@ -111,6 +114,11 @@ func (r *Resolver) resolveCloudOnly(ctx context.Context, requested, canonical, a
 			Provider:      llm.ProviderOllamaCloudAPI,
 			BaseURL:       llm.OllamaCloudBaseURL,
 		}, nil
+	}
+	// A stale local ":cloud" stub is advertised by /v1/models but the cloud no
+	// longer serves it. Say so instead of a bare "model not found".
+	if localModels, err := r.LocalClient.ListModels(ctx); err == nil && hasModel(localModels, requested) {
+		return llm.ResolvedModel{}, fmt.Errorf("%w: model %s is no longer available in Ollama Cloud", ErrCloudModelRetired, canonical)
 	}
 	return llm.ResolvedModel{}, fmt.Errorf("%w: %s", ErrModelNotFound, requested)
 }

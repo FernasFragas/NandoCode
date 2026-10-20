@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/FernasFragas/Nandocode/internal/tui/fileindex"
+	"github.com/FernasFragas/Nandocode/internal/fileindex"
 )
 
 type fakeFreq struct {

@@ -4,8 +4,10 @@ import (
 	"context"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
+	"unicode/utf8"
 
 	"github.com/FernasFragas/Nandocode/internal/agent"
 	"github.com/FernasFragas/Nandocode/internal/tools"
@@ -365,7 +367,7 @@ func TestSelectDirectoryEvidenceParallelReadsDeterministicOrder(t *testing.T) {
 	const input = "review alpha beta zeta in @docs?content"
 	const wantOrder = "docs/alpha.md,docs/beta.md,docs/zeta.md"
 	for i := 0; i < 20; i++ {
-		parts, omitted := selectDirectoryEvidence(context.Background(), ref, input)
+		parts, omitted := selectDirectoryEvidence(context.Background(), tools.DefaultContext(context.Background(), root), ref, input)
 		if len(omitted) != 0 {
 			t.Fatalf("unexpected omitted entries: %+v", omitted)
 		}
@@ -409,6 +411,72 @@ func TestBuildEvidencePartsRespectsCanceledContext(t *testing.T) {
 	for i, want := range []string{"a.txt", "b.txt"} {
 		if omitted[i].Path != want || omitted[i].Reason != "read_error" {
 			t.Fatalf("omitted[%d]=%+v want path=%q reason=read_error", i, omitted[i], want)
+		}
+	}
+}
+
+func TestPackCurrentTurnPromptDirectoryMentionDoesNotFollowSymlinkOutsideRoots(t *testing.T) {
+	root := t.TempDir()
+	outside := t.TempDir()
+	const secret = "OUTSIDE_SECRET_TOKEN_12345"
+	if err := os.WriteFile(filepath.Join(outside, "secret.md"), []byte(secret+"\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	docs := filepath.Join(root, "docs")
+	if err := os.Mkdir(docs, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(docs, "secret-notes.md"), []byte("inside notes\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(filepath.Join(outside, "secret.md"), filepath.Join(docs, "secret.md")); err != nil {
+		t.Skipf("symlinks unavailable: %v", err)
+	}
+	ctx := tools.DefaultContext(context.Background(), root)
+	packed, err := PackCurrentTurnPrompt("review secret in @docs?content", ctx, agent.AssemblyBudget{AvailableEvidenceTokens: 500})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(packed.Prompt, secret) {
+		t.Fatalf("symlinked outside file content leaked into packed prompt:\n%s", packed.Prompt)
+	}
+	if !strings.Contains(packed.Prompt, "inside notes") {
+		t.Fatalf("expected in-workspace file to remain packed:\n%s", packed.Prompt)
+	}
+}
+
+func TestDeterministicExcerptKeepsValidUTF8(t *testing.T) {
+	src := strings.Repeat("é世🙂", 200)
+	for max := 1; max < 200; max++ {
+		got, _ := deterministicExcerpt(src, max)
+		if !utf8.ValidString(got) {
+			t.Fatalf("max=%d produced invalid UTF-8: %q", max, got)
+		}
+	}
+}
+
+func TestResolveMentionRefsTrailingQuestionMark(t *testing.T) {
+	root := t.TempDir()
+	files := map[string]string{"main.go": "package main\n", "what?": "literal\n"}
+	cases := map[string]string{"read @main.go?": "main.go", "see @what?": "what?"}
+	if runtime.GOOS == "windows" {
+		// "?" is not a legal file name character on Windows.
+		delete(files, "what?")
+		delete(cases, "see @what?")
+	}
+	for name, body := range files {
+		if err := os.WriteFile(filepath.Join(root, name), []byte(body), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	ctx := tools.DefaultContext(context.Background(), root)
+	for in, want := range cases {
+		refs, err := resolveMentionRefs(in, ctx)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(refs) != 1 || refs[0].Path != want {
+			t.Fatalf("%q: refs=%+v want %s", in, refs, want)
 		}
 	}
 }

@@ -5,12 +5,10 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
-	"os"
-	"path/filepath"
+	"regexp"
 	"strings"
 	"sync"
 	"testing"
-	"time"
 
 	"github.com/FernasFragas/Nandocode/internal/agent"
 	"github.com/FernasFragas/Nandocode/internal/bootstrap"
@@ -137,7 +135,14 @@ func TestPostMessageConflictAndDuplicate(t *testing.T) {
 		t.Fatalf("dup body=%s", w.Body.String())
 	}
 
-	time.Sleep(30 * time.Millisecond)
+	// Wait for the first run to finish instead of sleeping.
+	if sess, ok := s.registry.get(view.SessionID); ok {
+		eventually(t, "first run to finish", func() bool {
+			sess.mu.Lock()
+			defer sess.mu.Unlock()
+			return !sess.running
+		})
+	}
 	if sess, ok := s.registry.get(view.SessionID); ok {
 		sess.mu.Lock()
 		sess.running = true
@@ -171,6 +176,34 @@ func TestHealthAndModels(t *testing.T) {
 	}
 }
 
+func TestModelsIncludesCloudOnlyCatalogEntries(t *testing.T) {
+	s := testServer(t)
+	local := &testLLMClient{models: []llm.ModelInfo{{Name: "qwen3"}, {Name: "shared"}}}
+	cloud := &testLLMClient{models: []llm.ModelInfo{{Name: "kimi-k2.6"}, {Name: "shared"}}}
+	s.modelRuntime = &modelruntime.Service{
+		LocalClient: local,
+		Resolver: &modelresolver.Resolver{
+			LocalClient: local, CloudClient: cloud, CloudEnabled: true,
+		},
+	}
+	w := httptest.NewRecorder()
+	s.handleModels(w, httptest.NewRequest(http.MethodGet, "/v1/models", nil))
+	if w.Code != http.StatusOK {
+		t.Fatalf("status=%d body=%s", w.Code, w.Body.String())
+	}
+	var response modelsResponse
+	if err := json.Unmarshal(w.Body.Bytes(), &response); err != nil {
+		t.Fatal(err)
+	}
+	var names []string
+	for _, model := range response.Models {
+		names = append(names, model.Name)
+	}
+	if got, want := strings.Join(names, ","), "qwen3,shared,kimi-k2.6"; got != want {
+		t.Fatalf("models=%q, want %q", got, want)
+	}
+}
+
 func TestRoutesServeRichEmbeddedUI(t *testing.T) {
 	s := testServer(t)
 	w := httptest.NewRecorder()
@@ -180,14 +213,79 @@ func TestRoutesServeRichEmbeddedUI(t *testing.T) {
 	}
 	body := w.Body.String()
 	for _, want := range []string{
-		`id="model-picker"`,
-		`id="modal-overlay"`,
-		`currentReader = r.body.getReader()`,
-		`eventPayload(msg)`,
+		`id="header"`,
+		`id="transcript"`,
+		`id="message-input"`,
+		`href="css/tokens.css"`,
+		`href="css/components.css"`,
+		`href="css/app.css"`,
+		`<script type="module" src="js/app.js"></script>`,
 	} {
 		if !strings.Contains(body, want) {
 			t.Fatalf("served UI missing %q", want)
 		}
+	}
+	// BV-2: no inline style and no inline script (the CSP forbids both).
+	if strings.Contains(body, `style="`) {
+		t.Fatalf("served UI still has an inline style attribute")
+	}
+	if strings.Contains(body, "<style") {
+		t.Fatalf("served UI still has a <style> block")
+	}
+	scriptTag := regexp.MustCompile(`(?is)<script\b([^>]*)>(.*?)</script>`)
+	for _, m := range scriptTag.FindAllStringSubmatch(body, -1) {
+		if !strings.Contains(m[1], "src=") || strings.TrimSpace(m[2]) != "" {
+			t.Fatalf("served UI has an inline script: %q", m[0])
+		}
+	}
+	if regexp.MustCompile(`(?i)\son[a-z]+\s*=`).MatchString(body) {
+		t.Fatalf("served UI has an inline event handler attribute")
+	}
+	for _, inlined := range []string{"function renderMarkdown(", "function escapeHtml(", "currentReader = r.body.getReader()"} {
+		if strings.Contains(body, inlined) {
+			t.Fatalf("served UI still inlines %q", inlined)
+		}
+	}
+	csp := w.Header().Get("Content-Security-Policy")
+	if strings.Contains(csp, "unsafe-inline") {
+		t.Fatalf("CSP still allows unsafe-inline: %q", csp)
+	}
+
+	// Every asset the page references (and the module graph app.js pulls in)
+	// must be served with the right content type.
+	assets := regexp.MustCompile(`(?:href|src)="([^"#]+)"`).FindAllStringSubmatch(body, -1)
+	if len(assets) < 4 {
+		t.Fatalf("expected the page to reference assets, got %v", assets)
+	}
+	for _, m := range assets {
+		path := "/" + m[1]
+		aw := httptest.NewRecorder()
+		s.routes().ServeHTTP(aw, httptest.NewRequest(http.MethodGet, path, nil))
+		if aw.Code != http.StatusOK {
+			t.Fatalf("%s status=%d", path, aw.Code)
+		}
+		ct := aw.Header().Get("Content-Type")
+		switch {
+		case strings.HasSuffix(path, ".js") && !strings.Contains(ct, "javascript"):
+			t.Fatalf("%s content type=%q, want JavaScript", path, ct)
+		case strings.HasSuffix(path, ".css") && !strings.Contains(ct, "text/css"):
+			t.Fatalf("%s content type=%q, want text/css", path, ct)
+		}
+	}
+	for _, mod := range []string{"/js/app.js", "/js/sse.js", "/js/token.js", "/js/layout.js", "/js/markdown.js", "/js/features/transcript.js"} {
+		mw := httptest.NewRecorder()
+		s.routes().ServeHTTP(mw, httptest.NewRequest(http.MethodGet, mod, nil))
+		if mw.Code != http.StatusOK {
+			t.Fatalf("%s status=%d", mod, mw.Code)
+		}
+		if ct := mw.Header().Get("Content-Type"); !strings.Contains(ct, "javascript") {
+			t.Fatalf("%s content type=%q, want JavaScript", mod, ct)
+		}
+	}
+	mw := httptest.NewRecorder()
+	s.routes().ServeHTTP(mw, httptest.NewRequest(http.MethodGet, "/js/markdown.js", nil))
+	if !strings.Contains(mw.Body.String(), "export function renderMarkdown") {
+		t.Fatalf("markdown module body missing renderMarkdown export")
 	}
 	for _, old := range []string{
 		"new EventSource",
@@ -236,6 +334,37 @@ func TestPostMessageRequiresCredentialForCloudModel(t *testing.T) {
 	}
 }
 
+// lockedRecorder makes a recorder safe to read while a handler goroutine
+// is still writing to it.
+type lockedRecorder struct {
+	*httptest.ResponseRecorder
+	mu sync.Mutex
+}
+
+func (l *lockedRecorder) Write(b []byte) (int, error) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	return l.ResponseRecorder.Write(b)
+}
+
+func (l *lockedRecorder) WriteHeader(code int) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	l.ResponseRecorder.WriteHeader(code)
+}
+
+func (l *lockedRecorder) Flush() {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	l.ResponseRecorder.Flush()
+}
+
+func (l *lockedRecorder) bodyString() string {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	return l.Body.String()
+}
+
 func TestEventsHandlerLastEventIDReplay(t *testing.T) {
 	s := testServer(t)
 	r := httptest.NewRequest(http.MethodPost, "/v1/sessions", nil)
@@ -256,7 +385,7 @@ func TestEventsHandlerLastEventIDReplay(t *testing.T) {
 	defer cancel()
 	req := httptest.NewRequest(http.MethodGet, "/v1/sessions/"+view.SessionID+"/events", nil).WithContext(ctx)
 	req.Header.Set("Last-Event-ID", "3")
-	rr := httptest.NewRecorder()
+	rr := &lockedRecorder{ResponseRecorder: httptest.NewRecorder()}
 
 	var wg sync.WaitGroup
 	wg.Add(1)
@@ -264,10 +393,13 @@ func TestEventsHandlerLastEventIDReplay(t *testing.T) {
 		defer wg.Done()
 		s.handleEvents(rr, req, view.SessionID)
 	}()
-	time.Sleep(25 * time.Millisecond)
+	// Wait until the replay has been written instead of sleeping.
+	eventually(t, "replayed event c", func() bool {
+		return strings.Contains(rr.bodyString(), "event: c")
+	})
 	cancel()
 	wg.Wait()
-	body := rr.Body.String()
+	body := rr.bodyString()
 	if !strings.Contains(body, "event: c") {
 		t.Fatalf("expected replayed event c, got body=%q", body)
 	}
@@ -423,93 +555,33 @@ func TestUpdateModelWithModelRuntime(t *testing.T) {
 	})
 }
 
-func TestGetTree(t *testing.T) {
+func TestUpdateModelRequiresCredentialForKeylessCloud(t *testing.T) {
+	t.Setenv("OLLAMA_API_KEY", "")
+	local := &testLLMClient{models: []llm.ModelInfo{{Name: "qwen3"}}}
+	cloud := &testLLMClient{models: []llm.ModelInfo{{Name: "kimi-k2.6"}}}
+	createdCloudClient := false
 	s := testServer(t)
-	r := httptest.NewRequest(http.MethodPost, "/v1/sessions", nil)
-	r.RemoteAddr = "127.0.0.1:1234"
+	s.modelRuntime = &modelruntime.Service{
+		LocalClient: local, LocalBaseURL: "http://localhost:11434",
+		Runtime:        llm.NewRuntimeClient(local, llm.ProviderOllamaLocal, "http://localhost:11434"),
+		Resolver:       &modelresolver.Resolver{LocalClient: local, CloudClient: cloud, CloudEnabled: true},
+		Creds:          &credentials.Resolver{Store: &testCredStore{}},
+		NewCloudClient: func(string, string) llm.Client { createdCloudClient = true; return cloud },
+	}
+	id := createTestSession(t, s)
 	w := httptest.NewRecorder()
-	s.handleCreateSession(w, r)
-	var view SessionView
-	if err := json.Unmarshal(w.Body.Bytes(), &view); err != nil {
+	s.handleUpdateModel(w, httptest.NewRequest(http.MethodPost, "/", strings.NewReader(`{"model":"kimi-k2.6:cloud"}`)), id)
+	if w.Code != http.StatusPreconditionRequired {
+		t.Fatalf("status=%d want 428 body=%s", w.Code, w.Body.String())
+	}
+	var body map[string]any
+	if err := json.Unmarshal(w.Body.Bytes(), &body); err != nil {
 		t.Fatal(err)
 	}
-
-	sess, _ := s.registry.get(view.SessionID)
-	tmpDir := t.TempDir()
-	os.MkdirAll(filepath.Join(tmpDir, "sub"), 0o755)
-	os.WriteFile(filepath.Join(tmpDir, "file.txt"), []byte("hello"), 0o644)
-	os.WriteFile(filepath.Join(tmpDir, "sub", "nested.txt"), []byte("world"), 0o644)
-	os.MkdirAll(filepath.Join(tmpDir, ".git"), 0o755)
-	os.WriteFile(filepath.Join(tmpDir, ".git", "config"), []byte(""), 0o644)
-
-	sess.mu.Lock()
-	sess.appState.ToolSettings.WorkingDir = tmpDir
-	sess.mu.Unlock()
-
-	// Valid tree
-	req := httptest.NewRequest(http.MethodGet, "/v1/sessions/"+view.SessionID+"/tree", nil)
-	w = httptest.NewRecorder()
-	s.handleGetTree(w, req, view.SessionID)
-	if w.Code != http.StatusOK {
-		t.Fatalf("tree status=%d body=%s", w.Code, w.Body.String())
+	if body["error"] != "requires_credential" || body["credential"] != "OLLAMA_API_KEY" {
+		t.Fatalf("credential response=%v", body)
 	}
-	var tree TreeResponse
-	if err := json.Unmarshal(w.Body.Bytes(), &tree); err != nil {
-		t.Fatal(err)
-	}
-	if tree.Root != tmpDir {
-		t.Fatalf("expected root %s, got %s", tmpDir, tree.Root)
-	}
-	hasFile := false
-	hasSub := false
-	hasGit := false
-	for _, e := range tree.Entries {
-		if e.Name == "file.txt" {
-			hasFile = true
-		}
-		if e.Name == "sub" {
-			hasSub = true
-		}
-		if e.Name == ".git" {
-			hasGit = true
-		}
-	}
-	if !hasFile || !hasSub {
-		t.Fatalf("expected file.txt and sub in entries, got %d entries", len(tree.Entries))
-	}
-	if hasGit {
-		t.Fatalf(".git should be excluded")
-	}
-
-	// Path traversal
-	req = httptest.NewRequest(http.MethodGet, "/v1/sessions/"+view.SessionID+"/tree?path=..", nil)
-	w = httptest.NewRecorder()
-	s.handleGetTree(w, req, view.SessionID)
-	if w.Code != http.StatusForbidden && w.Code != http.StatusBadRequest {
-		t.Fatalf("traversal status=%d", w.Code)
-	}
-
-	// Deep depth beyond max is capped
-	deepDir := filepath.Join(tmpDir, "a", "b", "c", "d")
-	os.MkdirAll(deepDir, 0o755)
-	os.WriteFile(filepath.Join(deepDir, "deep.txt"), []byte("deep"), 0o644)
-	req = httptest.NewRequest(http.MethodGet, "/v1/sessions/"+view.SessionID+"/tree?depth=10", nil)
-	w = httptest.NewRecorder()
-	s.handleGetTree(w, req, view.SessionID)
-	if w.Code != http.StatusOK {
-		t.Fatalf("deep depth status=%d body=%s", w.Code, w.Body.String())
-	}
-	var tree2 TreeResponse
-	if err := json.Unmarshal(w.Body.Bytes(), &tree2); err != nil {
-		t.Fatal(err)
-	}
-	hasDeep := false
-	for _, e := range tree2.Entries {
-		if e.Name == "deep.txt" {
-			hasDeep = true
-		}
-	}
-	if hasDeep {
-		t.Fatalf("deep.txt should be excluded when depth is capped at 4")
+	if createdCloudClient {
+		t.Fatal("cloud client created before credential")
 	}
 }

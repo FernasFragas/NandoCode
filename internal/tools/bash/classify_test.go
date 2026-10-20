@@ -60,6 +60,49 @@ func TestBashPermissionMatrix(t *testing.T) {
 		{command: "ls > out.txt", readOnly: false, destructive: true},
 		{command: "echo $(rm file)", readOnly: false, destructive: true},
 		{command: "if", readOnly: false, destructive: true},
+		// P0-6: arguments and wrapper commands decide read-only status.
+		{command: "find . -delete", readOnly: false, destructive: true},
+		{command: "find . -name x -exec rm {} ;", readOnly: false, destructive: true},
+		{command: "find . -fprint out.txt", readOnly: false, destructive: true},
+		{command: "env rm -rf x", readOnly: false, destructive: true},
+		{command: "env FOO=1 rm x", readOnly: false, destructive: true},
+		{command: "env -i rm x", readOnly: false, destructive: true},
+		{command: "env FOO=1 ls", readOnly: false},
+		{command: "xargs rm", readOnly: false, destructive: true},
+		{command: "xargs -n1 rm", readOnly: false, destructive: true},
+		{command: "xargs grep foo", readOnly: true},
+		{command: "nice rm x", readOnly: false, destructive: true},
+		{command: "nice -n 5 rm x", readOnly: false, destructive: true},
+		{command: "timeout 5 rm x", readOnly: false, destructive: true},
+		{command: "timeout 5 ls", readOnly: true},
+		{command: "nohup rm x", readOnly: false, destructive: true},
+		{command: "sort -o out.txt in.txt", readOnly: false},
+		{command: "sort --output=out.txt in.txt", readOnly: false},
+		{command: "sort -oout.txt in.txt", readOnly: false},
+		{command: "uniq in.txt out.txt", readOnly: false},
+		{command: "git branch -D feature", readOnly: false, destructive: true},
+		{command: "git branch -d feature", readOnly: false, destructive: true},
+		{command: "git branch -m old new", readOnly: false, destructive: true},
+		{command: "git branch newbranch", readOnly: false, destructive: true},
+		{command: "git branch -a", readOnly: true},
+		{command: "git branch --list", readOnly: true},
+		{command: "git branch --show-current", readOnly: true},
+		{command: "git remote add origin x", readOnly: false, destructive: true},
+		{command: "git remote remove origin", readOnly: false, destructive: true},
+		{command: "git remote -v", readOnly: true},
+		{command: "git remote", readOnly: true},
+		{command: "git diff --output=out.txt", readOnly: false, destructive: true},
+		{command: "go env -w GOFLAGS=-mod=mod", readOnly: false, destructive: true},
+		{command: "go env -u GOFLAGS", readOnly: false, destructive: true},
+		{command: "go env GOPATH", readOnly: true},
+		{command: "date -s 2020-01-01", readOnly: false},
+		{command: "command -v go", readOnly: true},
+		{command: "command rm x", readOnly: false, destructive: true},
+		{command: "env -S 'rm x'", readOnly: false, destructive: true},
+		{command: "env $CMD", readOnly: false, destructive: true},
+		{command: "nice -n 5 env FOO=1 xargs rm", readOnly: false, destructive: true},
+		{command: "git -C other status", readOnly: false, destructive: true},
+		{command: "rg --pre ./evil.sh foo", readOnly: false},
 	}
 
 	tool := NewBashTool()
@@ -95,5 +138,43 @@ func TestBashPermissions(t *testing.T) {
 	}
 	if perm := tool.CheckPermissions(tools.Context{PermissionMode: tools.PermissionDontAsk}, write); perm.Decision != tools.PermDeny {
 		t.Fatalf("dontAsk write permission = %s", perm.Decision)
+	}
+}
+
+// TestBashClassifierFailsClosed covers bypasses found in review: quoting,
+// getopt long-option abbreviations, environment assignments and flags that
+// make otherwise read-only commands run programs or write files. Anything the
+// classifier cannot prove read-only must not be read-only.
+func TestBashClassifierFailsClosed(t *testing.T) {
+	commands := []string{
+		// Quoted flags.
+		`find . "-delete"`, `find . '-delete'`, `sort '-o' f f`, `rg '--pre' sh p`,
+		`date '-s' now`, `go env '-w' X=1`, `git diff "--output=x"`,
+		// Non-literal words.
+		`cat $FILE`, `cat "$FILE"`, `find . $'-delete'`, `find . \-delete`, `find . {-delete,}`,
+		// Abbreviated long options.
+		`git diff --out=x`, `sort --out=x f`, `sort --comp=sh f`, `rg --pr=sh p`, `date --se=now`,
+		// Environment assignments.
+		`GIT_EXTERNAL_DIFF=id git diff`, `GIT_PAGER=id git log`, `GIT_SSH_COMMAND=id git status`,
+		`LD_PRELOAD=x ls`, `PATH=/tmp ls`, `env LD_PRELOAD=x ls`,
+		// Git.
+		`git grep -O sh`, `git grep -Osh`, `git grep -nO sh x`, `git log --ext-diff`,
+		`git diff --textconv`, `git diff --ext`, `git remote -v add x y`, `git remote show origin`,
+		// Go.
+		`go test -exec x ./...`, `go test -toolexec x`, `go test -c -o out`,
+		`go test -coverprofile=c.out`, `go test -cpuprofile cpu.out`, `go test --exec=x`, `go test -o out`,
+	}
+	tool := NewBashTool()
+	for _, c := range commands {
+		t.Run(c, func(t *testing.T) {
+			if tool.IsReadOnly(Input{Command: c}) {
+				t.Fatalf("%q must not be classified read-only", c)
+			}
+		})
+	}
+	for _, c := range []string{`go test ./...`, `git remote -v`, `git grep foo`, `git diff --no-textconv`, `find . -name "*.go"`, `ls "my dir"`} {
+		if !tool.IsReadOnly(Input{Command: c}) {
+			t.Errorf("%q should stay read-only", c)
+		}
 	}
 }
