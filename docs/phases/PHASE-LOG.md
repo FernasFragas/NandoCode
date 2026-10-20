@@ -26,10 +26,22 @@ Older entries cite finished specs, plans and reports (`docs/archive/`, completed
 - RED: `TestRecorderWaitFinishedOutOfOrder` failed with `no finished event for b; events=[finished]`, the CI symptom. `TestOpenInsideRootsConfinesReads` failed to build (`undefined: openInsideRoots`).
 - GREEN: `go test -race -count=200 -cpu 1,2,4 -run 'TestWorker|TestRecorder|TestSetWorkerMeta' ./internal/tasks/`; existing traversal/symlink tests (`TestFilesRejects*`, `TestSave*`) unchanged and passing; `go test -race ./...`; `make check`; `tools/check-allowed-deps.sh`; `tools/check-network-policy.sh`. gosec v2.29.0 (the CI version) reports no findings for `internal/server`, `internal/tui`, `tools/visualdiff`.
 
+### Second pass: Windows job and remaining gosec alerts
+
+With `fail-fast: false` the Windows job ran to completion for the first time on this branch and showed 13 failing tests, all new in this PR (`main` is green on Windows).
+
+- **Product fix, Windows "Always Allow":** `permissions.SessionAllowRule` escaped the backslashes of a Windows path, while matching converts every target to `/`, so a session rule for a Windows path never matched. It now converts the target to `/` before escaping (no change on Unix). Test: `TestSessionAllowRuleMatchesNativePath`; RED was `TestSaveAlwaysRuleMatchesAgentRelativeAndAbsolute` on Windows CI.
+- **Product fix:** `internal/cli/print.go` built config paths with `+ "/"`; now `filepath.Join` like every other caller (`TestRunPrintFailsFastOnMalformedConfig`).
+- **Line endings:** `.gitattributes` adds `*.json text eol=lf`; the Windows checkout turned the gallery fixtures into CRLF (`TestRecordGalleryFixtures`).
+- **Test assumptions about Unix:** "what?" file name skipped on Windows (`contextpack`, `mentions`); `ScopeRoot` want uses `filepath.FromSlash`; the `agenttool` test quotes a `/`-separated path for `sh`; save-rule test writes the rule with `/` (the documented rule contract); `"/"` traversal case kept only off Windows, where it is workspace-relative and contained; four save-hook tests skip on Windows like `internal/hooks` (`cmd /C` cannot run POSIX test commands).
+- **gosec:** the 10 older alerts at `agent/subagent.go:101`, `hooks/snapshot.go:30`, `mcp/config.go:68`, `mentions/expand.go:496`, `tasks/supervisor.go:277,380`, `fileedit.go:123`, `filewrite.go:116`, `grep.go:215,274` get `#nosec` with the source of each path or command (app-built paths, config locations, or `tools.ResolvePath` output; the Bash task runs after the permission check).
+
+Evidence: `go test -race ./...`, `make check`, policy scripts pass on macOS; `GOOS=windows go vet ./internal/...` and `GOOS=windows go test -c` for every package pass; gosec v2.29.0 reports nothing at any flagged location.
+
 ### Known constraints
 
-- Remaining code-scanning alerts on the PR are older code (`tasks/supervisor.go:277,380` from 5fdceed, `agent/subagent.go`, `hooks/snapshot.go`, `mcp/config.go`, `mentions/expand.go`, `tools/fileedit`, `filewrite`, `grep`) flagged because the diff is large. They stay in the gosec backlog (Phase 18).
-- Not yet confirmed on GitHub Actions; needs a push.
+- Windows behaviour was checked by reasoning and cross-compilation only; no local Windows run. Needs a push to confirm.
+- On Windows a driveless rooted path such as `/` or `\x` resolves inside the workspace (`tools.ResolvePath`, unchanged from `main`), not at the drive root.
 
 ## Browser Revamp Batch (B1, B1.5, B2, BV-1 to BV-8): Common Status (2026-10-20)
 

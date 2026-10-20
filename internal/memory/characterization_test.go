@@ -177,7 +177,7 @@ func TestStalenessCharacterization(t *testing.T) {
 }
 
 func TestScopeRootCharacterization(t *testing.T) {
-	if got, _ := ScopeRoot("/ignored", "/repo/../repo"); got != "/repo" {
+	if got, _ := ScopeRoot("/ignored", "/repo/../repo"); got != filepath.FromSlash("/repo") {
 		t.Fatalf("gitRoot not cleaned: %q", got)
 	}
 	if _, err := ScopeRoot("  ", ""); err == nil {

@@ -4,6 +4,7 @@ import (
 	"context"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 	"unicode/utf8"
@@ -456,13 +457,20 @@ func TestDeterministicExcerptKeepsValidUTF8(t *testing.T) {
 
 func TestResolveMentionRefsTrailingQuestionMark(t *testing.T) {
 	root := t.TempDir()
-	for name, body := range map[string]string{"main.go": "package main\n", "what?": "literal\n"} {
+	files := map[string]string{"main.go": "package main\n", "what?": "literal\n"}
+	cases := map[string]string{"read @main.go?": "main.go", "see @what?": "what?"}
+	if runtime.GOOS == "windows" {
+		// "?" is not a legal file name character on Windows.
+		delete(files, "what?")
+		delete(cases, "see @what?")
+	}
+	for name, body := range files {
 		if err := os.WriteFile(filepath.Join(root, name), []byte(body), 0o644); err != nil {
 			t.Fatal(err)
 		}
 	}
 	ctx := tools.DefaultContext(context.Background(), root)
-	for in, want := range map[string]string{"read @main.go?": "main.go", "see @what?": "what?"} {
+	for in, want := range cases {
 		refs, err := resolveMentionRefs(in, ctx)
 		if err != nil {
 			t.Fatal(err)

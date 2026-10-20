@@ -1,6 +1,9 @@
 package permissions
 
-import "testing"
+import (
+	"path/filepath"
+	"testing"
+)
 
 func TestSessionAllowRuleMatchesOnlyTheApprovedCall(t *testing.T) {
 	t.Parallel()
@@ -59,5 +62,18 @@ func TestSessionAllowRuleRejectsEmptyInput(t *testing.T) {
 	}
 	if _, ok := SessionAllowRule("Bash", "  "); ok {
 		t.Fatal("empty target must not produce a rule")
+	}
+}
+
+func TestSessionAllowRuleMatchesNativePath(t *testing.T) {
+	t.Parallel()
+	target := filepath.Join(t.TempDir(), "note.txt")
+	rule, ok := SessionAllowRule("FileWrite", target)
+	if !ok {
+		t.Fatal("expected a rule")
+	}
+	rules := Rules{AlwaysAllow: []Rule{rule}}
+	if _, _, ok := rules.FirstMatchingRule("FileWrite", target); !ok {
+		t.Fatalf("rule %q must match its own native path %q", rule.Pattern, target)
 	}
 }

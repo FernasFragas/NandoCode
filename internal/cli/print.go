@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -75,8 +76,8 @@ func runPrint(ctx context.Context, cmd *cobra.Command, opts printOptions) error 
 	modelOverride := ptrOrNil(opts.model)
 	urlOverride := ptrOrNil(opts.ollamaURL)
 	cfgRes, loadErr := config.Load(
-		initial.ConfigDir+"/config.toml",
-		initial.WorkingDir+"/.nandocodego/config.toml",
+		filepath.Join(initial.ConfigDir, "config.toml"),
+		filepath.Join(initial.WorkingDir, ".nandocodego", "config.toml"),
 		config.FlagOverrides{
 			Model:                     modelOverride,
 			OllamaURL:                 urlOverride,

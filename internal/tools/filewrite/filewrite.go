@@ -113,7 +113,7 @@ func call(ctx tools.Context, input any, progress chan<- tools.ProgressEvent) (to
 		return tools.Result{}, fmt.Errorf("parent path is not a directory: %s", parent)
 	}
 
-	prior, readErr := os.ReadFile(path)
+	prior, readErr := os.ReadFile(path) // #nosec G304 -- resolved by tools.ResolvePath, inside the workspace roots
 	created := errors.Is(readErr, os.ErrNotExist)
 	if readErr != nil && !created {
 		return tools.Result{}, readErr

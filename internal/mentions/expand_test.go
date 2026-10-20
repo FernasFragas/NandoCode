@@ -4,6 +4,7 @@ import (
 	"context"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strconv"
 	"strings"
 	"testing"
@@ -812,6 +813,9 @@ func TestExpandPromptTrailingQuestionMarkResolvesFile(t *testing.T) {
 }
 
 func TestExpandPromptFileNamedWithTrailingQuestionMark(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip(`"?" is not a legal file name character on Windows`)
+	}
 	t.Parallel()
 	dir := t.TempDir()
 	mustWriteFile(t, filepath.Join(dir, "what?"), "literal\n")

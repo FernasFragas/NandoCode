@@ -493,7 +493,7 @@ func expandDirectory(ctx tools.Context, m resolvedMention, budget *promptBudget,
 			continue
 		}
 
-		content, readErr := os.ReadFile(resolved)
+		content, readErr := os.ReadFile(resolved) // #nosec G304 -- resolved by tools.ResolvePath, inside the workspace roots
 		if readErr != nil {
 			if os.IsPermission(readErr) {
 				skippedCount++

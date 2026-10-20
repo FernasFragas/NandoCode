@@ -120,7 +120,7 @@ func call(ctx tools.Context, input any, _ chan<- tools.ProgressEvent) (tools.Res
 	}
 	defer unlock()
 
-	rawContent, err := os.ReadFile(path)
+	rawContent, err := os.ReadFile(path) // #nosec G304 -- resolved by tools.ResolvePath, inside the workspace roots
 	if err != nil {
 		return tools.Result{}, err
 	}

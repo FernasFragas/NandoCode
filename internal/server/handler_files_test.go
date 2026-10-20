@@ -8,6 +8,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 )
@@ -183,12 +184,16 @@ func TestFilesRejectsEveryTraversalVariant(t *testing.T) {
 		"%2e%2e/%2e%2e/etc/passwd",
 		"..%5csecret.txt",
 		"/etc/passwd",
-		"/",
 		url.QueryEscape(filepath.Join(outside, "secret.txt")),
 		url.QueryEscape(outside),
 		"sub%2f..%2f..%2f..%2fetc",
 		"%00",
 		"sub%00/../..",
+	}
+	if runtime.GOOS != "windows" {
+		// On Windows "/" has no drive letter, so it is not absolute and
+		// resolves to the workspace root, which is allowed.
+		cases = append(cases, "/")
 	}
 	for _, p := range cases {
 		code, body := filesGet(t, s, id, p)

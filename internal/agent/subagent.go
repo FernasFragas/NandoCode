@@ -98,7 +98,7 @@ func runSubagent(
 		if err := os.MkdirAll(filepath.Dir(outPath), 0o700); err != nil {
 			return "", err
 		}
-		f, err := os.OpenFile(outPath, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0o600)
+		f, err := os.OpenFile(outPath, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0o600) // #nosec G304 -- path built by paths.TaskOutputPath from session and task IDs
 		if err != nil {
 			return "", err
 		}

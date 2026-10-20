@@ -274,7 +274,7 @@ func appendMailboxJSONL(path string, msg PendingMessage) error {
 	if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
 		return err
 	}
-	f, err := os.OpenFile(path, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o600)
+	f, err := os.OpenFile(path, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o600) // #nosec G304 -- mailbox path the supervisor built for this task
 	if err != nil {
 		return err
 	}
@@ -377,7 +377,7 @@ func (s *Supervisor) KillDream() error {
 // BashRunFunc runs bash command and writes stdout/stderr lines to JSONL.
 func BashRunFunc(command, workingDir string) RunFunc {
 	return func(ctx context.Context, out *OutputWriter) (int, error) {
-		cmd := exec.CommandContext(ctx, "bash", "-lc", command)
+		cmd := exec.CommandContext(ctx, "bash", "-lc", command) // #nosec G204 -- intended: runs the background Bash command after the permission check
 		if workingDir != "" {
 			cmd.Dir = workingDir
 		}

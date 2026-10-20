@@ -212,7 +212,7 @@ func call(ctx tools.Context, input any, _ chan<- tools.ProgressEvent) (tools.Res
 
 // searchFileInto appends matches from path into matches slice.
 func searchFileInto(path, relFile string, re *regexp.Regexp, ctxLines, headLimit int, matches *[]Match) {
-	f, err := os.Open(path)
+	f, err := os.Open(path) // #nosec G304 -- under the search root resolved by tools.ResolvePath
 	if err != nil {
 		return
 	}
@@ -271,7 +271,7 @@ func searchFileInto(path, relFile string, re *regexp.Regexp, ctxLines, headLimit
 
 // isBinaryFile checks the first 512 bytes for null bytes.
 func isBinaryFile(path string) bool {
-	f, err := os.Open(path)
+	f, err := os.Open(path) // #nosec G304 -- under the search root resolved by tools.ResolvePath
 	if err != nil {
 		return false
 	}

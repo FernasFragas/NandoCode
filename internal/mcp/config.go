@@ -65,7 +65,7 @@ func loadConfigFile(path string, trustedDefault bool) (Config, []string) {
 	if strings.TrimSpace(path) == "" {
 		return Config{}, nil
 	}
-	b, err := os.ReadFile(path)
+	b, err := os.ReadFile(path) // #nosec G304 -- MCP config file from the user or project config location
 	if err != nil {
 		if os.IsNotExist(err) {
 			return Config{}, nil

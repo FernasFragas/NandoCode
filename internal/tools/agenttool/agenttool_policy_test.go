@@ -56,7 +56,9 @@ func runParent(t *testing.T, parentMode permissions.Mode, rules permissions.Rule
 
 	script := &scriptedLLM{script: []llm.Message{
 		toolCallMessage("Agent", map[string]any{"task": "write the file", "permission_mode": requested}),
-		toolCallMessage("Bash", map[string]any{"command": "sed -i.bak s/a/b/g " + marker}),
+		// Quoted with "/" separators: the Bash tool runs sh, which would eat
+		// the backslashes of a Windows path.
+		toolCallMessage("Bash", map[string]any{"command": "sed -i.bak s/a/b/g '" + filepath.ToSlash(marker) + "'"}),
 		{Role: llm.RoleAssistant, Content: "child finished"},
 		{Role: llm.RoleAssistant, Content: "parent finished"},
 	}}

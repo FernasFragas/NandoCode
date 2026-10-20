@@ -10,6 +10,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"runtime"
 	"testing"
 
 	"github.com/FernasFragas/Nandocode/internal/agent"
@@ -124,6 +125,9 @@ func TestSaveAlwaysAllowAddsFileWriteRule(t *testing.T) {
 }
 
 func TestSavePreToolUseHookCanBlock(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("test hook command uses POSIX shell syntax")
+	}
 	s, sess, root, p := saveFixture(t)
 	s.hookSnapshot = hooks.Snapshot{Hooks: []hooks.Hook{{Kind: hooks.KindCommand, Event: hooks.EventPreToolUse, Matcher: "FileWrite(*)", Command: "echo blocked >&2; exit 2", Enabled: true}}}
 	s.hookCfg.WorkingDir = root
@@ -206,6 +210,9 @@ func TestSaveAcceptEditsAndBypass(t *testing.T) {
 }
 
 func TestSavePostToolUseHookNotice(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("test hook command uses POSIX shell syntax")
+	}
 	s, sess, root, _ := saveFixture(t)
 	s.hookSnapshot = hooks.Snapshot{Hooks: []hooks.Hook{{Kind: hooks.KindCommand, Event: hooks.EventPostToolUse, Matcher: "FileWrite(*)", Command: `echo '{"additional_context":"saved by hook"}'`, Enabled: true}}}
 	s.hookCfg.WorkingDir = root
@@ -342,6 +349,9 @@ func hookCounter(t *testing.T, root, extra string) hooks.Hook {
 }
 
 func TestSaveHookRunsOncePerLogicalSave(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("test hook command uses POSIX shell syntax")
+	}
 	s, sess, root, _ := saveFixture(t)
 	h := hookCounter(t, root, "")
 	counter := h.Command[len("echo x >> '") : len(h.Command)-1]
@@ -360,6 +370,9 @@ func TestSaveHookRunsOncePerLogicalSave(t *testing.T) {
 }
 
 func TestSaveHookAllowReportedAsRule(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("test hook command uses POSIX shell syntax")
+	}
 	s, sess, root, _ := saveFixture(t)
 	s.hookSnapshot = hooks.Snapshot{Hooks: []hooks.Hook{{Kind: hooks.KindCommand, Event: hooks.EventPreToolUse, Matcher: "FileWrite(*)", Command: `echo '{"decision":"allow"}'`, Enabled: true}}}
 	s.hookCfg.WorkingDir = root
@@ -449,7 +462,8 @@ func TestSaveAbsoluteRuleBlocksEveryPathForm(t *testing.T) {
 				t.Fatal(err)
 			}
 			aliasOK := os.Symlink(filepath.Join(root, "secrets"), filepath.Join(root, "alias")) == nil
-			rule := permissions.Rule{Pattern: "FileWrite(" + filepath.Join(root, "secrets") + "/*)"}
+			// Rules use "/" separators on every OS; "\\" is the glob escape.
+			rule := permissions.Rule{Pattern: "FileWrite(" + filepath.ToSlash(filepath.Join(root, "secrets")) + "/*)"}
 			sess.mu.Lock()
 			if kind == "deny" {
 				sess.permRules.AlwaysDeny = append(sess.permRules.AlwaysDeny, rule)

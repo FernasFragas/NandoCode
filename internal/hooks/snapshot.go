@@ -27,7 +27,7 @@ func (s *Snapshot) merge(other Snapshot) {
 }
 
 func loadFile(path string, source Source, executable bool) Snapshot {
-	b, err := os.ReadFile(path)
+	b, err := os.ReadFile(path) // #nosec G304 -- hook config file from the user or project config location
 	if err != nil {
 		if os.IsNotExist(err) {
 			return Snapshot{}
