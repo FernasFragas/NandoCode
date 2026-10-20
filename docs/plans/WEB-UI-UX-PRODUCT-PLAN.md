@@ -3,7 +3,7 @@
 **Date reviewed:** 2026-05-24  
 **Implementation audit:** 2026-05-28  
 **Re-planned:** 2026-10-05 - the browser UI is now the **primary v0.1 surface** ([ADR-002](../adr/ADR-002-BROWSER-UI-PRIMARY-SURFACE.md)). The P1 panels are committed roadmap work and new browser-first P0 items were added; see "Browser-First P0 Additions (2026-10-05)".  
-**Status:** Original P0 chat scope implemented as of 2026-06-23. Browser-first P0 additions, P1 management panels (UI-7), and UI-8 hardening remain. The visual layer and UI-6 moved to [`BROWSER-VISUAL-REVAMP-PLAN.md`](BROWSER-VISUAL-REVAMP-PLAN.md) on 2026-10-18.
+**Status:** Original P0 chat scope implemented as of 2026-06-23. Browser-first P0 additions, P1 management panels (UI-7), and UI-8 hardening remain. The visual layer and UI-6 moved to [`BROWSER-VISUAL-REVAMP-PLAN.md`](BROWSER-VISUAL-REVAMP-PLAN.md) on 2026-10-18. Update 2026-10-20: browser-first additions BF-1 (page split), BF-2 (cancel), BF-3 (cloud key entry), BF-4 (model list: precise error for retired cloud tags, `/v1/models` still lists them), BF-5 (clear, compact, cost, index status/build) and BF-6 (session list) are implemented but not committed; BF-7 (default command opens the browser) remains Phase 17. UI-7 panels (B3) are not started; UI-8 hardening has the `unsafe-inline`-free CSP, with ARIA, keyboard and reduced-motion work remaining. B1 hardening items (XSS, per-session runtime, history across turns, Always Allow, security headers, files walk) are implemented, pending commit.
 **Scope:** Make the Phase 21 browser page the primary local product surface.  
 **Module path:** `github.com/FernasFragas/Nandocode`
 
@@ -305,7 +305,7 @@ surface. Each item ships with backend tests and follows the Architecture Rules
 | --- | --- | --- |
 | BF-1 | Split the page into embedded static files (B1 extracts `web/js/markdown.js`, embeds `web/`, and adds the `node --test` CI job; B2 moves the rest) | Move inline CSS/JS out of `index.html` into files under `internal/server/web/` (for example `app.css`, `app.js`, small ES modules). Plain JS, no build tools, no npm. Embed the directory with `//go:embed web` and keep the existing route/embed test. Tighten CSP once inline script/style is gone. The SSE module must send `Last-Event-ID` on reconnect and drop already-seen event IDs, which fixes today's duplicated transcript after a reconnect (server-side event-log fixes are Phase 25 slice 0). Keep the markdown, SSE-parser, and tree modules DOM-free and test them with `node --test` (no npm; decided 2026-10-06). |
 | BF-2 | Stop/cancel an active run | Add `POST /v1/sessions/{id}/cancel` that cancels the run context and emits the normal terminal event. Add a Stop button. Today the only option is deleting the session. |
-| BF-3 | Ollama Cloud API key entry | Server mode must not block on input, so add an explicit endpoint (for example `POST /v1/credentials/ollama-cloud` with use-once or save-to-keychain) and handle `requires_credential` in the model picker. The key must be provided before any project context is sent; never log or echo it. Follow `docs/plans/OLLAMA-CLOUD-API-KEY-PLAN.md`. |
+| BF-3 | Ollama Cloud API key entry | Server mode must not block on input, so add an explicit endpoint (for example `POST /v1/credentials/ollama-cloud` with use-once or save-to-keychain) and handle `requires_credential` in the model picker. The key must be provided before any project context is sent; never log or echo it. Implemented in B2 (2026-10-20). |
 | BF-4 | Model list matches what can be selected | Fix the P0 bug: `/v1/models` must not advertise stale `:cloud` tags that the switch path rejects, or the switch must return a precise "not available in Ollama Cloud" error. The picker should mark cloud models and their credential state. |
 | BF-5 | Session commands | Small endpoints for clear, compact, index build/refresh/status (with the Phase 29 progress events), and cost. Reuse the same code paths as the TUI commands. |
 | BF-6 | Session list | List, switch, and delete sessions in the browser. Persistence across server restarts comes from rescoped Phase 25. |
@@ -653,6 +653,8 @@ Do not implement a generic slash-command HTTP bridge. Add only the endpoint(s)
 needed for the selected panel, with tests, and update the served browser UI for
 that panel. Run the relevant go test command plus go test ./internal/server.
 ```
+
+B1-1 completed 2026-10-19: Markdown helpers now live in `web/js/markdown.js`, escape both quote types, and accept only HTTP(S)/mailto link schemes. The full `web/` directory is embedded. Node tests run in CI; the rest of the page split and stricter CSP remain with B2/B4.
 
 ### Slice UI-8: Accessibility, Security Headers, and Final Hardening
 

@@ -18,6 +18,13 @@ type AssistantTurnStarted struct {
 
 func (AssistantTurnStarted) isEvent() {}
 
+// TurnUsage reports cumulative, measured usage after one model turn.
+type TurnUsage struct {
+	Usage Usage
+}
+
+func (TurnUsage) isEvent() {}
+
 // AssistantTextDelta contains streaming assistant content.
 type AssistantTextDelta struct {
 	Content string

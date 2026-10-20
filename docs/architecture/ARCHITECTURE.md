@@ -65,8 +65,7 @@ selects one and supplies an `OLLAMA_API_KEY`.
 ```
 
 Dependencies mostly point downward. `internal/agent` depends only on the `llm.Client`
-interface, not on Ollama. Known exceptions (2026-10-06): `analysis` imports
-`tui/fileindex`, `hooks` imports `mcp` to reuse its SSRF-safe HTTP client,
+interface, not on Ollama. Known exceptions (2026-10-06): `hooks` imports `mcp` to reuse its SSRF-safe HTTP client,
 `state` embeds `agent` types, and `config` embeds `semantic.Config`. The surfaces never call tools directly; they submit
 input to the agent and render the events it emits.
 
@@ -76,7 +75,7 @@ input to the agent and render the events it emits.
 | --- | --- |
 | `cmd/nandocodego` | Process entrypoint; signal handling; calls `cli.Run`. |
 | `internal/cli` | Cobra commands (`root`, `repl`, `print`, `server`, `index`, `eval`, `doctor`, `init`) and runtime assembly for the TUI (`repl.go`) and `--print` (`print.go`). The server assembles its own runtime in `server.New`, and eval in `internal/eval`; the four assemblies are separate copies (see Known Architectural Gaps). |
-| `internal/tui` | Bubble Tea model: transcript, markdown, input, Vim mode, keybindings, permission modal, run state/status bar, index progress. `fileindex/` and `picker/` power `@` file completion. |
+| `internal/tui` | Bubble Tea model: transcript, markdown, input, Vim mode, keybindings, permission modal, run state/status bar, index progress. `picker/` powers `@` file completion on top of `internal/fileindex`. |
 | `internal/server` | HTTP/SSE API (`/v1/health`, `/v1/models`, `/v1/sessions/...`), token auth, rate limiting, session manager with event ring buffer, HTTP permission broker, embedded browser UI in `web/`. |
 | `internal/commands` | Slash-command registry: `/help /clear /exit /model /models /pull /memory /context /hooks /permissions /skills /cost /trace /prompt /init /agents /queue /compact /refresh-index /analyze-project /checkpoint /bg /btw /semantic /index`. |
 | `internal/config` | Layered TOML config (user `config.toml` + project `.nandocodego/config.toml` + flags), with source tagging and warnings. |
@@ -189,4 +188,4 @@ Verified against code; details, evidence, and recommended order in
 - [EMBEDDING-AND-MODEL-ROUTING.md](EMBEDDING-AND-MODEL-ROUTING.md): local vs cloud chat and embedding routing.
 - [../guides/DEBUG-BREAKPOINTS.md](../guides/DEBUG-BREAKPOINTS.md): where to break in each stage of a request.
 - [../adr/](../adr/): architecture decision records.
-- `docs/phases/PHASE-N-DETAILED-PLAN.md` (active) and `docs/archive/phases/` (finished): the design spec each subsystem was built from.
+- `docs/phases/PHASE-N-DETAILED-PLAN.md`: specs for phases that are still open; finished specs are in git history, and `docs/phases/PHASE-LOG.md` records what each phase built.

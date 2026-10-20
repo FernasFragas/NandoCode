@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<base href="/">
+<title>NandoCode component gallery</title>
+<link rel="stylesheet" href="css/tokens.css">
+<link rel="stylesheet" href="css/components.css">
+</head>
+<body class="gallery">
+<div class="gallery-bar">
+  <h1>NandoCode component gallery</h1>
+  <span class="gallery-last" id="gallery-last">no action yet</span>
+  <button type="button" class="gallery-width" data-width="fit" aria-pressed="true">Fit</button>
+  <button type="button" class="gallery-width" data-width="1280" aria-pressed="false">1280</button>
+  <button type="button" class="gallery-width" data-width="1440" aria-pressed="false">1440</button>
+  <button type="button" class="gallery-width" data-width="1920" aria-pressed="false">1920</button>
+</div>
+<main class="gallery-stage" id="gallery-stage" data-width="fit"></main>
+<script type="module" src="dev/gallery.js"></script>
+</body>
+</html>

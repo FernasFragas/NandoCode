@@ -4,8 +4,6 @@ Date: 2026-05-07
 Status: ✅ Implemented in code and automated checks (2026-05-08); manual live exit-gate pending
 Source plans and references:
 
-- `.codex/go-ollama-plan-AGENTS.md`
-- `.codex/go-ollama-plan-HUMANS.md`
 - `docs/phases/PHASE-LOG.md`
 - `docs/roadmap/PROJECT-STATUS-AND-ONBOARDING.md`
 - `docs/phases/PHASE-8-DETAILED-PLAN.md`
@@ -13,7 +11,6 @@ Source plans and references:
 - `book/ch05-agent-loop.md`
 - `book/ch06-tools.md`
 - `book/ch14-tasks.md`
-- `.codex/agent-context/learnings-memory.md`
 
 ## Goal
 

@@ -4,8 +4,6 @@ Date: 2026-05-07
 Status: Complete in code and automated checks; live exit-gate validation pending
 Source plans and references:
 
-- `.codex/go-ollama-plan-AGENTS.md`
-- `.codex/go-ollama-plan-HUMANS.md`
 - `docs/phases/PHASE-LOG.md`
 - `docs/roadmap/PROJECT-STATUS-AND-ONBOARDING.md`
 - `docs/phases/PHASE-8-DETAILED-PLAN.md`
@@ -17,7 +15,6 @@ Source plans and references:
 - `book/ch08-sub-agents.md`
 - `book/ch09-permissions.md`
 - `book/ch12-extensibility.md`
-- `.codex/agent-context/learnings-memory.md`
 
 ## Goal
 

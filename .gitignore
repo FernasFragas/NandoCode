@@ -13,3 +13,6 @@ dist/
 # Binary artifacts
 bin/
 /nandocodego
+
+# Local screen recordings (the README demo video is hosted on GitHub)
+*.mov

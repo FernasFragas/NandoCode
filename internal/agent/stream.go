@@ -70,7 +70,12 @@ func (a *Agent) executeOneTurn(
 	// Call LLM
 	requestStartedAt := time.Now()
 	sendEvent(ctx, events, LLMRequestStarted{})
-	stream, err := a.client.Chat(ctx, req)
+	// The upstream request gets its own context so that when the stream ends
+	// (including a watchdog timeout, where the watchdog stops reading) the
+	// request is canceled instead of staying open on the model server.
+	reqCtx, cancelRequest := context.WithCancel(ctx)
+	defer cancelRequest()
+	stream, err := a.client.Chat(reqCtx, req)
 	if err != nil {
 		return turnResult{}, err
 	}
@@ -94,7 +99,7 @@ func (a *Agent) executeOneTurn(
 	defer cancelWatchdog()
 
 	// Accumulate the turn
-	return a.accumulateTurn(ctx, watchedStream, registry, toolCtx, permissionMode, permissionRules, permissionPrompt, hookDecision, postToolUse, permissionDenied, model, events, requestStartedAt)
+	return a.accumulateTurn(ctx, watchedStream, cancelRequest, registry, toolCtx, permissionMode, permissionRules, permissionPrompt, hookDecision, postToolUse, permissionDenied, model, events, requestStartedAt)
 }
 
 // accumulateTurn reads from the stream, emits deltas, accumulates the final message,
@@ -102,6 +107,7 @@ func (a *Agent) executeOneTurn(
 func (a *Agent) accumulateTurn(
 	ctx context.Context,
 	stream <-chan llm.StreamEvent,
+	streamFinished context.CancelFunc,
 	registry *tools.Registry,
 	toolCtx tools.Context,
 	permissionMode permissions.Mode,
@@ -150,6 +156,10 @@ func (a *Agent) accumulateTurn(
 			usage.TotalDuration = evt.TotalDuration
 		}
 	}
+
+	// The stream is fully read (or the watchdog gave up on it): release the
+	// upstream request before running tools, which can take a long time.
+	streamFinished()
 
 	// Build assistant message
 	assistantMsg := llm.Message{

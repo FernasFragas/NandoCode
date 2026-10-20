@@ -3,6 +3,7 @@ package fileedit
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -111,8 +112,15 @@ func call(ctx tools.Context, input any, _ chan<- tools.ProgressEvent) (tools.Res
 	if err != nil {
 		return tools.Result{}, err
 	}
+	lockCtx, cancelLock := context.WithTimeout(ctx.EffectiveContext(), filewrite.PathLockTimeout)
+	defer cancelLock()
+	unlock, err := filewrite.LockPath(lockCtx, path)
+	if err != nil {
+		return tools.Result{}, fmt.Errorf("file is being saved from the browser, try again: %w", err)
+	}
+	defer unlock()
 
-	rawContent, err := os.ReadFile(path)
+	rawContent, err := os.ReadFile(path) // #nosec G304 -- resolved by tools.ResolvePath, inside the workspace roots
 	if err != nil {
 		return tools.Result{}, err
 	}

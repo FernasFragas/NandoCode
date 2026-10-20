@@ -19,18 +19,19 @@ import (
 	"github.com/FernasFragas/Nandocode/internal/commands"
 	"github.com/FernasFragas/Nandocode/internal/contextpack"
 	"github.com/FernasFragas/Nandocode/internal/credentials"
+	"github.com/FernasFragas/Nandocode/internal/fileindex"
 	"github.com/FernasFragas/Nandocode/internal/hooks"
 	"github.com/FernasFragas/Nandocode/internal/llm"
 	"github.com/FernasFragas/Nandocode/internal/llm/modelruntime"
 	"github.com/FernasFragas/Nandocode/internal/mentions"
 	"github.com/FernasFragas/Nandocode/internal/observability"
 	"github.com/FernasFragas/Nandocode/internal/permissions"
-	"github.com/FernasFragas/Nandocode/internal/retrievalroute"
+	"github.com/FernasFragas/Nandocode/internal/runctl"
 	"github.com/FernasFragas/Nandocode/internal/semantic"
 	"github.com/FernasFragas/Nandocode/internal/skills"
 	"github.com/FernasFragas/Nandocode/internal/state"
-	"github.com/FernasFragas/Nandocode/internal/tui/fileindex"
 	"github.com/FernasFragas/Nandocode/internal/tui/picker"
+	"github.com/FernasFragas/Nandocode/internal/turnprep"
 	"github.com/charmbracelet/bubbles/textarea"
 	"github.com/charmbracelet/bubbles/textinput"
 	"github.com/charmbracelet/bubbles/viewport"
@@ -51,12 +52,13 @@ type Model struct {
 	broker                *PermissionBroker
 	width                 int
 	height                int
-	cancelRun             context.CancelFunc
-	compactCh             chan struct{}
+	runs                  *runctl.Controller
+	currentRun            runctl.Run
+	compactHooks          runctl.HookDispatcher
+	sessionID             string
 	transcript            []TranscriptItem
 	toolIndex             map[string]int
 	err                   error
-	activeRunCtx          context.Context
 	skillLoader           *skills.Loader
 	cmdRegistry           *commands.Registry
 	cmdCtx                commands.HandlerContext
@@ -224,6 +226,7 @@ func New(
 		chordInterceptor:    NewChordInterceptor(time.Second),
 		inputPreprocessor:   NewInputPreprocessor(),
 		activeRunKind:       "main",
+		runs:                runctl.New(),
 		markdownRenderWidth: 80,
 	}, nil
 }
@@ -530,14 +533,8 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.handleAgentEvent(msg.Event)
 
 	case agentDoneMsg:
-		if m.cancelRun != nil {
-			m.cancelRun()
-			m.cancelRun = nil
-		}
-		if m.activeRunCtx != nil {
-			m.activeRunCtx = nil
-		}
-		m.compactCh = nil
+		m.runs.Finish(m.currentRun)
+		m.currentRun = runctl.Run{}
 		m.thinkingActive = false
 		if m.activeRunKind == "main" {
 			m.backgroundedRun = false
@@ -831,8 +828,7 @@ func (m *Model) handleKeyMsg(msg tea.KeyMsg) (tea.Cmd, bool) {
 
 	// Handle Ctrl-C
 	if msg.Type == tea.KeyCtrlC {
-		if m.activeRunCtx != nil && m.cancelRun != nil {
-			m.cancelRun()
+		if m.runs.Cancel() {
 			return nil, true
 		}
 		// No active run, exit
@@ -995,33 +991,7 @@ func (m *Model) handleKeyMsg(msg tea.KeyMsg) (tea.Cmd, bool) {
 				}
 
 				if command == "compact" {
-					appState := m.store.Get()
-					if appState.ActiveRun && m.compactCh != nil {
-						select {
-						case m.compactCh <- struct{}{}:
-							m.transcript = append(m.transcript, CreateSystemItem("[Compact requested...]"))
-						default:
-							m.transcript = append(m.transcript, CreateSystemItem("[Compact already pending]"))
-						}
-					} else {
-						msgs := appState.Messages
-						cfg := agent.DefaultCompactionConfig()
-						turns := agent.CountTurnsExported(msgs)
-						if turns < cfg.MinTurns {
-							m.transcript = append(m.transcript, CreateSystemItem(
-								fmt.Sprintf("[Compact skipped: not enough turns to compact (need at least %d, have %d)]",
-									cfg.MinTurns, turns)))
-						} else {
-							truncated := agent.EmergencyTruncateExported(msgs, cfg.MinTurns)
-							m.store.Set(func(app state.App) state.App {
-								app.Messages = truncated
-								return app
-							})
-							m.transcript = append(m.transcript, CreateSystemItem(
-								fmt.Sprintf("[Compacted: %d → %d messages (emergency truncate)]",
-									len(msgs), len(truncated))))
-						}
-					}
+					m.handleCompactCommand()
 					m.refreshViewportContent(true)
 					return nil, true
 				}
@@ -1103,14 +1073,7 @@ func (m *Model) handleKeyMsg(msg tea.KeyMsg) (tea.Cmd, bool) {
 				if out.Clear {
 					m.clearTranscript()
 					m.refreshViewportContent(true)
-					m.store.Set(func(app state.App) state.App {
-						app.Messages = []llm.Message{}
-						app.LastRetryNotice = ""
-						app.TerminalReason = ""
-						app.TerminalDetail = ""
-						app.ActiveTools = map[string]state.ToolUse{}
-						return app
-					})
+					m.store.Set(runctl.ResetConversation)
 				}
 
 				if out.Quit {
@@ -1146,7 +1109,7 @@ func (m *Model) handleWindowSize(msg tea.WindowSizeMsg) tea.Cmd {
 	// Resize renderer
 	if m.renderer != nil {
 		newWidth := msg.Width - 4
-		m.renderer.Resize(newWidth)
+		_ = m.renderer.Resize(newWidth)
 		if newWidth != m.markdownRenderWidth {
 			m.markdownRenderWidth = newWidth
 			m.invalidateAssistantMarkdownCache()
@@ -1370,15 +1333,9 @@ func (m *Model) handleAgentEvent(evt agent.Event) {
 			}
 			m.transcript = append(m.transcript, CreateSystemItem(message))
 		}
+		side := m.activeRunKind == "btw"
 		m.store.Set(func(app state.App) state.App {
-			app.ActiveRun = false
-			app.TerminalReason = e.Reason
-			app.TerminalDetail = e.Detail
-			app.Usage = e.Usage
-			if len(e.Conversation) > 0 && m.activeRunKind != "btw" {
-				app.Messages = append(app.Messages, e.Conversation...)
-			}
-			return app
+			return runctl.ApplyTerminal(app, e, runctl.TerminalOptions{Side: side})
 		})
 		m.compactingActive = false
 		m.retryActiveUntil = time.Time{}
@@ -1421,52 +1378,57 @@ func (m *Model) buildAnalyzeProjectInput(path, question string) (string, analysi
 }
 
 func (m *Model) saveRunCheckpoint(term agent.Terminal) {
-	lastUser := ""
-	lastAssistant := ""
-	app := m.store.Get()
-	for i := len(app.Messages) - 1; i >= 0; i-- {
-		msg := app.Messages[i]
-		if lastUser == "" && msg.Role == llm.RoleUser && strings.TrimSpace(msg.Content) != "" {
-			lastUser = msg.Content
-		}
-		if lastAssistant == "" && msg.Role == llm.RoleAssistant && strings.TrimSpace(msg.Content) != "" {
-			lastAssistant = msg.Content
-		}
-		if lastUser != "" && lastAssistant != "" {
+	fallback := ""
+	for i := len(m.transcript) - 1; i >= 0; i-- {
+		if m.transcript[i].Kind == TranscriptAssistant && strings.TrimSpace(m.transcript[i].Content) != "" {
+			fallback = m.transcript[i].Content
 			break
 		}
 	}
-	if lastAssistant == "" {
-		for i := len(m.transcript) - 1; i >= 0; i-- {
-			if m.transcript[i].Kind == TranscriptAssistant && strings.TrimSpace(m.transcript[i].Content) != "" {
-				lastAssistant = m.transcript[i].Content
-				break
-			}
-		}
-	}
-	pending := term.Reason != agent.TerminalCompleted || analysis.LooksLikeIncompleteFinalAnswer(lastAssistant)
-	inspected := analysis.ExtractMentionedPaths(lastUser)
-	_ = analysis.SaveCheckpoint(analysis.Checkpoint{
-		Model:               app.ActiveModel,
-		WorkingDir:          app.ToolSettings.WorkingDir,
-		LastUserPrompt:      lastUser,
-		LastAssistantOutput: lastAssistant,
-		TerminalReason:      string(term.Reason),
-		TerminalDetail:      term.Detail,
-		PendingFinalAnswer:  pending,
-		InspectedFiles:      inspected,
-		SynthesisStage:      synthesisStage(term, pending),
-	})
+	_ = runctl.SaveRunCheckpoint(m.store.Get(), term, fallback)
 }
 
-func synthesisStage(term agent.Terminal, pending bool) string {
-	if pending {
-		return "synthesis_pending"
+// SetCompactHooks wires the PreCompact and PostCompact hook dispatcher used by
+// the idle /compact command.
+func (m *Model) SetCompactHooks(d runctl.HookDispatcher, sessionID string) {
+	m.compactHooks = d
+	m.sessionID = sessionID
+}
+
+func (m *Model) handleCompactCommand() {
+	appState := m.store.Get()
+	// Only a run that is still going can take a compact request. After its
+	// Terminal event (ActiveRun=false) the controller may not be released yet.
+	if appState.ActiveRun {
+		switch m.runs.RequestCompact() {
+		case runctl.CompactRequested:
+			m.transcript = append(m.transcript, CreateSystemItem("[Compact requested...]"))
+			return
+		case runctl.CompactPending:
+			m.transcript = append(m.transcript, CreateSystemItem("[Compact already pending]"))
+			return
+		}
 	}
-	if term.Reason == agent.TerminalCompleted {
-		return "completed"
+	deps := runctl.CompactDeps{
+		Hooks:      m.compactHooks,
+		SessionID:  m.sessionID,
+		WorkingDir: appState.ToolSettings.WorkingDir,
 	}
-	return "interrupted"
+	out := runctl.CompactConversation(context.Background(), deps, appState.Messages)
+	switch {
+	case out.Denied:
+		m.transcript = append(m.transcript, CreateSystemItem(
+			fmt.Sprintf("[Compact skipped: blocked by PreCompact hook: %s]", out.DenyReason)))
+	case out.Skipped:
+		cfg := agent.DefaultCompactionConfig()
+		m.transcript = append(m.transcript, CreateSystemItem(
+			fmt.Sprintf("[Compact skipped: not enough turns to compact (need at least %d, have %d)]",
+				cfg.MinTurns, agent.CountTurnsExported(appState.Messages))))
+	default:
+		m.store.Set(func(app state.App) state.App { return runctl.ApplyCompaction(app, out) })
+		m.transcript = append(m.transcript, CreateSystemItem(
+			fmt.Sprintf("[Compacted: %d → %d messages (emergency truncate)]", out.Before, out.After)))
+	}
 }
 
 func (m *Model) applyModelSwitchResult(result modelruntime.SwitchResult) {
@@ -1520,107 +1482,31 @@ func (m *Model) submitPrompt(input, displayInput string, preExpanded bool) tea.C
 		})
 	}
 
-	expandedInput := input
-	var expandedFiles []mentions.ResolvedFile
-	var expandedDirs []mentions.ResolvedDirectory
-	var expansionReport mentions.ExpansionReport
-	var evidencePack *agent.EvidencePackReport
-	if !preExpanded {
-		mentionStart := time.Now()
-		assemblyCfg := agent.DefaultConfig()
-		assemblyCfg.ContextMode = appState.ContextMode
-		if appState.RuntimeNumCtx > 0 {
-			assemblyCfg.NumCtx = appState.RuntimeNumCtx
-		}
-		if appState.MaxOutputTokens > 0 {
-			assemblyCfg.MaxOutputTokens = appState.MaxOutputTokens
-		}
-		packed, _, err := contextpack.BuildCurrentTurnPrompt(input, appState.ToolContext(context.Background()), assemblyCfg, agent.Input{
-			Model:           appState.ActiveModel,
-			ContextMode:     appState.ContextMode,
-			MaxOutputTokens: appState.MaxOutputTokens,
-		}, appState.Messages)
-		mentionDuration := time.Since(mentionStart)
-		if m.meter != nil {
-			m.meter.NotePendingRunStage("mention_expand", mentionDuration)
-		}
-		m.appendSlowStageNotice("mention_expand", mentionDuration)
-		if err != nil {
-			var tooLarge contextpack.ErrEvidenceTooLarge
-			if errors.As(err, &tooLarge) {
-				largest := ""
-				if len(tooLarge.Largest) > 0 {
-					largest = fmt.Sprintf(" Largest omitted: %s.", tooLarge.Largest[0].Path)
-				}
-				m.transcript = append(m.transcript, CreateSystemItem(fmt.Sprintf("[Context too large: %d files exceed the current context budget after packing.%s %s.]", tooLarge.ReferencedFiles, largest, tooLarge.SplitHint)))
-				m.refreshViewportContent(true)
-				return nil
-			}
-			m.transcript = append(m.transcript, CreateSystemItem("[Mention error] "+err.Error()))
-			m.refreshViewportContent(true)
-			return nil
-		}
-		expandedInput = packed.Prompt
-		expandedFiles = packed.Files
-		expandedDirs = packed.Dirs
-		expansionReport = packed.ExpansionReport
-		rep := packed.PackReport
-		evidencePack = &rep
+	assemblyCfg := agent.DefaultConfig()
+	assemblyCfg.ContextMode = appState.ContextMode
+	if appState.RuntimeNumCtx > 0 {
+		assemblyCfg.NumCtx = appState.RuntimeNumCtx
 	}
-	explicitPaths := analysis.ExtractMentionedPaths(displayInput)
-	currentTurnPaths := make([]string, 0, len(expandedFiles))
-	for _, f := range expandedFiles {
-		if strings.TrimSpace(f.Path) == "" {
-			continue
-		}
-		currentTurnPaths = append(currentTurnPaths, f.Path)
+	if appState.MaxOutputTokens > 0 {
+		assemblyCfg.MaxOutputTokens = appState.MaxOutputTokens
 	}
-	currentTurnDirs := make([]string, 0, len(expandedDirs))
-	for _, d := range expandedDirs {
-		if strings.TrimSpace(d.Path) == "" {
-			continue
-		}
-		currentTurnDirs = append(currentTurnDirs, d.Path)
-	}
-	routeCfg := semanticRouteConfig(m.semanticConfig, m.semanticService != nil)
-	indexKnown, hasIndex, indexCompatible := m.semanticRouteIndexStatus(appState.ToolSettings.WorkingDir)
-	routeDecision := retrievalroute.Decide(retrievalroute.Input{
-		RawPrompt:            displayInput,
-		ShouldQuery:          true,
-		AttachmentPolicy:     string(expansionReport.Intent.AttachmentPolicy),
-		CurrentTurnPaths:     currentTurnPaths,
-		CurrentTurnDirs:      currentTurnDirs,
-		AttachedFileCount:    len(expandedFiles),
-		AttachedContextBytes: len(expandedInput),
-		IndexKnown:           indexKnown,
-		HasIndex:             hasIndex,
-		IndexCompatible:      indexCompatible,
-		SemanticEnabled:      m.semanticService != nil && m.semanticConfig.Enabled,
-		SemanticMode:         routeCfg.Mode,
-		ForceDeep:            m.semanticDeepNext,
-		PromptIntent:         string(expansionReport.Intent.Kind),
-	}, routeCfg)
-	if m.semanticDeepNext {
-		m.semanticDeepNext = false
-	}
-
-	if routeDecision.AllowEmbedding && m.semanticService != nil {
-		semanticStart := time.Now()
-		res, err := m.semanticService.Retrieve(context.Background(), semantic.RetrieveRequest{
-			Root:                 appState.ToolSettings.WorkingDir,
-			Query:                displayInput,
-			Config:               m.semanticConfig,
-			ExplicitPaths:        explicitPaths,
-			CurrentTurnPaths:     currentTurnPaths,
-			Deadline:             routeDecision.Deadline,
-			RouteAction:          string(routeDecision.Action),
-			RouteReason:          string(routeDecision.Reason),
-			RouteProfile:         routeDecision.Profile,
-			UseCurrentPathWeight: routeDecision.UseCurrentPathWeight,
-			MaxRecords:           routeDecision.MaxRecords,
-			MaxFiles:             routeDecision.MaxFiles,
-			MaxContextBytes:      routeDecision.MaxContextBytes,
-			Observer: func(evt semantic.RetrieveStageEvent) {
+	prep, err := turnprep.Prepare(turnprep.Request{
+		Prompt:          displayInput,
+		Input:           input,
+		PreExpanded:     preExpanded,
+		ToolContext:     appState.ToolContext(context.Background()),
+		AgentConfig:     assemblyCfg,
+		Model:           appState.ActiveModel,
+		LLMProvider:     appState.LLMProvider,
+		ContextMode:     appState.ContextMode,
+		MaxOutputTokens: appState.MaxOutputTokens,
+		History:         appState.Messages,
+		Semantic:        turnprep.Semantic{Service: m.semanticService, Config: m.semanticConfig},
+		ForceDeep:       m.semanticDeepNext,
+		Grounding:       true,
+		TrimToLatest:    true,
+		Hooks: turnprep.Hooks{
+			OnSemanticStage: func(evt semantic.RetrieveStageEvent) {
 				stage := strings.TrimSpace(string(evt.Stage))
 				if stage == "" {
 					return
@@ -1634,42 +1520,60 @@ func (m *Model) submitPrompt(input, displayInput string, preExpanded bool) tea.C
 				}
 				m.appendSlowStageNotice(stageName, evt.Duration)
 			},
-		})
-		semanticDuration := time.Since(semanticStart)
+		},
+	})
+	if !preExpanded {
+		if m.meter != nil {
+			m.meter.NotePendingRunStage("mention_expand", prep.PackDuration)
+		}
+		m.appendSlowStageNotice("mention_expand", prep.PackDuration)
+	}
+	if err != nil {
+		var tooLarge contextpack.ErrEvidenceTooLarge
+		if errors.As(err, &tooLarge) {
+			largest := ""
+			if len(tooLarge.Largest) > 0 {
+				largest = fmt.Sprintf(" Largest omitted: %s.", tooLarge.Largest[0].Path)
+			}
+			m.transcript = append(m.transcript, CreateSystemItem(fmt.Sprintf("[Context too large: %d files exceed the current context budget after packing.%s %s.]", tooLarge.ReferencedFiles, largest, tooLarge.SplitHint)))
+			m.refreshViewportContent(true)
+			return nil
+		}
+		m.transcript = append(m.transcript, CreateSystemItem("[Mention error] "+err.Error()))
+		m.refreshViewportContent(true)
+		return nil
+	}
+	if m.semanticDeepNext {
+		m.semanticDeepNext = false
+	}
+	expandedInput := prep.Expanded
+	expandedFiles := prep.Files
+	expandedDirs := prep.Dirs
+	expansionReport := prep.ExpansionReport
+	evidencePack := prep.Input.EvidencePack
+	if prep.Semantic.Attempted {
+		semanticDuration := prep.Semantic.Duration
 		if m.meter != nil {
 			m.meter.NotePendingRunStage("semantic_retrieve", semanticDuration)
 		}
 		m.appendSlowStageNotice("semantic_retrieve", semanticDuration)
-		switch {
-		case err == nil && res.Used:
-			expandedInput = strings.TrimRight(expandedInput, "\n") + "\n\n" + strings.TrimSpace(res.RenderedContext)
+		switch prep.Semantic.Kind {
+		case turnprep.SemanticUsed:
+			res := prep.Semantic.Result
 			m.transcript = append(m.transcript, CreateSystemItem(
 				fmt.Sprintf("[Semantic retrieval: records=%d files=%d stale_dropped=%d context=%d bytes]",
 					len(res.Records), len(res.Files), res.StaleDropped, res.ContextBytes),
 			))
-		case err != nil && semantic.IsFallbackError(err):
-			m.transcript = append(m.transcript, CreateSystemItem("[Semantic retrieval fallback] "+err.Error()))
-		case err != nil:
-			m.transcript = append(m.transcript, CreateSystemItem("[Semantic retrieval error] "+err.Error()))
-		case res.FallbackReason != "":
-			m.transcript = append(m.transcript, CreateSystemItem("[Semantic retrieval fallback] "+res.FallbackReason))
+		case turnprep.SemanticFallback:
+			m.transcript = append(m.transcript, CreateSystemItem("[Semantic retrieval fallback] "+prep.Semantic.Reason))
+		case turnprep.SemanticError:
+			m.transcript = append(m.transcript, CreateSystemItem("[Semantic retrieval error] "+prep.Semantic.Err.Error()))
 		}
 	}
 
-	userMessage := llm.Message{
-		Role:    llm.RoleUser,
-		Content: expandedInput,
-	}
-	updatedMessages := append(append([]llm.Message(nil), appState.Messages...), userMessage)
-	historyPolicy := agent.HistoryPolicyDefault
-	if expansionReport.Intent.AttachmentPolicy == mentions.AttachListingTreeOnly ||
-		expansionReport.Intent.Kind == mentions.IntentFileStatus {
-		historyPolicy = agent.HistoryPolicyLatestOnly
-	}
-	runMessages := updatedMessages
-	if historyPolicy == agent.HistoryPolicyLatestOnly {
-		runMessages = []llm.Message{userMessage}
-	}
+	updatedMessages := prep.Messages
+	historyPolicy := prep.Input.HistoryPolicy
+	runMessages := prep.Input.Messages
 
 	m.transcript = append(m.transcript, CreateUserItem(displayInput))
 	if summary := directoryExpansionSummary(expandedFiles, expandedDirs); summary != "" {
@@ -1711,7 +1615,7 @@ func (m *Model) submitPrompt(input, displayInput string, preExpanded bool) tea.C
 	}
 	m.refreshViewportContent(true)
 
-	if appState.ActiveRun {
+	if appState.ActiveRun || m.runs.Active() {
 		m.store.Set(func(app state.App) state.App {
 			app.QueuedPrompts = append(app.QueuedPrompts, expandedInput)
 			app.Messages = updatedMessages
@@ -1730,15 +1634,18 @@ func (m *Model) submitPrompt(input, displayInput string, preExpanded bool) tea.C
 	})
 	m.activeRunKind = "main"
 
-	runCtx, cancel := context.WithCancel(context.Background())
-	parentAbort := make(chan struct{})
-	go func() {
-		<-runCtx.Done()
-		close(parentAbort)
-	}()
-	m.activeRunCtx = runCtx
-	m.cancelRun = cancel
-	m.compactCh = make(chan struct{}, 1)
+	run, err := m.runs.BeginKind(context.Background(), runctl.KindMain)
+	if err != nil {
+		m.store.Set(func(app state.App) state.App {
+			app.ActiveRun = false
+			return app
+		})
+		m.transcript = append(m.transcript, CreateSystemItem("[Error: a run is already active]"))
+		m.refreshViewportContent(true)
+		return nil
+	}
+	m.currentRun = run
+	runCtx := run.Ctx
 	m.runStartedAt = time.Now()
 	m.firstStreamAt = time.Time{}
 	m.firstRenderSet = false
@@ -1752,28 +1659,14 @@ func (m *Model) submitPrompt(input, displayInput string, preExpanded bool) tea.C
 			})
 		}
 	}
-	agentInput := agent.Input{
-		Model:            appState.ActiveModel,
-		LLMProvider:      appState.LLMProvider,
-		Messages:         runMessages,
-		ToolContext:      appState.ToolContext(runCtx),
-		ContextMode:      appState.ContextMode,
-		PromptIntent:     string(expansionReport.Intent.Kind),
-		AttachmentPolicy: string(expansionReport.Intent.AttachmentPolicy),
-		OriginalUserText: displayInput,
-		HistoryPolicy:    historyPolicy,
-		ToolMode:         string(routeDecision.ToolMode),
-		RouteAction:      string(routeDecision.Action),
-		RouteReason:      string(routeDecision.Reason),
-		RouteProfile:     routeDecision.RequestProfile,
-		EvidencePack:     evidencePack,
-		PermissionMode:   appState.PermissionMode,
-		PermissionRules:  appState.PermissionRules,
-		PermissionPrompt: m.broker.PromptFunc(),
-		ParentAbort:      parentAbort,
-		CompactRequest:   m.compactCh,
-		MaxOutputTokens:  appState.MaxOutputTokens,
-	}
+	agentInput := prep.Input
+	agentInput.Messages = runMessages
+	agentInput.ToolContext = appState.ToolContext(runCtx)
+	agentInput.PermissionMode = appState.PermissionMode
+	agentInput.PermissionRules = appState.PermissionRules
+	agentInput.PermissionPrompt = m.broker.PromptFunc()
+	agentInput.ParentAbort = run.ParentAbort
+	agentInput.CompactRequest = run.CompactRequest
 
 	runCmd := startAgentCmd(runCtx, m.agent, agentInput, func(msg tea.Msg) {
 		if m.program != nil {
@@ -2588,15 +2481,18 @@ func (m *Model) refreshFileIndexCmd(source string) tea.Cmd {
 // app.Messages and the visible transcript when it was queued.
 func (m *Model) startQueuedPrompt() tea.Cmd {
 	appState := m.store.Get()
-	runCtx, cancel := context.WithCancel(context.Background())
-	parentAbort := make(chan struct{})
-	go func() {
-		<-runCtx.Done()
-		close(parentAbort)
-	}()
-	m.activeRunCtx = runCtx
-	m.cancelRun = cancel
-	m.compactCh = make(chan struct{}, 1)
+	run, err := m.runs.BeginKind(context.Background(), runctl.KindMain)
+	if err != nil {
+		m.store.Set(func(app state.App) state.App {
+			app.ActiveRun = false
+			return app
+		})
+		m.transcript = append(m.transcript, CreateSystemItem("[Error: a run is already active]"))
+		m.refreshViewportContent(true)
+		return nil
+	}
+	m.currentRun = run
+	runCtx := run.Ctx
 	m.runStartedAt = time.Now()
 	m.firstStreamAt = time.Time{}
 	m.firstRenderSet = false
@@ -2613,8 +2509,8 @@ func (m *Model) startQueuedPrompt() tea.Cmd {
 		PermissionMode:   appState.PermissionMode,
 		PermissionRules:  appState.PermissionRules,
 		PermissionPrompt: m.broker.PromptFunc(),
-		ParentAbort:      parentAbort,
-		CompactRequest:   m.compactCh,
+		ParentAbort:      run.ParentAbort,
+		CompactRequest:   run.CompactRequest,
 		MaxOutputTokens:  appState.MaxOutputTokens,
 	}
 	if len(agentInput.Messages) > 0 {
@@ -2635,15 +2531,18 @@ func (m *Model) startQueuedPrompt() tea.Cmd {
 
 func (m *Model) startBTWPrompt(question string) tea.Cmd {
 	appState := m.store.Get()
-	runCtx, cancel := context.WithCancel(context.Background())
-	parentAbort := make(chan struct{})
-	go func() {
-		<-runCtx.Done()
-		close(parentAbort)
-	}()
-	m.activeRunCtx = runCtx
-	m.cancelRun = cancel
-	m.compactCh = make(chan struct{}, 1)
+	run, err := m.runs.BeginKind(context.Background(), runctl.KindSide)
+	if err != nil {
+		m.store.Set(func(app state.App) state.App {
+			app.ActiveRun = false
+			return app
+		})
+		m.transcript = append(m.transcript, CreateSystemItem("[Error: a run is already active]"))
+		m.refreshViewportContent(true)
+		return nil
+	}
+	m.currentRun = run
+	runCtx := run.Ctx
 	m.runStartedAt = time.Now()
 	m.firstStreamAt = time.Time{}
 	m.firstRenderSet = false
@@ -2665,8 +2564,8 @@ func (m *Model) startBTWPrompt(question string) tea.Cmd {
 		PermissionMode:   permissions.ModePlan,
 		PermissionRules:  appState.PermissionRules,
 		PermissionPrompt: m.broker.PromptFunc(),
-		ParentAbort:      parentAbort,
-		CompactRequest:   m.compactCh,
+		ParentAbort:      run.ParentAbort,
+		CompactRequest:   run.CompactRequest,
 		MaxOutputTokens:  appState.MaxOutputTokens,
 	}
 	return startAgentCmd(runCtx, m.agent, agentInput, func(msg tea.Msg) {
@@ -2701,7 +2600,7 @@ func (m *Model) handleBTWCommand(args []string) tea.Cmd {
 		m.refreshViewportContent(true)
 		return nil
 	}
-	if m.store.Get().ActiveRun {
+	if m.store.Get().ActiveRun || m.runs.Active() {
 		m.pendingBTW = question
 		m.transcript = append(m.transcript, CreateSystemItem("[BTW] queued. It will run after the active run finishes."))
 		m.refreshViewportContent(true)
@@ -2766,50 +2665,6 @@ func (m *Model) handleSemanticCommand(args []string) tea.Cmd {
 	}
 	m.refreshViewportContent(true)
 	return nil
-}
-
-func semanticRouteConfig(cfg semantic.Config, hasService bool) retrievalroute.Config {
-	mode := strings.ToLower(strings.TrimSpace(cfg.Mode))
-	if mode == "" {
-		mode = "auto"
-	}
-	if !cfg.Enabled || !hasService {
-		mode = "off"
-	}
-	return retrievalroute.Config{
-		Mode: mode,
-		Light: retrievalroute.Limits{
-			MaxRecords:      cfg.LightTopKRecords,
-			MaxFiles:        cfg.LightTopKFiles,
-			MaxContextBytes: cfg.LightMaxContextBytes,
-			Deadline:        time.Duration(cfg.LightDeadlineMS) * time.Millisecond,
-		},
-		Full: retrievalroute.Limits{
-			MaxRecords:      cfg.FullTopKRecords,
-			MaxFiles:        cfg.FullTopKFiles,
-			MaxContextBytes: cfg.FullMaxContextBytes,
-			Deadline:        time.Duration(cfg.FullDeadlineMS) * time.Millisecond,
-		},
-		Deep: retrievalroute.Limits{
-			MaxRecords:      cfg.DeepTopKRecords,
-			MaxFiles:        cfg.DeepTopKFiles,
-			MaxContextBytes: cfg.DeepMaxContextBytes,
-			Deadline:        time.Duration(cfg.DeepDeadlineMS) * time.Millisecond,
-		},
-	}
-}
-
-func (m *Model) semanticRouteIndexStatus(root string) (known, exists, compatible bool) {
-	if m == nil || m.semanticService == nil || !m.semanticConfig.Enabled {
-		return false, false, false
-	}
-	ctx, cancel := context.WithTimeout(context.Background(), 250*time.Millisecond)
-	defer cancel()
-	status, err := m.semanticService.Status(ctx, root)
-	if err != nil {
-		return false, false, false
-	}
-	return true, status.Exists, status.Compatible
 }
 
 func (m *Model) handleIndexCommand(args []string) tea.Cmd {
@@ -3197,7 +3052,7 @@ func (m *Model) transcriptMutationSignature() uint64 {
 		sig *= prime
 		sig ^= boolToUint64(item.Streaming)
 		sig *= prime
-		sig ^= uint64(item.CharCount)
+		sig ^= uint64(item.CharCount) // #nosec G115 -- hash input; wraparound is harmless
 		sig *= prime
 		sig = hashStringSample(sig, item.Content)
 		sig = hashStringSample(sig, item.Error)
@@ -3765,7 +3620,7 @@ func (m *Model) handleMemoryEdit(args []string) tea.Cmd {
 	if editor == "" {
 		editor = "vi"
 	}
-	cmd := exec.Command(editor, path)
+	cmd := exec.Command(editor, path) // #nosec G204 G702 -- runs the user's own $EDITOR on a memory file
 	return tea.ExecProcess(cmd, func(err error) tea.Msg {
 		return memoryEditDoneMsg{Path: path, Err: err}
 	})

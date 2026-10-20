@@ -96,7 +96,10 @@ func (t *Tool) CheckPermissions(ctx tools.Context, input any) tools.PermissionRe
 }
 
 func (t *Tool) Call(ctx tools.Context, input any, _ chan<- tools.ProgressEvent) (tools.Result, error) {
-	in := input.(Input)
+	in, ok := input.(Input)
+	if !ok {
+		return tools.Result{}, fmt.Errorf("sendmessage: unexpected input type %T", input)
+	}
 	if in.WaitForReply {
 		return tools.Result{}, ErrNotSupported
 	}

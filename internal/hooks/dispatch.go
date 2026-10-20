@@ -26,12 +26,21 @@ func NewDispatcher(snapshot Snapshot, client llm.Client, cfg Config) *Dispatcher
 const parallelHookLimit = 4
 
 func (d *Dispatcher) Dispatch(ctx context.Context, env Envelope) Result {
+	results := d.dispatchAll(ctx, env)
+	if len(results) == 0 {
+		return Result{}
+	}
+	return aggregate(results)
+}
+
+// dispatchAll runs every matching hook and returns each hook's own result.
+func (d *Dispatcher) dispatchAll(ctx context.Context, env Envelope) []Result {
 	d.mu.RLock()
 	snap := d.Snapshot
 	d.mu.RUnlock()
 	hooks := matchingHooks(snap, env)
 	if len(hooks) == 0 {
-		return Result{}
+		return nil
 	}
 	results := make([]Result, len(hooks))
 	parallelIdx := make([]int, 0, len(hooks))
@@ -43,7 +52,7 @@ func (d *Dispatcher) Dispatch(ctx context.Context, env Envelope) Result {
 		results[i] = d.runHook(ctx, h, env)
 	}
 	if len(parallelIdx) == 0 {
-		return aggregate(results)
+		return results
 	}
 	g, groupCtx := errgroup.WithContext(ctx)
 	g.SetLimit(parallelHookLimit)
@@ -56,7 +65,7 @@ func (d *Dispatcher) Dispatch(ctx context.Context, env Envelope) Result {
 		})
 	}
 	_ = g.Wait()
-	return aggregate(results)
+	return results
 }
 
 func (d *Dispatcher) runHook(ctx context.Context, h Hook, env Envelope) Result {

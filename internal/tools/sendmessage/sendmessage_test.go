@@ -170,3 +170,15 @@ func TestSendMessageTerminalTaskCallsResume(t *testing.T) {
 		t.Fatalf("unexpected display: %q", res.Display)
 	}
 }
+
+func TestSendMessageCallRejectsWrongInputTypeWithoutPanic(t *testing.T) {
+	tool := New(tasks.NewSupervisor(filepath.Join(t.TempDir(), "tasks"), nil), nil)
+	defer func() {
+		if r := recover(); r != nil {
+			t.Fatalf("Call panicked on wrong input type: %v", r)
+		}
+	}()
+	if _, err := tool.Call(tools.Context{}, "not an Input", nil); err == nil {
+		t.Fatal("expected an error for a wrong input type")
+	}
+}

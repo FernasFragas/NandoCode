@@ -66,7 +66,7 @@ flowchart TD
     RetrievalRoute[internal/retrievalroute<br/>semantic/local routing]
     Semantic[internal/semantic<br/>index, retrieve, render]
     Analysis[internal/analysis<br/>project analysis + checkpoints]
-    FileIndex[internal/tui/fileindex<br/>frecency file picker]
+    FileIndex[internal/fileindex<br/>frecency file picker]
   end
 
   subgraph ToolsStack["Tools + Permission Stack"]

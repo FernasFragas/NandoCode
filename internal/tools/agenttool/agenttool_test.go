@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"path/filepath"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -13,6 +14,7 @@ import (
 	"github.com/FernasFragas/Nandocode/internal/permissions"
 	"github.com/FernasFragas/Nandocode/internal/tasks"
 	"github.com/FernasFragas/Nandocode/internal/tools"
+	"github.com/FernasFragas/Nandocode/internal/types"
 )
 
 type fakeLLM struct{}
@@ -157,5 +159,118 @@ func TestWrapPermissionPromptTimeoutReturnsDeny(t *testing.T) {
 	}
 	if !strings.Contains(reason, "timeout") {
 		t.Fatalf("reason = %q", reason)
+	}
+}
+
+func TestCoordinatorDuplicateNameLaunchesNothing(t *testing.T) {
+	t.Setenv("NANDOCODEGO_COORDINATOR", "1")
+	tool := New(&fakeLLM{}, tools.NewRegistry(), agent.DefaultConfig(), "s1", func() string { return "llama2" }, func() string { return string(llm.ProviderOllamaLocal) })
+	sup := tasks.NewSupervisor(filepath.Join(t.TempDir(), "tasks"), nil)
+	tool.SetSupervisor(sup)
+	release := make(chan struct{})
+	defer close(release)
+	holder, err := sup.Start(context.Background(), types.KindAgent, "holder", func(context.Context, *tasks.OutputWriter) (int, error) {
+		<-release
+		return 0, nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := sup.RegisterName("dup", holder); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := tool.Call(tools.Context{Context: context.Background()}, Input{Task: "x", Name: "dup"}, nil); err == nil {
+		t.Fatal("expected duplicate-name error")
+	}
+	agents := 0
+	for _, st := range sup.List() {
+		if st.ToSummary().Kind == types.KindAgent {
+			agents++
+		}
+	}
+	if agents != 1 {
+		t.Fatalf("a rejected launch left %d agent tasks, want only the holder", agents-1)
+	}
+	if got := sup.WorkerSnapshots(); len(got) != 0 {
+		t.Fatalf("rejected launch was announced: %+v", got)
+	}
+}
+
+func TestNormalSubagentEmitsWorkerEvents(t *testing.T) {
+	tool := New(&fakeLLM{}, tools.NewRegistry(), agent.DefaultConfig(), "s1", func() string { return "llama2" }, func() string { return string(llm.ProviderOllamaLocal) })
+	sup := tasks.NewSupervisor(filepath.Join(t.TempDir(), "tasks"), nil)
+	tool.SetSupervisor(sup)
+	var mu sync.Mutex
+	var seen []string
+	finished := make(chan struct{})
+	sup.SetWorkerObserver(func(e tasks.WorkerEvent) {
+		mu.Lock()
+		seen = append(seen, e.Type)
+		mu.Unlock()
+		if e.Type == "finished" {
+			close(finished)
+		}
+	})
+	if _, err := tool.Call(tools.Context{Context: context.Background()}, Input{Task: "x", Model: "m"}, nil); err != nil {
+		t.Fatal(err)
+	}
+	select {
+	case <-finished:
+	case <-time.After(3 * time.Second):
+		mu.Lock()
+		defer mu.Unlock()
+		t.Fatalf("no finished event; events=%v", seen)
+	}
+	mu.Lock()
+	defer mu.Unlock()
+	if len(seen) < 3 || seen[0] != "started" || seen[len(seen)-1] != "finished" {
+		t.Fatalf("events=%v", seen)
+	}
+	hasUsage := false
+	for _, e := range seen {
+		hasUsage = hasUsage || e == "usage"
+	}
+	if !hasUsage {
+		t.Fatalf("no usage event: %v", seen)
+	}
+	snaps := sup.WorkerSnapshots()
+	if len(snaps) != 1 || snaps[0].Parent != "main" || snaps[0].Task != "x" {
+		t.Fatalf("snapshots=%+v", snaps)
+	}
+}
+
+func TestNormalSubagentPanicReturnsErrorAndFinishesOnce(t *testing.T) {
+	orig := runSubagentFn
+	runSubagentFn = func(context.Context, agent.Input, agent.SubagentParams, llm.Client, *tools.Registry, agent.Config) (string, error) {
+		panic("boom")
+	}
+	defer func() { runSubagentFn = orig }()
+	tool := New(&fakeLLM{}, tools.NewRegistry(), agent.DefaultConfig(), "s1", func() string { return "llama2" }, func() string { return string(llm.ProviderOllamaLocal) })
+	sup := tasks.NewSupervisor(filepath.Join(t.TempDir(), "tasks"), nil)
+	tool.SetSupervisor(sup)
+	var mu sync.Mutex
+	var statuses []types.TaskStatus
+	finished := make(chan struct{}, 4)
+	sup.SetWorkerObserver(func(e tasks.WorkerEvent) {
+		if e.Type == "finished" {
+			mu.Lock()
+			statuses = append(statuses, e.Worker.Status)
+			mu.Unlock()
+			finished <- struct{}{}
+		}
+	})
+	res, err := tool.Call(tools.Context{Context: context.Background()}, Input{Task: "x", Model: "m"}, nil)
+	if err == nil || !strings.Contains(err.Error(), "sub-agent failed") {
+		t.Fatalf("want sub-agent failed error, got res=%q err=%v", res.Display, err)
+	}
+	select {
+	case <-finished:
+	case <-time.After(3 * time.Second):
+		t.Fatal("no finished event")
+	}
+	mu.Lock()
+	defer mu.Unlock()
+	if len(statuses) != 1 || statuses[0] != types.StatusFailed {
+		t.Fatalf("finished statuses=%v", statuses)
 	}
 }

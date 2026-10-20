@@ -25,6 +25,8 @@ jobs:
   go:
     name: Go Build & Test
     strategy:
+      # Report every OS so one failure does not hide the others.
+      fail-fast: false
       matrix:
         os: [ubuntu-latest, macos-latest, windows-latest]
     runs-on: ${{ matrix.os }}
@@ -118,3 +120,18 @@ jobs:
         with:
           name: eval-deterministic
           path: .tmp-evals/ci
+
+  browser-js:
+    name: Browser JS Tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+
+      - name: Set up Node
+        uses: actions/setup-node@v6
+        with:
+          node-version: '22.12.0'
+
+      - name: Run node tests
+        run: node --test 'internal/server/web/js/**/*.test.js' 'internal/server/web/dev/*.test.js'

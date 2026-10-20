@@ -4,15 +4,12 @@ Date: 2026-05-03
 Status: Core implementation landed; manual exit-gate validation pending
 Source plans and references:
 
-- `.codex/go-ollama-plan-AGENTS.md`
-- `.codex/go-ollama-plan-HUMANS.md`
 - `docs/phases/PHASE-LOG.md`
 - `docs/roadmap/PROJECT-STATUS-AND-ONBOARDING.md`
 - `docs/phases/PHASE-8-DETAILED-PLAN.md`
 - `book/ch09-permissions.md`
 - `book/ch12-extensibility.md`
 - `book/ch13-terminal-ui.md`
-- `.codex/agent-context/learnings-memory.md`
 
 ## Goal
 

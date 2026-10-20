@@ -1,0 +1,21 @@
+.bv-agents-tab { min-height: 100%; color: var(--text); }
+.bv-agents-tab__body { min-height: 100%; }
+.bv-agents-tab__header { display: flex; align-items: center; gap: var(--sp-3); padding: var(--sp-3) var(--sp-4); border-bottom: 1px solid var(--border); }
+.bv-agents-tab__header h2 { margin: 0; flex: 1; font-size: var(--fs-lg); }
+.bv-agents-tab__header button, .bv-agents-tab__filters button { padding: 5px var(--sp-3); border: 1px solid var(--border); border-radius: var(--r-md); color: var(--text); background: var(--card); }
+.bv-agents-tab__header button:hover, .bv-agents-tab__filters button:hover, .bv-agents-tab__filters [aria-pressed="true"] { border-color: var(--primary); background: var(--primary-soft); }
+.bv-agents-tab__running { padding: 2px var(--sp-2); border-radius: var(--r-pill); color: var(--info); background: var(--chip); font-size: var(--fs-xs); }
+.bv-agents-tab__filters { display: flex; flex-wrap: wrap; gap: var(--sp-2); padding: var(--sp-2) var(--sp-4); }
+.bv-agents-tab__logs { padding: var(--sp-2) var(--sp-4); }
+.bv-agents__graph { display: flex; flex-direction: column; align-items: center; }
+.bv-agents__root { display: flex; align-items: center; gap: var(--sp-2); padding: var(--sp-2) var(--sp-4); border: 1px solid var(--primary); border-radius: var(--r-lg); background: var(--card); }
+.bv-agents__connectors { width: min(100%, 520px); height: 32px; color: var(--border); }
+.bv-agents__nodes { display: flex; flex-wrap: wrap; justify-content: center; gap: var(--sp-3); width: 100%; }
+.bv-agents__graph .bv-agg-node { margin-top: var(--sp-3); }
+@media (max-width: 900px) { .bv-agents { grid-template-columns: 1fr; grid-template-areas: "list" "graph" "log"; } }
+.bv-subagent-card { align-self: stretch; margin: var(--sp-2) var(--sp-4); padding: var(--sp-3); border: 1px solid var(--border); border-left: 3px solid var(--agent-1); border-radius: var(--r-md); background: var(--card); }
+.bv-subagent-card__head { display: flex; gap: var(--sp-2); align-items: center; }
+.bv-subagent-card__status { color: var(--text-muted); font-size: var(--fs-xs); }
+.bv-subagent-card__task { margin: var(--sp-1) 0 0; color: var(--text-muted); }
+.bv-subagent-card__children { margin-top: var(--sp-2); padding-left: var(--sp-3); border-left: 1px solid var(--border); }
+.bv-agents__group { display: flex; flex-direction: column; align-items: center; width: 100%; }

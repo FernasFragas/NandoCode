@@ -8,7 +8,7 @@ import (
 	"testing"
 
 	"github.com/FernasFragas/Nandocode/internal/commands"
-	"github.com/FernasFragas/Nandocode/internal/tui/fileindex"
+	"github.com/FernasFragas/Nandocode/internal/fileindex"
 )
 
 func TestFileProviderRanksBasenamePrefixHigher(t *testing.T) {

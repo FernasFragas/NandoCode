@@ -4,14 +4,11 @@ Date: 2026-05-07
 Status: ✅ Implemented in code and automated checks (2026-05-08); manual live REPL exit-gate still pending
 Source plans:
 
-- `.codex/go-ollama-plan-AGENTS.md`
-- `.codex/go-ollama-plan-HUMANS.md`
 - `docs/phases/PHASE-LOG.md`
 - `docs/roadmap/PROJECT-STATUS-AND-ONBOARDING.md`
 - `docs/phases/PHASE-8-DETAILED-PLAN.md`
 - `docs/phases/PHASE-9-DETAILED-PLAN.md`
 - `book/ch12-extensibility.md`
-- `.codex/agent-context/learnings-memory.md`
 
 ## Goal
 

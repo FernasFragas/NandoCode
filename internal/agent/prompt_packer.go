@@ -57,6 +57,11 @@ func packPromptHistory(history []llm.Message, inputBudgetTokens int) packResult 
 		}
 	}
 
+	// An assistant message with tool calls and the tool results that answer
+	// it form one unit: they are kept or dropped together, because a tool
+	// result without its call (or the reverse) is an invalid conversation.
+	units := toolPairUnits(history)
+
 	included := map[int]struct{}{}
 	used := 0
 	forced := false
@@ -67,24 +72,39 @@ func packPromptHistory(history []llm.Message, inputBudgetTokens int) packResult 
 		used += estimated[0].tokens
 	}
 
-	// Fill from newest to oldest to keep recency.
-	for i := len(history) - 1; i >= 0; i-- {
-		if _, ok := included[i]; ok {
-			continue
+	unitTokens := func(u packUnit) int {
+		n := 0
+		for i := u.start; i < u.end; i++ {
+			n += estimated[i].tokens
 		}
-		toks := estimated[i].tokens
-		if used+toks > inputBudgetTokens {
-			continue
+		return n
+	}
+	includeUnit := func(u packUnit) {
+		for i := u.start; i < u.end; i++ {
+			if _, ok := included[i]; !ok {
+				included[i] = struct{}{}
+				used += estimated[i].tokens
+			}
 		}
-		included[i] = struct{}{}
-		used += toks
 	}
 
-	// Force include most recent message so the current user turn is preserved.
+	// Fill from newest to oldest to keep recency.
+	for k := len(units) - 1; k >= 0; k-- {
+		u := units[k]
+		if _, ok := included[u.start]; ok {
+			continue
+		}
+		if used+unitTokens(u) > inputBudgetTokens {
+			continue
+		}
+		includeUnit(u)
+	}
+
+	// Force include most recent message (and its tool call, if it is a tool
+	// result) so the current turn is preserved.
 	lastIdx := len(history) - 1
 	if _, ok := included[lastIdx]; !ok {
-		included[lastIdx] = struct{}{}
-		used += estimated[lastIdx].tokens
+		includeUnit(units[len(units)-1])
 		forced = true
 	}
 
@@ -147,4 +167,25 @@ func mentionBlockCount(content string) int {
 		return 0
 	}
 	return strings.Count(content, "<file ") + strings.Count(content, "<directory ")
+}
+
+// packUnit is a half-open range [start, end) of history that must be kept or
+// dropped as a whole.
+type packUnit struct{ start, end int }
+
+// toolPairUnits splits history into units: an assistant message with tool
+// calls plus the tool messages that directly follow it, or a single message.
+func toolPairUnits(history []llm.Message) []packUnit {
+	var units []packUnit
+	for i := 0; i < len(history); {
+		end := i + 1
+		if history[i].Role == llm.RoleAssistant && len(history[i].ToolCalls) > 0 {
+			for end < len(history) && history[end].Role == llm.RoleTool {
+				end++
+			}
+		}
+		units = append(units, packUnit{start: i, end: end})
+		i = end
+	}
+	return units
 }

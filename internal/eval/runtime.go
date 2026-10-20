@@ -10,6 +10,7 @@ import (
 
 	"github.com/FernasFragas/Nandocode/internal/agent"
 	"github.com/FernasFragas/Nandocode/internal/bootstrap"
+	"github.com/FernasFragas/Nandocode/internal/bootstrap/applyconfig"
 	"github.com/FernasFragas/Nandocode/internal/config"
 	"github.com/FernasFragas/Nandocode/internal/credentials"
 	"github.com/FernasFragas/Nandocode/internal/llm"
@@ -19,6 +20,7 @@ import (
 	"github.com/FernasFragas/Nandocode/internal/permissions"
 	"github.com/FernasFragas/Nandocode/internal/tools"
 	"github.com/FernasFragas/Nandocode/internal/tools/builtin"
+	"github.com/FernasFragas/Nandocode/internal/turnprep"
 )
 
 const evaluatorSystemPrompt = `You are evaluating whether you can complete a coding task correctly.
@@ -119,22 +121,8 @@ func buildLiveClient(ctx context.Context, opts RunOptions) (string, llm.Client, 
 	if err != nil {
 		return "", nil, liveRuntimeConfig{}, fmt.Errorf("load config: %w", err)
 	}
-	initial.DefaultModel = cfgRes.Config.DefaultModel
-	initial.OllamaBaseURL = cfgRes.Config.OllamaBaseURL
-	initial.LLMBaseURL = cfgRes.Config.OllamaBaseURL
-	initial.OllamaCloudEnabled = cfgRes.Config.OllamaCloudEnabled
-	initial.KeepAlive = cfgRes.Config.ChatKeepAlive
-	initial.LLMStreamIdleTimeout = cfgRes.Config.LLMStreamIdleTimeout
-	initial.CloudLLMStreamIdleTimeout = cfgRes.Config.CloudLLMStreamIdleTimeout
-	initial.MaxTurns = cfgRes.Config.MaxTurns
-	initial.MaxConcurrentTools = cfgRes.Config.MaxConcurrentTools
-	if opts.Model != "" {
-		initial.DefaultModel = opts.Model
-	}
-	if opts.OllamaURL != "" {
-		initial.OllamaBaseURL = opts.OllamaURL
-		initial.LLMBaseURL = opts.OllamaURL
-	}
+	applyconfig.ApplyConfig(&initial, cfgRes.Config, cfgRes.Sources.SlowStageNoticeThreshold)
+	bootstrap.ApplyOverrides(&initial, bootstrap.Overrides{Model: opts.Model, OllamaURL: opts.OllamaURL})
 	localClient := ollama.NewClient(initial.OllamaBaseURL)
 	runtimeClient := llm.NewRuntimeClient(localClient, llm.ProviderOllamaLocal, initial.OllamaBaseURL)
 	modelRuntimeSvc := &modelruntime.Service{
@@ -176,24 +164,33 @@ func stringPtrOrNil(s string) *string {
 	return &s
 }
 
-func buildAgentInput(ctx context.Context, fixture Fixture, workspaceDir string, cfg ScoringConfig, model string) (agent.Input, permissions.PromptFunc) {
+func buildAgentInput(ctx context.Context, fixture Fixture, workspaceDir string, cfg ScoringConfig, model string) (agent.Input, permissions.PromptFunc, error) {
 	toolCtx := tools.DefaultContext(ctx, workspaceDir)
 	toolCtx.PermissionMode = permissions.ToToolsMode(permissions.Mode(cfg.Execution.PermissionMode).Normalize())
 	toolCtx.Env = os.Environ()
 	promptFunc := permissionPromptFor(cfg.Execution.ApprovalStrategy)
-	input := agent.Input{
-		Model:        model,
-		SystemPrompt: evaluatorSystemPrompt,
-		Messages: []llm.Message{
-			{Role: llm.RoleUser, Content: fixture.Task},
-		},
-		ToolContext:      toolCtx,
-		PermissionMode:   permissions.Mode(cfg.Execution.PermissionMode).Normalize(),
-		PermissionRules:  permissions.Rules{},
-		PermissionPrompt: promptFunc,
-		MaxOutputTokens:  8192,
+	// The task goes through turnprep like every other surface, but verbatim:
+	// no mention packing and no routing, so recordings stay stable and the
+	// evaluator keeps every tool.
+	prep, err := turnprep.Prepare(turnprep.Request{
+		Ctx:             ctx,
+		Prompt:          fixture.Task,
+		PreExpanded:     true,
+		ToolContext:     toolCtx,
+		Model:           model,
+		MaxOutputTokens: 8192,
+		SystemPrompt:    evaluatorSystemPrompt,
+		Grounding:       true,
+		Routing:         turnprep.RoutingNone,
+	})
+	if err != nil {
+		return agent.Input{}, nil, err
 	}
-	return input, promptFunc
+	input := prep.Input
+	input.PermissionMode = permissions.Mode(cfg.Execution.PermissionMode).Normalize()
+	input.PermissionRules = permissions.Rules{}
+	input.PermissionPrompt = promptFunc
+	return input, promptFunc, nil
 }
 
 func permissionPromptFor(strategy ApprovalStrategy) permissions.PromptFunc {

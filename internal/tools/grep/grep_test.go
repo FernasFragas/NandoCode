@@ -206,3 +206,36 @@ func TestGrep_EmptyFile(t *testing.T) {
 		t.Errorf("expected no matches in empty file, got %d", len(out.Matches))
 	}
 }
+
+func TestGrep_LongLineDoesNotHideLaterMatches(t *testing.T) {
+	dir := t.TempDir()
+	long := strings.Repeat("x", 70*1024)
+	writeFile(t, dir, "a.txt", "first needle\n"+long+"\nlast needle\n")
+
+	res, err := NewGrepTool().Call(makeCtx(t, dir), Input{Pattern: "needle"}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	out := res.Data.(Output)
+	if len(out.Matches) != 2 || out.Matches[1].Line != 3 {
+		t.Fatalf("expected matches on lines 1 and 3 around a 70 KB line, got %+v", out.Matches)
+	}
+}
+
+func TestGrep_ExcludesNestedNodeModules(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(dir, "pkg", "node_modules", "dep"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	writeFile(t, dir, "pkg/node_modules/dep/index.js", "needle\n")
+	writeFile(t, dir, "pkg/main.js", "needle\n")
+
+	res, err := NewGrepTool().Call(makeCtx(t, dir), Input{Pattern: "needle"}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	out := res.Data.(Output)
+	if len(out.Matches) != 1 || out.Matches[0].File != "pkg/main.js" {
+		t.Fatalf("nested node_modules must be skipped, got %+v", out.Matches)
+	}
+}

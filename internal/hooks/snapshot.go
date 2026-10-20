@@ -6,7 +6,7 @@ import (
 	"os"
 	"strings"
 
-	"github.com/FernasFragas/Nandocode/internal/mcp"
+	"github.com/FernasFragas/Nandocode/internal/netguard"
 )
 
 func LoadSnapshot(opts LoadOptions) Snapshot {
@@ -27,7 +27,7 @@ func (s *Snapshot) merge(other Snapshot) {
 }
 
 func loadFile(path string, source Source, executable bool) Snapshot {
-	b, err := os.ReadFile(path)
+	b, err := os.ReadFile(path) // #nosec G304 -- hook config file from the user or project config location
 	if err != nil {
 		if os.IsNotExist(err) {
 			return Snapshot{}
@@ -50,7 +50,7 @@ func loadFile(path string, source Source, executable bool) Snapshot {
 			continue
 		}
 		if h.Kind == KindHTTP {
-			if err := mcp.ValidateHTTPDestination(h.URL, false); err != nil {
+			if err := netguard.ValidateURL(h.URL, hookPolicy(0)); err != nil {
 				reason := fmt.Sprintf("http hook destination rejected: %v", err)
 				snap.Disabled = append(snap.Disabled, DisabledHook{Hook: h, Reason: reason})
 				snap.Warnings = append(snap.Warnings, fmt.Sprintf("%s: %s %s %s", path, h.Kind, h.Event, reason))

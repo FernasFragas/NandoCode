@@ -3,6 +3,7 @@ package retrievalroute
 import (
 	"strings"
 	"time"
+	"unicode"
 )
 
 type Action string
@@ -85,7 +86,15 @@ type Decision struct {
 	StatusLabel          string
 }
 
+// Decide picks the retrieval action and, separately, the tool mode. The
+// retrieval pipeline never sets ToolModeNone; decideToolMode owns that.
 func Decide(input Input, cfg Config) Decision {
+	d := decideRetrieval(input, cfg)
+	d.ToolMode = decideToolMode(input, normalizePrompt(input), d)
+	return d
+}
+
+func decideRetrieval(input Input, cfg Config) Decision {
 	cfg = normalizeConfig(cfg)
 	prompt := normalizePrompt(input)
 	mode := strings.ToLower(strings.TrimSpace(cfg.Mode))
@@ -133,7 +142,7 @@ func Decide(input Input, cfg Config) Decision {
 	}
 
 	if !isWorkspaceDiscoveryPrompt(prompt) {
-		return skipDecision(ActionSkipAllRetrieval, ReasonSkipGeneralPrompt, "Preparing model request...", "general_prompt", ToolModeNone)
+		return skipDecision(ActionSkipAllRetrieval, ReasonSkipGeneralPrompt, "Preparing model request...", "general_prompt", ToolModeDefault)
 	}
 
 	return semanticDecision(ActionSemanticFull, ReasonRunWorkspaceDiscovery, cfg.Full, false, "full", "workspace_discovery")
@@ -242,18 +251,113 @@ func isRelatedCodePrompt(prompt string) bool {
 }
 
 func isWorkspaceDiscoveryPrompt(prompt string) bool {
-	if strings.TrimSpace(prompt) == "" {
-		return false
+	return hasCodeWord(prompt)
+}
+
+// codeWords are whole words that mark a prompt as being about the workspace.
+// Matching is by word (not substring) so "capital" does not match "api" and
+// "author" does not match "auth".
+var codeWords = wordSet(
+	"fix", "debug", "bug", "broken", "error", "failing", "failure", "panic",
+	"implement", "refactor", "code", "codebase", "repo", "repository", "workspace",
+	"project", "file", "function", "method", "class", "package", "module", "test",
+	"auth", "authentication", "handler", "service", "api", "cli", "tui",
+	"endpoint", "server", "session", "model", "route", "verify", "agent",
+	"event", "loop", "struct", "interface", "variable", "compile", "build",
+	"config", "configuration", "database", "schema", "query", "parser",
+	"middleware", "request", "response", "stack", "trace", "commit", "branch",
+	"diff", "lint", "dependency", "dependencies", "import", "library",
+)
+
+// toolWords are action verbs and shell/tool nouns. They keep tools enabled but
+// do not by themselves trigger semantic retrieval. When in doubt, keep tools.
+var toolWords = wordSet(
+	"read", "write", "edit", "update", "modify", "change", "changed", "changes",
+	"run", "execute", "delete", "remove", "rename", "move", "copy", "create",
+	"add", "show", "list", "open", "find", "search", "grep", "look", "check",
+	"summarize", "summarise", "inspect", "review", "install", "start", "stop",
+	"git", "npm", "ls", "cat", "make", "go", "docker", "bash", "shell", "sh",
+	"status", "log", "logs", "logging", "file", "folder", "directory", "dir",
+	"readme", "todo", "path", "output", "terminal", "command", "script",
+)
+
+func wordSet(words ...string) map[string]struct{} {
+	m := make(map[string]struct{}, len(words))
+	for _, w := range words {
+		m[w] = struct{}{}
 	}
-	if containsAny(prompt, []string{
-		"fix ", "debug", "bug", "broken", "error", "failing", "failure", "panic",
-		"implement", "refactor", "code", "codebase", "repo", "repository", "workspace",
-		"project", "file", "function", "method", "class", "package", "module", "test",
-		"auth", "authentication", "handler", "service", "api", "cli", "tui",
-	}) {
-		return true
+	return m
+}
+
+func hasCodeWord(prompt string) bool { return hasWordIn(prompt, codeWords) }
+
+func hasToolWord(prompt string) bool { return hasWordIn(prompt, toolWords) }
+
+func hasWordIn(prompt string, set map[string]struct{}) bool {
+	words := strings.FieldsFunc(strings.ToLower(prompt), func(r rune) bool {
+		return !unicode.IsLetter(r) && !unicode.IsDigit(r)
+	})
+	for _, w := range words {
+		if _, ok := set[w]; ok {
+			return true
+		}
+		if strings.HasSuffix(w, "s") {
+			if _, ok := set[strings.TrimSuffix(w, "s")]; ok {
+				return true
+			}
+		}
 	}
 	return false
+}
+
+// hasIdentifierToken reports whether the raw prompt contains something that
+// looks like a code identifier or path: snake_case, camelCase, a path
+// separator, a file extension, or a call such as foo().
+func hasIdentifierToken(raw string) bool {
+	for _, tok := range strings.Fields(raw) {
+		tok = strings.TrimFunc(tok, func(r rune) bool {
+			return !unicode.IsLetter(r) && !unicode.IsDigit(r) && r != '_'
+		})
+		if tok == "" {
+			continue
+		}
+		if strings.ContainsAny(tok, "_/\\") {
+			return true
+		}
+		if i := strings.LastIndex(tok, "."); i > 0 && len(tok)-i-1 >= 2 {
+			return true
+		}
+		runes := []rune(tok)
+		for i := 1; i < len(runes); i++ {
+			if unicode.IsLower(runes[i-1]) && unicode.IsUpper(runes[i]) {
+				return true
+			}
+		}
+	}
+	return strings.Contains(raw, "()")
+}
+
+// decideToolMode disables tools only for general prompts (semantic retrieval on)
+// the workspace. It is independent of whether semantic retrieval is enabled.
+// Anything with explicit context, a local command, listing, memory recall,
+// file status, code vocabulary or an identifier keeps its tools.
+func decideToolMode(input Input, prompt string, d Decision) ToolMode {
+	if !input.ShouldQuery || strings.HasPrefix(prompt, "/") || isListingIntent(input) || isMemoryRecallIntent(prompt) {
+		return ToolModeDefault
+	}
+	if input.PromptIntent == "file_status" ||
+		input.AttachedFileCount > 0 || len(input.CurrentTurnPaths) > 0 || len(input.CurrentTurnDirs) > 0 {
+		return ToolModeDefault
+	}
+	// Only the general-prompt branch (semantic retrieval on, nothing
+	// workspace-related) may disable tools.
+	if d.Reason != ReasonSkipGeneralPrompt {
+		return ToolModeDefault
+	}
+	if hasCodeWord(prompt) || hasToolWord(prompt) || isRelatedCodePrompt(prompt) || hasIdentifierToken(input.RawPrompt+" "+input.NormalizedPrompt) {
+		return ToolModeDefault
+	}
+	return ToolModeNone
 }
 
 func containsAny(s string, needles []string) bool {

@@ -3,6 +3,7 @@ package mcp
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -202,5 +203,79 @@ command = "second"
 	}
 	if len(warnings) == 0 {
 		t.Fatalf("expected duplicate section warning")
+	}
+}
+
+func TestLoadConfigProjectCannotMarkItselfTrusted(t *testing.T) {
+	t.Parallel()
+	td := t.TempDir()
+	projectPath := filepath.Join(td, "project.toml")
+	project := `
+[mcp.servers.project_one]
+enabled = true
+command = "project-cmd"
+trusted = true
+`
+	if err := os.WriteFile(projectPath, []byte(project), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	cfg, warnings := LoadConfig("", projectPath)
+	if len(cfg.Servers) != 1 {
+		t.Fatalf("expected 1 server, got %d", len(cfg.Servers))
+	}
+	if cfg.Servers[0].Trusted {
+		t.Fatalf("project config must not be able to set trusted = true")
+	}
+	found := false
+	for _, w := range warnings {
+		if strings.Contains(w, "trusted") && strings.Contains(w, projectPath) {
+			found = true
+		}
+	}
+	if !found {
+		t.Fatalf("expected a warning naming the ignored trusted key, got %v", warnings)
+	}
+}
+
+func TestLoadConfigUserCanDeclareUntrusted(t *testing.T) {
+	t.Parallel()
+	td := t.TempDir()
+	userPath := filepath.Join(td, "user.toml")
+	user := `
+[mcp.servers.user_one]
+enabled = true
+command = "user-cmd"
+trusted = false
+`
+	if err := os.WriteFile(userPath, []byte(user), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	cfg, warnings := LoadConfig(userPath, "")
+	if len(warnings) != 0 {
+		t.Fatalf("unexpected warnings: %v", warnings)
+	}
+	if cfg.Servers[0].Trusted {
+		t.Fatalf("user trusted = false must be honoured")
+	}
+}
+
+func TestParseTOMLHashInsideQuotesIsNotAComment(t *testing.T) {
+	data := `
+[mcp.servers.web]
+transport = "http"
+url = "http://localhost:11434/path#frag" # trailing comment
+`
+	cfg, warnings := parseTOML(data, "test.toml", true)
+	if len(warnings) != 0 {
+		t.Fatalf("unexpected warnings: %v", warnings)
+	}
+	if len(cfg.Servers) != 1 || cfg.Servers[0].URL != "http://localhost:11434/path#frag" {
+		t.Fatalf("URL fragment was cut at '#': %+v", cfg.Servers)
+	}
+
+	data = "[mcp.servers.s]\ncommand = \"sh\"\nargs = [\"-c\", \"echo #1\"] # note\n"
+	cfg, warnings = parseTOML(data, "test.toml", true)
+	if len(warnings) != 0 || len(cfg.Servers) != 1 || len(cfg.Servers[0].Args) != 2 || cfg.Servers[0].Args[1] != "echo #1" {
+		t.Fatalf("args with '#' mangled: %+v %v", cfg.Servers, warnings)
 	}
 }

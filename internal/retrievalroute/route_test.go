@@ -215,3 +215,66 @@ func TestDecideNoQuerySkipsAll(t *testing.T) {
 		t.Fatalf("reason=%q", d.Reason)
 	}
 }
+
+func TestDecideToolModeAndAction(t *testing.T) {
+	t.Parallel()
+	rows := []struct {
+		name         string
+		prompt       string
+		semantic     bool
+		wantAction   Action
+		wantToolMode ToolMode
+	}{
+		{"agent event loop", "explain the agent event loop", true, ActionSemanticFull, ToolModeDefault},
+		{"endpoint location", "where is the endpoint registered", true, ActionSemanticFull, ToolModeDefault},
+		{"capital is not api", "what is the capital of France", true, ActionSkipAllRetrieval, ToolModeNone},
+		{"author is not auth", "who is the author of this novel", true, ActionSkipAllRetrieval, ToolModeNone},
+		{"auth bug", "fix the authentication bug", true, ActionSemanticFull, ToolModeDefault},
+		{"weather", "how is the weather", true, ActionSkipAllRetrieval, ToolModeNone},
+		{"code question semantic off", "explain the session model", false, ActionExplicitContextOnly, ToolModeDefault},
+		{"chitchat semantic off keeps tools", "tell me a joke", false, ActionExplicitContextOnly, ToolModeDefault},
+		{"verify route handler", "verify the route handler", true, ActionSemanticFull, ToolModeDefault},
+		{"camelCase identifier", "what does parseConfig do", true, ActionSkipAllRetrieval, ToolModeDefault},
+		{"exact reply", "Respond with exactly: ok", true, ActionSkipAllRetrieval, ToolModeNone},
+	}
+	for _, row := range rows {
+		row := row
+		t.Run(row.name, func(t *testing.T) {
+			t.Parallel()
+			d := Decide(Input{RawPrompt: row.prompt, ShouldQuery: true, SemanticEnabled: row.semantic, SemanticMode: "auto"}, Config{Mode: "auto"})
+			if d.Action != row.wantAction {
+				t.Errorf("action=%q want %q", d.Action, row.wantAction)
+			}
+			if d.ToolMode != row.wantToolMode {
+				t.Errorf("tool mode=%q want %q", d.ToolMode, row.wantToolMode)
+			}
+		})
+	}
+}
+
+func TestDecideCodeIdentifiersNeverDisableTools(t *testing.T) {
+	t.Parallel()
+	prompts := []string{
+		"what does the endpoint do",
+		"how does the server start",
+		"describe the session lifecycle",
+		"which model does it use",
+		"trace the route for chat",
+		"verify this works",
+		"explain the code",
+		"what is in main.go",
+		"look at internal/server/handler.go",
+		"why does build_prompt fail",
+		"read README", "update the README", "edit the readme", "run ls", "git status",
+		"run npm install", "grep for TODO", "show me the logs", "what changed",
+		"summarize this", "add logging", "delete the temp folder",
+	}
+	for _, semantic := range []bool{true, false} {
+		for _, p := range prompts {
+			d := Decide(Input{RawPrompt: p, ShouldQuery: true, SemanticEnabled: semantic, SemanticMode: "auto"}, Config{Mode: "auto"})
+			if d.ToolMode == ToolModeNone {
+				t.Errorf("prompt %q (semantic=%v) got ToolModeNone", p, semantic)
+			}
+		}
+	}
+}

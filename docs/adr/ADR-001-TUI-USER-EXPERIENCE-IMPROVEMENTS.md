@@ -6,7 +6,7 @@ Status: Accepted for v0.1 roadmap; **partially superseded on 2026-10-05 by [ADR-
 
 ## Roadmap Placement
 
-Updated 2026-10-06. This ADR was Phase 22 input, written when the TUI was the primary surface and was expected to land before Phase 21 server work and Phase 25 remote/bridge mode. [ADR-002](ADR-002-BROWSER-UI-PRIMARY-SURFACE.md) (2026-10-05) made the browser UI the primary surface and put the TUI in maintenance mode. Phase 22 was accepted as-is: the slices that landed stay valid, and the unimplemented ones (including UI-6 hierarchical activity) are parked in `docs/roadmap/BACKLOG.md` §6. The agent-readable breakdown for this ADR is archived at `docs/archive/plans/TASKS-TUI.md`. The run-state ideas here (phases, status priority, visible progress) remain a useful reference for the browser status UI.
+Updated 2026-10-06. This ADR was Phase 22 input, written when the TUI was the primary surface and was expected to land before Phase 21 server work and Phase 25 remote/bridge mode. [ADR-002](ADR-002-BROWSER-UI-PRIMARY-SURFACE.md) (2026-10-05) made the browser UI the primary surface and put the TUI in maintenance mode. Phase 22 was accepted as-is: the slices that landed stay valid, and the unimplemented ones (including UI-6 hierarchical activity) are parked in `docs/roadmap/BACKLOG.md` §6. The agent-readable breakdown for this ADR was `TASKS-TUI.md` (removed 2026-10-20; in git history). The run-state ideas here (phases, status priority, visible progress) remain a useful reference for the browser status UI.
 
 ## Context
 
