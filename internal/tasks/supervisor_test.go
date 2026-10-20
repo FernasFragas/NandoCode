@@ -26,23 +26,17 @@ func TestSupervisorStartComplete(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	deadline := time.Now().Add(2 * time.Second)
-	for time.Now().Before(deadline) {
-		got, ok := s.Get(id)
-		if ok && got.ToSummary().Status == types.StatusCompleted {
-			return
-		}
-		time.Sleep(10 * time.Millisecond)
-	}
-	t.Fatalf("task %s did not complete", id)
+	waitForStatus(t, s, id, types.StatusCompleted, 2*time.Second)
 }
 
 func TestSupervisorStartNonBlocking(t *testing.T) {
 	t.Parallel()
 	s := NewSupervisor(filepath.Join(t.TempDir(), "tasks"), nil)
-	start := time.Now()
+	release := make(chan struct{})
+	t.Cleanup(func() { close(release) })
+	// Start must return while the run func is still blocked.
 	id, err := s.Start(context.Background(), types.KindBash, "slow", func(ctx context.Context, out *OutputWriter) (int, error) {
-		time.Sleep(200 * time.Millisecond)
+		<-release
 		return 0, nil
 	})
 	if err != nil {
@@ -51,33 +45,42 @@ func TestSupervisorStartNonBlocking(t *testing.T) {
 	if id == "" {
 		t.Fatal("expected id")
 	}
-	if d := time.Since(start); d > 50*time.Millisecond {
-		t.Fatalf("start took too long: %v", d)
+	got, ok := s.Get(id)
+	if !ok || got.ToSummary().Status != types.StatusRunning {
+		t.Fatalf("expected a running task right after Start, got %+v", got)
 	}
 }
 
 func TestSupervisorStop(t *testing.T) {
 	t.Parallel()
-	s := NewSupervisor(filepath.Join(t.TempDir(), "tasks"), nil)
+	st := state.NewStore(state.DefaultApp(bootstrap.New(bootstrap.DefaultInitial(".")).Snapshot()), nil)
+	s := NewSupervisor(filepath.Join(t.TempDir(), "tasks"), st)
+	started := make(chan struct{})
+	observed := make(chan error, 1)
 	id, err := s.Start(context.Background(), types.KindBash, "sleep", func(ctx context.Context, out *OutputWriter) (int, error) {
+		close(started)
 		<-ctx.Done()
+		observed <- ctx.Err()
 		return 137, ctx.Err()
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
+	<-started
+	if got, _ := s.Get(id); got.ToSummary().Status != types.StatusRunning {
+		t.Fatalf("expected running before Stop, got %s", got.ToSummary().Status)
+	}
 	if err := s.Stop(id); err != nil {
 		t.Fatal(err)
 	}
-	deadline := time.Now().Add(2 * time.Second)
-	for time.Now().Before(deadline) {
-		got, ok := s.Get(id)
-		if ok && got.ToSummary().Status == types.StatusKilled {
-			return
-		}
-		time.Sleep(10 * time.Millisecond)
+	if err := <-observed; !errors.Is(err, context.Canceled) {
+		t.Fatalf("run func saw ctx error %v, want context.Canceled", err)
 	}
-	t.Fatalf("task %s did not transition to killed", id)
+	waitForStatus(t, s, id, types.StatusKilled, 2*time.Second)
+	waitForStoreStatus(t, st, id, types.StatusKilled)
+	if err := s.Stop(id); err == nil {
+		t.Fatal("expected an error stopping an already killed task")
+	}
 }
 
 func TestSupervisorFailedTask(t *testing.T) {
@@ -89,18 +92,11 @@ func TestSupervisorFailedTask(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	deadline := time.Now().Add(2 * time.Second)
-	for time.Now().Before(deadline) {
-		got, ok := s.Get(id)
-		if ok && got.ToSummary().Status == types.StatusFailed {
-			if got.ToSummary().Err == "" {
-				t.Fatal("expected error summary")
-			}
-			return
-		}
-		time.Sleep(10 * time.Millisecond)
+	waitForStatus(t, s, id, types.StatusFailed, 2*time.Second)
+	got, _ := s.Get(id)
+	if got.ToSummary().Err == "" {
+		t.Fatal("expected error summary")
 	}
-	t.Fatal("task did not transition to failed")
 }
 
 func TestBashRunFuncNonZeroExitIsCompletedWithExitCode(t *testing.T) {
@@ -110,25 +106,11 @@ func TestBashRunFuncNonZeroExitIsCompletedWithExitCode(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	deadline := time.Now().Add(2 * time.Second)
-	for time.Now().Before(deadline) {
-		got, ok := s.Get(id)
-		if !ok {
-			t.Fatal("task missing")
-		}
-		sum := got.ToSummary()
-		if sum.Status == types.StatusCompleted {
-			if sum.ExitCode != 7 {
-				t.Fatalf("expected exit code 7, got %d", sum.ExitCode)
-			}
-			return
-		}
-		if sum.Status == types.StatusFailed {
-			t.Fatalf("expected completed status for non-zero command, got failed: %+v", sum)
-		}
-		time.Sleep(10 * time.Millisecond)
+	waitForStatus(t, s, id, types.StatusCompleted, 5*time.Second)
+	got, _ := s.Get(id)
+	if sum := got.ToSummary(); sum.ExitCode != 7 {
+		t.Fatalf("expected exit code 7, got %d (%+v)", sum.ExitCode, sum)
 	}
-	t.Fatal("non-zero bash task did not complete")
 }
 
 func TestSupervisorStopErrors(t *testing.T) {
@@ -194,40 +176,28 @@ func TestSupervisorListSortedAndConcurrentStarts(t *testing.T) {
 func TestOutputReadableDuringExecution(t *testing.T) {
 	t.Parallel()
 	s := NewSupervisor(filepath.Join(t.TempDir(), "tasks"), nil)
+	wrote := make(chan struct{})
+	release := make(chan struct{})
 	id, err := s.Start(context.Background(), types.KindBash, "stream", func(ctx context.Context, out *OutputWriter) (int, error) {
-		for i := 0; i < 5; i++ {
-			if err := out.WriteText("stdout", "tick"); err != nil {
-				return 1, err
-			}
-			time.Sleep(30 * time.Millisecond)
+		if err := out.WriteText("stdout", "tick"); err != nil {
+			return 1, err
 		}
+		close(wrote)
+		<-release
 		return 0, nil
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
-
-	deadline := time.Now().Add(600 * time.Millisecond)
-	readAny := false
-	for time.Now().Before(deadline) {
-		st, ok := s.Get(id)
-		if !ok {
-			t.Fatal("task disappeared")
-		}
-		file := st.ToSummary().OutputFile
-		if file == "" {
-			time.Sleep(10 * time.Millisecond)
-			continue
-		}
-		lines, err := TailLines(file, 10)
-		if err == nil && len(lines) > 0 {
-			readAny = true
-			break
-		}
-		time.Sleep(15 * time.Millisecond)
+	<-wrote
+	st, ok := s.Get(id)
+	if !ok {
+		t.Fatal("task disappeared")
 	}
-	if !readAny {
-		t.Fatal("expected to read output lines while task running")
+	lines, err := TailLines(st.ToSummary().OutputFile, 10)
+	close(release)
+	if err != nil || len(lines) == 0 {
+		t.Fatalf("expected to read output lines while task running: lines=%v err=%v", lines, err)
 	}
 }
 
@@ -240,21 +210,14 @@ func TestSupervisorPublishesTransitionsToStore(t *testing.T) {
 	}
 	s := NewSupervisor(filepath.Join(t.TempDir(), "tasks"), st)
 	id, err := s.Start(context.Background(), types.KindBash, "ok", func(ctx context.Context, out *OutputWriter) (int, error) {
-		time.Sleep(30 * time.Millisecond)
 		return 0, nil
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
-	waitForStatus(t, s, id, types.StatusCompleted, 2*time.Second)
-	got := st.Get()
-	summary, ok := got.Tasks[id]
-	if !ok {
-		t.Fatalf("expected task summary in app state for %s", id)
-	}
-	if summary.Status != types.StatusCompleted {
-		t.Fatalf("expected completed summary, got %q", summary.Status)
-	}
+	// The store is published just after the supervisor's own state changes,
+	// so wait on the store itself.
+	waitForStoreStatus(t, st, id, types.StatusCompleted)
 	if len(before.Tasks) != 0 {
 		t.Fatal("expected old snapshot to remain unchanged")
 	}
@@ -371,13 +334,34 @@ func TestActiveWorkerCount(t *testing.T) {
 
 func waitForStatus(t *testing.T, s *Supervisor, id string, want types.TaskStatus, timeout time.Duration) {
 	t.Helper()
-	deadline := time.Now().Add(timeout)
-	for time.Now().Before(deadline) {
+	deadline := time.NewTimer(timeout)
+	defer deadline.Stop()
+	tick := time.NewTicker(time.Millisecond)
+	defer tick.Stop()
+	for {
 		got, ok := s.Get(id)
 		if ok && got.ToSummary().Status == want {
 			return
 		}
-		time.Sleep(10 * time.Millisecond)
+		select {
+		case <-tick.C:
+		case <-deadline.C:
+			t.Fatalf("task %s did not reach status %s in %s", id, want, timeout)
+		}
 	}
-	t.Fatalf("task %s did not reach status %s in %s", id, want, timeout)
+}
+
+func waitForStoreStatus(t *testing.T, st *state.Store[state.App], id string, want types.TaskStatus) {
+	t.Helper()
+	deadline := time.NewTimer(2 * time.Second)
+	defer deadline.Stop()
+	tick := time.NewTicker(time.Millisecond)
+	defer tick.Stop()
+	for st.Get().Tasks[id].Status != want {
+		select {
+		case <-tick.C:
+		case <-deadline.C:
+			t.Fatalf("app state never showed %s as %s: %+v", id, want, st.Get().Tasks[id])
+		}
+	}
 }

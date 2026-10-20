@@ -13,8 +13,6 @@ Status: Pre-implementation plan; penultimate implementation phase
 - Earlier statements below that "Phase 17 must not change the TUI entrypoint" are superseded by this note.
 Source plans and references:
 
-- `.codex/go-ollama-plan-AGENTS.md`
-- `.codex/go-ollama-plan-HUMANS.md`
 - `docs/phases/PHASE-LOG.md`
 - `docs/roadmap/PROJECT-STATUS-AND-ONBOARDING.md`
 - `docs/phases/PHASE-8-DETAILED-PLAN.md`

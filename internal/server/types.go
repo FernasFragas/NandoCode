@@ -5,6 +5,7 @@ import (
 
 	"github.com/FernasFragas/Nandocode/internal/agent"
 	"github.com/FernasFragas/Nandocode/internal/llm"
+	"github.com/FernasFragas/Nandocode/internal/tasks"
 )
 
 type SessionState string
@@ -24,13 +25,17 @@ type SessionEvent struct {
 }
 
 type SessionView struct {
-	SessionID       string       `json:"session_id"`
-	CreatedAt       time.Time    `json:"created_at"`
-	LastActive      time.Time    `json:"last_active"`
-	State           SessionState `json:"state"`
-	Running         bool         `json:"running"`
-	CoordinatorMode bool         `json:"coordinator_mode,omitempty"`
-	WorkerCount     int          `json:"worker_count,omitempty"`
+	SessionID       string                 `json:"session_id"`
+	CreatedAt       time.Time              `json:"created_at"`
+	LastActive      time.Time              `json:"last_active"`
+	State           SessionState           `json:"state"`
+	Running         bool                   `json:"running"`
+	CoordinatorMode bool                   `json:"coordinator_mode,omitempty"`
+	WorkerCount     int                    `json:"worker_count,omitempty"`
+	Workers         []tasks.WorkerSnapshot `json:"workers"`
+	// WorkspaceRoot is the session working directory; the browser uses it to
+	// match absolute tool paths against workspace-relative open tabs.
+	WorkspaceRoot string `json:"workspace_root,omitempty"`
 }
 
 type MessageRequest struct {
@@ -54,22 +59,4 @@ type modelsResponse struct {
 
 type ModelUpdateRequest struct {
 	Model string `json:"model"`
-}
-
-type TreeEntry struct {
-	Path  string `json:"path"`
-	Name  string `json:"name"`
-	IsDir bool   `json:"is_dir"`
-}
-
-type TreeResponse struct {
-	Root    string      `json:"root"`
-	Entries []TreeEntry `json:"entries"`
-	Stats   TreeStats   `json:"stats"`
-}
-
-type TreeStats struct {
-	Truncated bool   `json:"truncated"`
-	Reason    string `json:"reason,omitempty"`
-	Source    string `json:"source,omitempty"`
 }

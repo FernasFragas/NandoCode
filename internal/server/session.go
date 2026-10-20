@@ -11,16 +11,17 @@ import (
 	"time"
 
 	"github.com/FernasFragas/Nandocode/internal/agent"
-	"github.com/FernasFragas/Nandocode/internal/analysis"
 	"github.com/FernasFragas/Nandocode/internal/contextpack"
 	"github.com/FernasFragas/Nandocode/internal/llm"
 	"github.com/FernasFragas/Nandocode/internal/llm/modelruntime"
-	"github.com/FernasFragas/Nandocode/internal/mentions"
 	"github.com/FernasFragas/Nandocode/internal/permissions"
 	"github.com/FernasFragas/Nandocode/internal/retrievalroute"
+	"github.com/FernasFragas/Nandocode/internal/runctl"
 	"github.com/FernasFragas/Nandocode/internal/semantic"
 	"github.com/FernasFragas/Nandocode/internal/state"
 	"github.com/FernasFragas/Nandocode/internal/tasks"
+	"github.com/FernasFragas/Nandocode/internal/tools/todo"
+	"github.com/FernasFragas/Nandocode/internal/turnprep"
 )
 
 type AgentRunner interface {
@@ -46,6 +47,8 @@ type Session struct {
 	recentMessage *RecentIDs
 	permRules     permissions.Rules
 	permMode      permissions.Mode
+	activeWrites  map[string]string // tool call ID to resolved path
+	saveHooks     map[string]saveHookMemo
 	broker        *HTTPPermissionBroker
 	lastTerminal  TerminalSnapshot
 	supervisor    *tasks.Supervisor
@@ -55,6 +58,19 @@ type Session struct {
 	taskWatchStop context.CancelFunc
 	semanticCfg   semantic.Config
 	semanticSvc   semantic.Service
+	runtime       *llm.RuntimeClient // per-session model router; nil when the server shares one
+	models        *modelruntime.Service
+	switchedModel string // ActiveModel the runtime was last switched to
+	runPrompt     string // raw user prompt of the active run
+	ctl           *runctl.Controller
+	todoWrites    map[string]struct{}
+	title         string
+	titlePrompt   string
+	titlePending  bool
+	titleDone     bool
+	titleStarted  bool
+	titleCancel   context.CancelFunc
+	titleFinished chan struct{}
 }
 
 type sessionRegistry struct {
@@ -85,6 +101,7 @@ func (r *sessionRegistry) all() []*Session {
 }
 
 func newSession(parent context.Context, id string, app state.App, runner AgentRunner) *Session {
+	app.TodoList = todo.NewTodoList()
 	ctx, cancel := context.WithCancel(parent)
 	now := time.Now().UTC()
 	s := &Session{
@@ -101,6 +118,8 @@ func newSession(parent context.Context, id string, app state.App, runner AgentRu
 		recentMessage: NewRecentIDs(128),
 		permRules:     app.PermissionRules,
 		permMode:      app.PermissionMode,
+		ctl:           runctl.New(),
+		todoWrites:    make(map[string]struct{}),
 	}
 	s.broker = NewHTTPPermissionBroker(s)
 	s.Emit("session_ready", nil)
@@ -111,6 +130,9 @@ func (s *Session) setCoordinatorRuntime(sup *tasks.Supervisor, taskStore *state.
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.supervisor = sup
+	if sup != nil {
+		sup.SetWorkerObserver(s.emitSubagentEvent)
+	}
 	s.taskStore = taskStore
 	s.llmClient = client
 	s.dreamEnabled = dreamEnabled
@@ -158,6 +180,10 @@ func (s *Session) watchTaskLifecycle(ctx context.Context) {
 func (s *Session) view() SessionView {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	var workers []tasks.WorkerSnapshot
+	if s.supervisor != nil {
+		workers = s.supervisor.WorkerSnapshots()
+	}
 	return SessionView{
 		SessionID:       s.id,
 		CreatedAt:       s.createdAt,
@@ -166,6 +192,8 @@ func (s *Session) view() SessionView {
 		Running:         s.running,
 		CoordinatorMode: s.appState.CoordinatorMode,
 		WorkerCount:     s.appState.WorkerCount,
+		Workers:         workers,
+		WorkspaceRoot:   s.appState.ToolSettings.WorkingDir,
 	}
 }
 
@@ -175,14 +203,53 @@ func (s *Session) activeModel() string {
 	return s.appState.ActiveModel
 }
 
+// setRuntime binds the session to its own model runtime.
+func (s *Session) setRuntime(rt sessionRuntime) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.runtime = rt.rc
+	s.llmClient = rt.client
+	s.models = rt.models
+}
+
+func (s *Session) modelService() *modelruntime.Service {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.models
+}
+
+// modelSwitchCurrent reports whether the session's runtime is already
+// switched to its active model, so a message does not re-resolve it.
+func (s *Session) modelSwitchCurrent() bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.switchedModel != "" && s.switchedModel == s.appState.ActiveModel
+}
+
 func (s *Session) applyModelSwitch(result modelruntime.SwitchResult) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.appState.ActiveModel = result.Resolved.Model
+	s.switchedModel = result.Resolved.Model
 	s.appState.LLMProvider = string(result.Resolved.Provider)
 	if strings.TrimSpace(result.Resolved.BaseURL) != "" {
 		s.appState.LLMBaseURL = result.Resolved.BaseURL
 	}
+}
+
+// applyActivation refreshes the per-session limits after a model switch.
+func (s *Session) applyActivation(res modelruntime.ActivateResult) {
+	s.applyModelSwitch(res.SwitchResult)
+	if !res.HasLimits {
+		return
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.appState.MaxOutputTokens = res.Limits.MaxOutputTokens
+	if res.Limits.NumCtx > 0 {
+		s.appState.RuntimeNumCtx = res.Limits.NumCtx
+	}
+	s.appState.ToolSettings.MaxResultChars = res.Limits.MaxResultChars
 }
 
 func (s *Session) touch() { s.mu.Lock(); s.lastActive = time.Now().UTC(); s.mu.Unlock() }
@@ -241,14 +308,32 @@ func (s *Session) Replay(lastID string) []SessionEvent {
 
 func (s *Session) StartRun(input MessageRequest, cfg agent.Config) error {
 	s.mu.Lock()
-	if s.running {
+	if s.running || s.state == SessionStateClosing {
+		s.mu.Unlock()
+		return errors.New("run already active")
+	}
+	run, err := s.ctl.Begin(s.ctx)
+	if err != nil {
 		s.mu.Unlock()
 		return errors.New("run already active")
 	}
 	s.running = true
 	s.state = SessionStateRunning
+	s.todoWrites = make(map[string]struct{})
+	// A title request must yield to an interactive run. The handler returns
+	// immediately; the run goroutine waits only for the canceled request to exit.
+	var titleFinished <-chan struct{}
+	if s.titlePending && !s.titleDone {
+		s.titlePending = false
+		s.titlePrompt = ""
+		if s.titleCancel != nil {
+			s.titleCancel()
+			titleFinished = s.titleFinished
+		}
+	}
 	app := s.appState.Clone()
 	conv := append([]llm.Message(nil), s.conversation...)
+	s.runPrompt = input.Prompt
 	mode := s.permMode
 	rules := s.permRules
 	s.mu.Unlock()
@@ -256,164 +341,77 @@ func (s *Session) StartRun(input MessageRequest, cfg agent.Config) error {
 		_ = s.supervisor.KillDream()
 	}
 
-	go s.runAgent(input, cfg, app, conv, mode, rules)
+	go func() {
+		if titleFinished != nil {
+			<-titleFinished
+		}
+		s.runAgent(run, input, cfg, app, conv, mode, rules)
+	}()
 	return nil
 }
 
-func (s *Session) runAgent(req MessageRequest, cfg agent.Config, app state.App, history []llm.Message, mode permissions.Mode, rules permissions.Rules) {
+func (s *Session) runAgent(run runctl.Run, req MessageRequest, cfg agent.Config, app state.App, history []llm.Message, mode permissions.Mode, rules permissions.Rules) {
 	defer func() {
+		s.ctl.Finish(run)
+		s.clearFileWrites()
 		s.mu.Lock()
 		s.running = false
 		s.state = SessionStateReady
+		titlePending := s.titlePending && !s.titleDone
 		s.mu.Unlock()
+		if titlePending {
+			go s.generateSessionTitle()
+		}
 		if s.supervisor != nil && s.dreamEnabled && s.llmClient != nil {
 			_, _ = s.supervisor.SpawnDream(s.ctx, s.llmClient, app.ActiveModel, "Speculative follow-up analysis.")
 		}
 	}()
-	toolCtx := app.ToolContext(s.ctx)
-	packed, _, err := contextpack.BuildCurrentTurnPrompt(req.Prompt, toolCtx, cfg, agent.Input{Model: app.ActiveModel, ContextMode: app.ContextMode, MaxOutputTokens: app.MaxOutputTokens}, history)
-	if err != nil {
-		var tooLarge contextpack.ErrEvidenceTooLarge
-		if errors.As(err, &tooLarge) {
-			s.Emit("error", map[string]any{"code": "evidence_too_large", "error": tooLarge.Error(), "budget_tokens": tooLarge.BudgetTokens, "estimated_tokens": tooLarge.EstimatedTokens})
-		} else {
-			s.Emit("error", map[string]any{"code": "prompt_pack_failed", "error": err.Error()})
-		}
-		return
+	if app.RuntimeNumCtx > 0 {
+		cfg.NumCtx = app.RuntimeNumCtx
 	}
-	historyPolicy := agent.HistoryPolicyDefault
-	if packed.ExpansionReport.Intent.AttachmentPolicy == mentions.AttachListingTreeOnly || packed.ExpansionReport.Intent.Kind == mentions.IntentFileStatus {
-		historyPolicy = agent.HistoryPolicyLatestOnly
-	}
-	finalPrompt := packed.Prompt
-	explicit := analysis.ExtractMentionedPaths(req.Prompt)
-	currentTurn := make([]string, 0, len(packed.Files))
-	for _, f := range packed.Files {
-		if strings.TrimSpace(f.Path) == "" {
-			continue
-		}
-		currentTurn = append(currentTurn, f.Path)
-	}
-	currentDirs := make([]string, 0, len(packed.Dirs))
-	for _, d := range packed.Dirs {
-		if strings.TrimSpace(d.Path) == "" {
-			continue
-		}
-		currentDirs = append(currentDirs, d.Path)
-	}
-	routeCfg := serverSemanticRouteConfig(s.semanticCfg, s.semanticSvc != nil)
-	indexKnown, hasIndex, indexCompatible := s.semanticRouteIndexStatus(app.ToolSettings.WorkingDir)
-	routeDecision := retrievalroute.Decide(retrievalroute.Input{
-		RawPrompt:            req.Prompt,
-		ShouldQuery:          true,
-		AttachmentPolicy:     string(packed.ExpansionReport.Intent.AttachmentPolicy),
-		CurrentTurnPaths:     currentTurn,
-		CurrentTurnDirs:      currentDirs,
-		AttachedFileCount:    len(packed.Files),
-		AttachedContextBytes: len(packed.Prompt),
-		IndexKnown:           indexKnown,
-		HasIndex:             hasIndex,
-		IndexCompatible:      indexCompatible,
-		SemanticEnabled:      s.semanticSvc != nil && s.semanticCfg.Enabled,
-		SemanticMode:         routeCfg.Mode,
-		PromptIntent:         string(packed.ExpansionReport.Intent.Kind),
-	}, routeCfg)
-	s.Emit("retrieval_route_decided", map[string]any{
-		"action":            string(routeDecision.Action),
-		"reason":            string(routeDecision.Reason),
-		"allow_embedding":   routeDecision.AllowEmbedding,
-		"tool_mode":         string(routeDecision.ToolMode),
-		"request_profile":   routeDecision.RequestProfile,
-		"profile":           routeDecision.Profile,
-		"max_records":       routeDecision.MaxRecords,
-		"max_files":         routeDecision.MaxFiles,
-		"max_context_bytes": routeDecision.MaxContextBytes,
-		"deadline_ms":       routeDecision.Deadline.Milliseconds(),
-	})
-
-	if routeDecision.AllowEmbedding && s.semanticSvc != nil {
-		semanticStart := time.Now()
-		s.Emit("semantic_query_embed_started", nil)
-		res, err := s.semanticSvc.Retrieve(s.ctx, semantic.RetrieveRequest{
-			Root:                 app.ToolSettings.WorkingDir,
-			Query:                req.Prompt,
-			Config:               s.semanticCfg,
-			ExplicitPaths:        explicit,
-			CurrentTurnPaths:     currentTurn,
-			Deadline:             routeDecision.Deadline,
-			RouteAction:          string(routeDecision.Action),
-			RouteReason:          string(routeDecision.Reason),
-			RouteProfile:         routeDecision.Profile,
-			UseCurrentPathWeight: routeDecision.UseCurrentPathWeight,
-			MaxRecords:           routeDecision.MaxRecords,
-			MaxFiles:             routeDecision.MaxFiles,
-			MaxContextBytes:      routeDecision.MaxContextBytes,
-			Observer: func(evt semantic.RetrieveStageEvent) {
+	toolCtx := app.ToolContext(run.Ctx)
+	prep, err := turnprep.Prepare(turnprep.Request{
+		Ctx:             run.Ctx,
+		Prompt:          req.Prompt,
+		ToolContext:     toolCtx,
+		AgentConfig:     cfg,
+		Model:           app.ActiveModel,
+		LLMProvider:     app.LLMProvider,
+		ContextMode:     app.ContextMode,
+		MaxOutputTokens: app.MaxOutputTokens,
+		History:         history,
+		Semantic:        turnprep.Semantic{Service: s.semanticSvc, Config: s.semanticCfg},
+		Grounding:       true,
+		Hooks: turnprep.Hooks{
+			OnRoute: s.emitRouteDecided,
+			OnSemanticStart: func() {
+				s.Emit("semantic_query_embed_started", nil)
+			},
+			OnSemanticStage: func(evt semantic.RetrieveStageEvent) {
 				s.Emit("semantic_stage_timing", map[string]any{
 					"stage":       string(evt.Stage),
 					"duration_ms": evt.Duration.Milliseconds(),
 					"cache_hit":   evt.CacheHit,
 				})
 			},
-		})
-		switch {
-		case err == nil && res.Used:
-			s.Emit("semantic_query_embed_finished", map[string]any{"duration_ms": time.Since(semanticStart).Milliseconds()})
-			finalPrompt = strings.TrimRight(finalPrompt, "\n") + "\n\n" + strings.TrimSpace(res.RenderedContext)
-			s.Emit("semantic_search_finished", map[string]any{
-				"records":       len(res.Records),
-				"files":         len(res.Files),
-				"context_bytes": res.ContextBytes,
-				"stale_dropped": res.StaleDropped,
-			})
-			s.Emit("semantic_retrieval", map[string]any{
-				"records":       len(res.Records),
-				"files":         len(res.Files),
-				"context_bytes": res.ContextBytes,
-				"stale_dropped": res.StaleDropped,
-			})
-		case err != nil && semantic.IsFallbackError(err):
-			s.Emit("semantic_query_embed_finished", map[string]any{"duration_ms": time.Since(semanticStart).Milliseconds()})
-			s.Emit("semantic_skipped", map[string]any{"reason": err.Error()})
-			s.Emit("semantic_retrieval", map[string]any{"fallback": true, "reason": err.Error()})
-		case err != nil:
-			s.Emit("semantic_query_embed_finished", map[string]any{"duration_ms": time.Since(semanticStart).Milliseconds()})
-			s.Emit("semantic_retrieval", map[string]any{"error": err.Error()})
-		case res.FallbackReason != "":
-			s.Emit("semantic_query_embed_finished", map[string]any{"duration_ms": time.Since(semanticStart).Milliseconds()})
-			s.Emit("semantic_skipped", map[string]any{"reason": res.FallbackReason})
-			s.Emit("semantic_retrieval", map[string]any{"fallback": true, "reason": res.FallbackReason})
-		}
-	} else {
-		s.Emit("semantic_skipped", map[string]any{"reason": string(routeDecision.Reason)})
+		},
+	})
+	if err != nil {
+		s.prepFailed(run, err)
+		return
 	}
+	s.emitSemanticOutcome(prep)
 
-	msgs := append(history, llm.Message{Role: llm.RoleUser, Content: finalPrompt})
-	in := agent.Input{
-		Model:            app.ActiveModel,
-		LLMProvider:      app.LLMProvider,
-		ContextMode:      app.ContextMode,
-		PromptIntent:     string(packed.ExpansionReport.Intent.Kind),
-		AttachmentPolicy: string(packed.ExpansionReport.Intent.AttachmentPolicy),
-		OriginalUserText: req.Prompt,
-		HistoryPolicy:    historyPolicy,
-		ToolMode:         string(routeDecision.ToolMode),
-		RouteAction:      string(routeDecision.Action),
-		RouteReason:      string(routeDecision.Reason),
-		RouteProfile:     routeDecision.RequestProfile,
-		ToolContext:      toolCtx,
-		EvidencePack:     &packed.PackReport,
-		Messages:         msgs,
-		PermissionMode:   mode,
-		PermissionRules:  rules,
-		PermissionPrompt: s.broker.PromptFunc(),
-		MaxOutputTokens:  app.MaxOutputTokens,
-	}
+	in := prep.Input
+	in.PermissionMode = mode
+	in.PermissionRules = rules
+	in.PermissionPrompt = s.broker.PromptFunc()
 	if app.CoordinatorMode {
 		in.SystemPrompt = agent.BuildCoordinatorSystemPrompt(nil, "")
 	}
 	s.Emit("run_started", map[string]any{"message_id": req.MessageID})
-	for evt := range s.runner.Run(s.ctx, in) {
+	in.ParentAbort = run.ParentAbort
+	for evt := range s.runner.Run(run.Ctx, in) {
 		s.handleAgentEvent(evt)
 	}
 }
@@ -425,15 +423,21 @@ func (s *Session) handleAgentEvent(evt agent.Event) {
 	case agent.AssistantThinkingDelta:
 		s.Emit("assistant_thinking_delta", map[string]any{"thinking": e.Thinking})
 	case agent.ToolUseStart:
+		s.trackFileWriteStart(e)
 		s.Emit("tool_use_start", map[string]any{"id": e.ID, "name": e.Name, "input": e.Input})
+		s.noteTodoToolStart(e)
 	case agent.ToolUseProgress:
 		s.Emit("tool_use_progress", map[string]any{"id": e.ID, "data": e.Data})
 	case agent.ToolUseResult:
+		s.trackFileWriteResult(e.ID)
 		err := ""
 		if e.Err != nil {
 			err = e.Err.Error()
 		}
 		s.Emit("tool_use_result", map[string]any{"id": e.ID, "result": e.Result.Display, "error": err})
+		s.emitTodoUpdatedAfterResult(e)
+	case agent.TurnUsage:
+		s.emitUsageUpdate(e.Usage)
 	case agent.HookNotice:
 		s.Emit("hook_notice", map[string]any{"message": e.Message})
 	case agent.RetryNotice:
@@ -455,8 +459,16 @@ func (s *Session) handleAgentEvent(evt agent.Event) {
 	case agent.PromptPackReport:
 		s.Emit("prompt_pack_report", map[string]any{"estimated_included": e.EstimatedIncluded, "estimated_skipped": e.EstimatedSkipped})
 	case agent.Terminal:
+		s.clearFileWrites()
 		s.mu.Lock()
-		s.conversation = append([]llm.Message(nil), e.Conversation...)
+		if !s.titleDone && !s.titlePending && s.runPrompt != "" {
+			s.titlePrompt = s.runPrompt
+			s.titlePending = true
+		}
+		// e.Conversation holds only what this run added (assistant and tool
+		// messages), so ApplyTerminal appends it after the user prompt.
+		turn := runctl.ApplyTerminal(state.App{Messages: s.conversation}, e, runctl.TerminalOptions{UserPrompt: s.runPrompt})
+		s.conversation = turn.Messages
 		s.lastTerminal = TerminalSnapshot{Reason: e.Reason, Detail: e.Detail, Usage: e.Usage}
 		s.mu.Unlock()
 		s.Emit("terminal", map[string]any{"reason": e.Reason, "detail": e.Detail, "usage": e.Usage})
@@ -473,14 +485,21 @@ func (s *Session) ResolvePermission(reqID, d string) bool {
 	}
 }
 
-func (s *Session) AllowAllRules() {
+// AllowSession records an "Always Allow" for exactly this tool and target. It
+// applies to later runs of this session; deny and ask rules still win.
+func (s *Session) AllowSession(toolName, target string) {
+	rule, ok := permissions.SessionAllowRule(toolName, target)
+	if !ok {
+		return
+	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	s.permRules.AlwaysAllow = append(s.permRules.AlwaysAllow, permissions.Rule{Pattern: "*(*)", Source: permissions.SourceSession})
+	s.permRules.AlwaysAllow = append(s.permRules.AlwaysAllow, rule)
 }
 
 func (s *Session) stop() {
 	s.cancel()
+	s.clearFileWrites()
 	s.mu.Lock()
 	if s.taskWatchStop != nil {
 		s.taskWatchStop()
@@ -500,46 +519,69 @@ func validateNonLoopback(bindAddr, token string) error {
 	return fmt.Errorf("refusing non-loopback bind without --token")
 }
 
-func serverSemanticRouteConfig(cfg semantic.Config, hasService bool) retrievalroute.Config {
-	mode := strings.ToLower(strings.TrimSpace(cfg.Mode))
-	if mode == "" {
-		mode = "auto"
+func (s *Session) emitRouteDecided(d retrievalroute.Decision) {
+	s.Emit("retrieval_route_decided", map[string]any{
+		"action":            string(d.Action),
+		"reason":            string(d.Reason),
+		"allow_embedding":   d.AllowEmbedding,
+		"tool_mode":         string(d.ToolMode),
+		"request_profile":   d.RequestProfile,
+		"profile":           d.Profile,
+		"max_records":       d.MaxRecords,
+		"max_files":         d.MaxFiles,
+		"max_context_bytes": d.MaxContextBytes,
+		"deadline_ms":       d.Deadline.Milliseconds(),
+	})
+}
+
+// emitSemanticOutcome turns the turnprep semantic outcome into the same
+// events the server has always emitted, in the same order.
+func (s *Session) emitSemanticOutcome(prep turnprep.Prepared) {
+	out := prep.Semantic
+	if !out.Attempted {
+		s.Emit("semantic_skipped", map[string]any{"reason": string(prep.Route.Reason)})
+		return
 	}
-	if !cfg.Enabled || !hasService {
-		mode = "off"
+	if out.Kind != turnprep.SemanticSkipped {
+		s.Emit("semantic_query_embed_finished", map[string]any{"duration_ms": out.Duration.Milliseconds()})
 	}
-	return retrievalroute.Config{
-		Mode: mode,
-		Light: retrievalroute.Limits{
-			MaxRecords:      cfg.LightTopKRecords,
-			MaxFiles:        cfg.LightTopKFiles,
-			MaxContextBytes: cfg.LightMaxContextBytes,
-			Deadline:        time.Duration(cfg.LightDeadlineMS) * time.Millisecond,
-		},
-		Full: retrievalroute.Limits{
-			MaxRecords:      cfg.FullTopKRecords,
-			MaxFiles:        cfg.FullTopKFiles,
-			MaxContextBytes: cfg.FullMaxContextBytes,
-			Deadline:        time.Duration(cfg.FullDeadlineMS) * time.Millisecond,
-		},
-		Deep: retrievalroute.Limits{
-			MaxRecords:      cfg.DeepTopKRecords,
-			MaxFiles:        cfg.DeepTopKFiles,
-			MaxContextBytes: cfg.DeepMaxContextBytes,
-			Deadline:        time.Duration(cfg.DeepDeadlineMS) * time.Millisecond,
-		},
+	switch out.Kind {
+	case turnprep.SemanticUsed:
+		res := out.Result
+		payload := func() map[string]any {
+			return map[string]any{
+				"records":       len(res.Records),
+				"files":         len(res.Files),
+				"context_bytes": res.ContextBytes,
+				"stale_dropped": res.StaleDropped,
+			}
+		}
+		s.Emit("semantic_search_finished", payload())
+		s.Emit("semantic_retrieval", payload())
+	case turnprep.SemanticFallback:
+		s.Emit("semantic_skipped", map[string]any{"reason": out.Reason})
+		s.Emit("semantic_retrieval", map[string]any{"fallback": true, "reason": out.Reason})
+	case turnprep.SemanticError:
+		s.Emit("semantic_retrieval", map[string]any{"error": out.Err.Error()})
 	}
 }
 
-func (s *Session) semanticRouteIndexStatus(root string) (known, exists, compatible bool) {
-	if s == nil || s.semanticSvc == nil || !s.semanticCfg.Enabled {
-		return false, false, false
+// prepFailed ends a run whose prompt preparation failed. When the run was
+// cancelled meanwhile it reports one aborted terminal and records nothing in
+// the history (the turn never started, so no lone user message is left). Any
+// other failure stays an error event.
+func (s *Session) prepFailed(run runctl.Run, err error) {
+	if run.Ctx.Err() != nil {
+		s.mu.Lock()
+		s.lastTerminal = TerminalSnapshot{Reason: agent.TerminalAborted}
+		s.mu.Unlock()
+		s.Emit("terminal", map[string]any{"reason": agent.TerminalAborted, "detail": "", "usage": agent.Usage{}})
+		return
 	}
-	ctx, cancel := context.WithTimeout(s.ctx, 250*time.Millisecond)
-	defer cancel()
-	status, err := s.semanticSvc.Status(ctx, root)
-	if err != nil {
-		return false, false, false
+	var tooLarge contextpack.ErrEvidenceTooLarge
+	if errors.As(err, &tooLarge) {
+		s.Emit("error", map[string]any{"code": "evidence_too_large", "error": tooLarge.Error(), "budget_tokens": tooLarge.BudgetTokens, "estimated_tokens": tooLarge.EstimatedTokens})
+	} else {
+		s.Emit("error", map[string]any{"code": "prompt_pack_failed", "error": err.Error()})
 	}
-	return true, status.Exists, status.Compatible
 }

@@ -88,7 +88,7 @@ func (a *Agent) Run(ctx context.Context, in Input) <-chan Event {
 // run is the internal implementation of the agent loop.
 func (a *Agent) run(ctx context.Context, in Input, events chan<- Event) {
 	if err := validateInput(ctx, &in); err != nil {
-		sendEvent(ctx, events, Terminal{
+		sendTerminal(ctx, events, Terminal{
 			Reason:       TerminalUnrecoverable,
 			Detail:       err.Error(),
 			Conversation: nil,
@@ -133,7 +133,7 @@ func (a *Agent) run(ctx context.Context, in Input, events chan<- Event) {
 		// Check context cancellation
 		select {
 		case <-ctx.Done():
-			sendEventForce(ctx, events, Terminal{
+			sendTerminal(ctx, events, Terminal{
 				Reason:       TerminalAborted,
 				Detail:       ctx.Err().Error(),
 				Usage:        usage,
@@ -191,7 +191,9 @@ func (a *Agent) run(ctx context.Context, in Input, events chan<- Event) {
 			usage.EvalCount += result.EvalCount
 			usage.TotalDuration += result.TotalDuration
 			usage.ToolCalls += result.ToolCallsInTurn
-			sendEvent(ctx, events, Terminal{
+			usage.DoneReason = result.DoneReason
+			sendEvent(ctx, events, TurnUsage{Usage: usage})
+			sendTerminal(ctx, events, Terminal{
 				Reason:       reason,
 				Detail:       detail,
 				Usage:        usage,
@@ -206,6 +208,7 @@ func (a *Agent) run(ctx context.Context, in Input, events chan<- Event) {
 		usage.TotalDuration += result.TotalDuration
 		usage.ToolCalls += result.ToolCallsInTurn
 		usage.DoneReason = result.DoneReason
+		sendEvent(ctx, events, TurnUsage{Usage: usage})
 		lastContextTokens = result.PromptEvalCount
 
 		// Handle done reason
@@ -242,7 +245,7 @@ func (a *Agent) run(ctx context.Context, in Input, events chan<- Event) {
 				// compaction skipped (not enough turns) — fall through to TerminalContextOverflow
 			}
 			// Third length or compaction also failed
-			sendEvent(ctx, events, Terminal{
+			sendTerminal(ctx, events, Terminal{
 				Reason:       TerminalContextOverflow,
 				Detail:       "context length exceeded after retry and compaction",
 				Usage:        usage,
@@ -251,7 +254,7 @@ func (a *Agent) run(ctx context.Context, in Input, events chan<- Event) {
 			return
 		}
 		if isTerminalStreamFailure(result.DoneReason) {
-			sendEvent(ctx, events, Terminal{
+			sendTerminal(ctx, events, Terminal{
 				Reason:       TerminalUnrecoverable,
 				Detail:       streamFailureDetail(result.DoneReason),
 				Usage:        usage,
@@ -297,7 +300,7 @@ func (a *Agent) run(ctx context.Context, in Input, events chan<- Event) {
 					LastAssistantContent: result.AssistantMessage.Content,
 				})
 				if !ok {
-					sendEvent(ctx, events, Terminal{
+					sendTerminal(ctx, events, Terminal{
 						Reason:       TerminalCompleted,
 						Usage:        usage,
 						Conversation: append([]llm.Message(nil), addedConversation...),
@@ -319,7 +322,7 @@ func (a *Agent) run(ctx context.Context, in Input, events chan<- Event) {
 			if in.StopHook != nil {
 				if reason, blocked := in.StopHook(ctx, append([]llm.Message(nil), addedConversation...)); blocked {
 					sendEvent(ctx, events, HookNotice{Message: reason})
-					sendEvent(ctx, events, Terminal{
+					sendTerminal(ctx, events, Terminal{
 						Reason:       TerminalStopHook,
 						Detail:       reason,
 						Usage:        usage,
@@ -328,7 +331,7 @@ func (a *Agent) run(ctx context.Context, in Input, events chan<- Event) {
 					return
 				}
 			}
-			sendEvent(ctx, events, Terminal{
+			sendTerminal(ctx, events, Terminal{
 				Reason:       TerminalCompleted,
 				Usage:        usage,
 				Conversation: append([]llm.Message(nil), addedConversation...),
@@ -349,7 +352,7 @@ func (a *Agent) run(ctx context.Context, in Input, events chan<- Event) {
 	}
 
 	// Max turns reached
-	sendEvent(ctx, events, Terminal{
+	sendTerminal(ctx, events, Terminal{
 		Reason:       TerminalMaxTurns,
 		Detail:       "exceeded maximum turn count",
 		Usage:        usage,
@@ -414,7 +417,20 @@ func (a *Agent) executeToolCallsConcurrent(
 	model string,
 	events chan<- Event,
 ) ([]llm.Message, int) {
-	var messages []llm.Message
+	// slots holds one tool message per call so the messages sent back to the
+	// model keep the order of the calls (Ollama has no tool-call IDs, so
+	// order is the only link between a call and its result).
+	slots := make([]*llm.Message, len(toolCalls))
+	setSlot := func(i int, m llm.Message) { slots[i] = &m }
+	collect := func() []llm.Message {
+		out := make([]llm.Message, 0, len(slots))
+		for _, m := range slots {
+			if m != nil {
+				out = append(out, *m)
+			}
+		}
+		return out
+	}
 	toolCallCount := 0
 
 	// Build indexed calls with tool lookups and error handling
@@ -434,7 +450,7 @@ func (a *Agent) executeToolCallsConcurrent(
 				ID:  toolID,
 				Err: fmt.Errorf("unknown tool: %s", call.Function.Name),
 			})
-			messages = append(messages, llm.Message{
+			setSlot(i, llm.Message{
 				Role:     llm.RoleTool,
 				ToolName: call.Function.Name,
 				Content:  fmt.Sprintf("Error: unknown tool '%s'", call.Function.Name),
@@ -455,7 +471,7 @@ func (a *Agent) executeToolCallsConcurrent(
 				ID:  toolID,
 				Err: fmt.Errorf("failed to marshal tool arguments: %w", err),
 			})
-			messages = append(messages, llm.Message{
+			setSlot(i, llm.Message{
 				Role:     llm.RoleTool,
 				ToolName: call.Function.Name,
 				Content:  fmt.Sprintf("Error: failed to marshal arguments: %v", err),
@@ -475,7 +491,7 @@ func (a *Agent) executeToolCallsConcurrent(
 				ID:  toolID,
 				Err: fmt.Errorf("failed to parse tool input: %w", err),
 			})
-			messages = append(messages, llm.Message{
+			setSlot(i, llm.Message{
 				Role:     llm.RoleTool,
 				ToolName: call.Function.Name,
 				Content:  fmt.Sprintf("Error: invalid input format: %v", err),
@@ -495,7 +511,7 @@ func (a *Agent) executeToolCallsConcurrent(
 	}
 
 	if len(indexed) == 0 {
-		return messages, toolCallCount
+		return collect(), toolCallCount
 	}
 
 	// Check permissions for all indexed calls before concurrent execution
@@ -504,6 +520,7 @@ func (a *Agent) executeToolCallsConcurrent(
 		if ppTool, ok := ic.Tool.(permissionPromptAware); ok {
 			ppTool.SetPermissionPrompt(permissionPrompt)
 		}
+		setParentPolicy(ic.Tool, ParentPolicy{Mode: permissionMode, Rules: permissionRules, HookDecision: hookDecision, PostToolUse: postToolUse, PermissionDenied: permissionDenied})
 
 		permResult := permissions.Resolve(ctx, permissions.Request{
 			Mode:         permissionMode,
@@ -533,6 +550,12 @@ func (a *Agent) executeToolCallsConcurrent(
 				}
 			}
 
+			// A denied call still announces itself, so every result has a start.
+			sendEvent(ctx, events, ToolUseStart{
+				ID:    ic.ToolID,
+				Name:  ic.Call.Function.Name,
+				Input: ic.Input,
+			})
 			sendEvent(ctx, events, ToolUseResult{
 				ID:  ic.ToolID,
 				Err: fmt.Errorf("permission denied: %s", reason),
@@ -550,7 +573,7 @@ func (a *Agent) executeToolCallsConcurrent(
 				})
 			}
 
-			messages = append(messages, llm.Message{
+			setSlot(ic.Index, llm.Message{
 				Role:     llm.RoleTool,
 				ToolName: ic.Call.Function.Name,
 				Content:  fmt.Sprintf("Permission denied: %s", reason),
@@ -562,7 +585,7 @@ func (a *Agent) executeToolCallsConcurrent(
 	}
 
 	if len(permittedCalls) == 0 {
-		return messages, toolCallCount
+		return collect(), toolCallCount
 	}
 
 	// Partition by safety and execute concurrently
@@ -577,10 +600,16 @@ func (a *Agent) executeToolCallsConcurrent(
 	executor.SetHooks(postToolUse, permissionDenied)
 	executor.SetBatchObserver(a.config.ToolBatchObserver)
 
+	// Partition keeps call order and every call yields exactly one message,
+	// so executed messages line up with permittedCalls.
 	executedMessages, _ := executor.ExecuteBatches(ctx, batches, events)
-	messages = append(messages, executedMessages...)
+	for j, m := range executedMessages {
+		if j < len(permittedCalls) {
+			setSlot(permittedCalls[j].Index, m)
+		}
+	}
 
-	return messages, toolCallCount
+	return collect(), toolCallCount
 }
 
 func defaultLogger() *slog.Logger {
@@ -592,14 +621,10 @@ func (a *Agent) nextToolID() string {
 	return fmt.Sprintf("tool-%d", id)
 }
 
+// sendEvent delivers evt unless the run is canceled and the consumer is not
+// reading. A free slot always wins over cancellation, so a canceled run does
+// not randomly drop events that could have been delivered.
 func sendEvent(ctx context.Context, events chan<- Event, evt Event) {
-	select {
-	case events <- evt:
-	case <-ctx.Done():
-	}
-}
-
-func sendEventForce(ctx context.Context, events chan<- Event, evt Event) {
 	select {
 	case events <- evt:
 		return
@@ -608,6 +633,35 @@ func sendEventForce(ctx context.Context, events chan<- Event, evt Event) {
 	select {
 	case events <- evt:
 	case <-ctx.Done():
+	}
+}
+
+// terminalGrace is how long a canceled run waits for a slow consumer to take
+// the Terminal event before giving up (so an abandoned channel cannot leak the
+// goroutine).
+const terminalGrace = 2 * time.Second
+
+// sendTerminal delivers the single Terminal event. Unlike sendEvent it keeps
+// trying after the context is canceled, because the consumer needs Terminal
+// to learn how the run ended.
+func sendTerminal(ctx context.Context, events chan<- Event, evt Terminal) {
+	select {
+	case events <- evt:
+		return
+	default:
+	}
+	if ctx.Err() == nil {
+		select {
+		case events <- evt:
+			return
+		case <-ctx.Done():
+		}
+	}
+	timer := time.NewTimer(terminalGrace)
+	defer timer.Stop()
+	select {
+	case events <- evt:
+	case <-timer.C:
 	}
 }
 

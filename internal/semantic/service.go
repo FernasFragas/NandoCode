@@ -49,22 +49,17 @@ func (s *LocalService) Status(ctx context.Context, root string) (Status, error) 
 		}
 		return st, err
 	}
-	records, err := s.store.LoadRecords(ctx, manifest)
-	if err != nil {
-		return st, err
-	}
-	vectors, err := s.store.LoadVectors(ctx, manifest)
-	if err != nil {
-		return st, err
-	}
+	// Status runs on every browser prompt, so it answers from the manifest
+	// alone: records and vectors are written together by Replace, so their
+	// counts equal manifest.RecordCount.
 	st.Exists = true
 	st.Compatible = manifest.SchemaVersion == SchemaVersion
 	st.Model = manifest.Model
 	st.Dimensions = manifest.Dimensions
 	st.SchemaVersion = manifest.SchemaVersion
 	st.FileCount = manifest.FileCount
-	st.RecordCount = len(records)
-	st.VectorCount = len(vectors.Vectors)
+	st.RecordCount = manifest.RecordCount
+	st.VectorCount = manifest.RecordCount
 	st.UpdatedAt = manifest.UpdatedAt
 	if ls, ok := s.store.(*LocalStore); ok {
 		st.IndexPath = ls.workspaceDir(manifest)
@@ -222,6 +217,16 @@ func (s *LocalService) Refresh(ctx context.Context, req RefreshRequest) (BuildRe
 			return s.Build(ctx, BuildRequest{Root: root, Config: cfg, EventSink: req.EventSink})
 		}
 		return BuildReport{}, err
+	}
+	if manifest.Model != cfg.Model {
+		// The old vectors belong to another embedding model; reusing them
+		// would only relabel them. Re-embed everything.
+		s.publish(req.EventSink, Event{
+			Stage:   StageScanStart,
+			Root:    root,
+			Message: "refresh falling back to full build: embedding model changed",
+		})
+		return s.Build(ctx, BuildRequest{Root: root, Config: cfg, EventSink: req.EventSink})
 	}
 	oldRecords, err := s.store.LoadRecords(ctx, manifest)
 	if err != nil {

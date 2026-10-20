@@ -9,11 +9,17 @@ import (
 	"strings"
 	"time"
 
-	"github.com/FernasFragas/Nandocode/internal/mcp"
+	"github.com/FernasFragas/Nandocode/internal/netguard"
 )
 
+// hookPolicy keeps the historical hook rules (loopback reachable, http only to
+// loopback, private ranges denied) on top of the shared guard.
+func hookPolicy(timeout time.Duration) netguard.Policy {
+	return netguard.Policy{AllowLoopback: true, HTTPLoopbackOnly: true, Timeout: timeout}
+}
+
 func runHTTPHook(ctx context.Context, h Hook, env Envelope, cfg Config) Result {
-	if err := mcp.ValidateHTTPDestination(h.URL, false); err != nil {
+	if err := netguard.ValidateURL(h.URL, hookPolicy(0)); err != nil {
 		return Result{Warning: fmt.Sprintf("http hook blocked for %q: %v", h.URL, err)}
 	}
 	method := strings.ToUpper(strings.TrimSpace(h.Method))
@@ -38,7 +44,7 @@ func runHTTPHook(ctx context.Context, h Hook, env Envelope, cfg Config) Result {
 		}
 		req.Header.Set(k, v)
 	}
-	client := mcp.NewSafeHTTPClient(false, timeout)
+	client := netguard.NewClient(hookPolicy(timeout))
 	resp, err := client.Do(req)
 	if err != nil {
 		return Result{Warning: fmt.Sprintf("http hook call failed: %v", err)}

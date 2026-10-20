@@ -795,3 +795,33 @@ func mustWriteFile(t *testing.T, path, body string) {
 		t.Fatal(err)
 	}
 }
+
+func TestExpandPromptTrailingQuestionMarkResolvesFile(t *testing.T) {
+	t.Parallel()
+	dir := t.TempDir()
+	mustWriteFile(t, filepath.Join(dir, "main.go"), "package main\n")
+	ctx := tools.DefaultContext(context.Background(), dir)
+
+	_, files, _, err := ExpandPrompt("what does @main.go? do", ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(files) != 1 || filepath.Base(files[0].Path) != "main.go" {
+		t.Fatalf("files=%+v", files)
+	}
+}
+
+func TestExpandPromptFileNamedWithTrailingQuestionMark(t *testing.T) {
+	t.Parallel()
+	dir := t.TempDir()
+	mustWriteFile(t, filepath.Join(dir, "what?"), "literal\n")
+	ctx := tools.DefaultContext(context.Background(), dir)
+
+	_, files, _, err := ExpandPrompt("see @what?", ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(files) != 1 || filepath.Base(files[0].Path) != "what?" {
+		t.Fatalf("files=%+v", files)
+	}
+}

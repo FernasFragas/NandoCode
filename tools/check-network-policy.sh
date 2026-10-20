@@ -16,6 +16,8 @@ ALLOWED_PATTERNS=(
   "https://localhost:11434"
   "https://127.0.0.1:11434"
   "https://ollama.com"
+  # XML namespace identifier used by createElementNS in web/js/dom.js; not an endpoint.
+  "http://www.w3.org/2000/svg"
 )
 
 # Files to ignore (documentation, this plan, git internals, vendor, binaries)
@@ -25,8 +27,6 @@ IGNORE_PATTERNS=(
   "node_modules/"
   ".github/"
   "SECURITY.md"
-  "go-ollama-plan-AGENTS.md"
-  "go-ollama-plan-HUMANS.md"
   "docs/"
   "book/"
   ".docs/"

@@ -1,0 +1,12 @@
+/* The dismissal control leaves the broker request pending and reviewable. */
+.bv-permission-review {
+  margin: var(--sp-2) var(--sp-4);
+  padding: var(--sp-2) var(--sp-3);
+  border: 1px solid var(--warning);
+  border-radius: var(--r-md);
+  background: var(--card-raised);
+  color: var(--text);
+  font: inherit;
+  cursor: pointer;
+}
+.bv-permission-review:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }

@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/FernasFragas/Nandocode/internal/agent"
@@ -35,6 +36,9 @@ type Tool struct {
 	permissionPrompt permissions.PromptFunc
 	promptTimeout    time.Duration
 	supervisor       *tasks.Supervisor
+
+	policyMu sync.Mutex
+	policy   *agent.ParentPolicy
 }
 
 func New(client llm.Client, registry *tools.Registry, cfg agent.Config, sessionID string, getModel, getProvider func() string) *Tool {
@@ -55,6 +59,27 @@ func (t *Tool) SetSupervisor(sup *tasks.Supervisor) {
 
 func (t *Tool) SetPermissionPrompt(fn permissions.PromptFunc) {
 	t.permissionPrompt = fn
+}
+
+// SetParentPolicy records the permission policy (mode, rules and hooks) of the
+// agent run that is calling this tool. The agent loop calls it before every
+// tool call, so the sub-agent can be held to the parent's policy.
+func (t *Tool) SetParentPolicy(p agent.ParentPolicy) {
+	t.policyMu.Lock()
+	defer t.policyMu.Unlock()
+	t.policy = &p
+}
+
+// parentPolicy returns the calling run's policy. When none was recorded it
+// falls back to the mode carried by the tool context, with no rules or hooks.
+func (t *Tool) parentPolicy(ctx tools.Context) agent.ParentPolicy {
+	t.policyMu.Lock()
+	p := t.policy
+	t.policyMu.Unlock()
+	if p != nil {
+		return *p
+	}
+	return agent.ParentPolicy{Mode: permissions.FromToolsMode(ctx.PermissionMode)}
 }
 
 func (t *Tool) Name() string { return "Agent" }
@@ -111,7 +136,10 @@ func (t *Tool) Call(ctx tools.Context, input any, progress chan<- tools.Progress
 		return tools.Result{}, fmt.Errorf("sub-agent recursion not allowed")
 	}
 
-	permMode := permissions.Mode(in.PermissionMode).Normalize()
+	// A sub-agent can never be looser than its parent: the model-supplied
+	// permission_mode is clamped, and the parent's rules and hooks carry over.
+	parent := t.parentPolicy(ctx)
+	permMode := permissions.ClampMode(parent.Mode, permissions.Mode(in.PermissionMode))
 	model := strings.TrimSpace(in.Model)
 	if model == "" {
 		model = t.getModel()
@@ -135,6 +163,14 @@ func (t *Tool) Call(ctx tools.Context, input any, progress chan<- tools.Progress
 		if !in.Background {
 			return tools.Result{}, fmt.Errorf("coordinator mode requires background worker launch")
 		}
+		name := strings.TrimSpace(in.Name)
+		if name != "" {
+			// Refuse before any worker starts, so a rejected name leaves
+			// nothing running and nothing counted against MaxWorkers.
+			if err := t.supervisor.CheckName(name); err != nil {
+				return tools.Result{}, err
+			}
+		}
 		taskIDCh := make(chan string, 1)
 		taskID, err := t.supervisor.Start(ctx.EffectiveContext(), types.KindAgent, "coordinator worker", tasks.AgentRunFuncWithMailbox(
 			t.client, t.registry, t.config, t.session, ctx, in.Task, model, provider, t.supervisor, taskIDCh,
@@ -142,12 +178,16 @@ func (t *Tool) Call(ctx tools.Context, input any, progress chan<- tools.Progress
 		if err != nil {
 			return tools.Result{}, err
 		}
-		taskIDCh <- taskID
-		if name := strings.TrimSpace(in.Name); name != "" {
+		if name != "" {
 			if err := t.supervisor.RegisterName(name, taskID); err != nil {
+				// Lost a race for the name: stop the worker before it is
+				// announced; it exits on its context at the taskIDCh wait.
+				_ = t.supervisor.Stop(taskID)
 				return tools.Result{}, err
 			}
 		}
+		t.supervisor.SetWorkerMeta(taskID, tasks.WorkerMeta{Name: name, Task: in.Task, Model: model, Parent: "coordinator"})
+		taskIDCh <- taskID
 		st, _ := t.supervisor.Get(taskID)
 		s := st.ToSummary()
 		return tools.Result{
@@ -165,24 +205,105 @@ func (t *Tool) Call(ctx tools.Context, input any, progress chan<- tools.Progress
 		Model:            model,
 		LLMProvider:      provider,
 		ToolContext:      ctx,
-		PermissionMode:   permMode,
-		PermissionRules:  permissions.Rules{},
+		PermissionMode:   parent.Mode.Normalize(),
+		PermissionRules:  parent.Rules,
 		PermissionPrompt: t.wrapPermissionPrompt(),
+		HookDecision:     parent.HookDecision,
+		PostToolUse:      parent.PostToolUse,
+		PermissionDenied: parent.PermissionDenied,
 		IsSubagent:       false,
 	}
-	result, err := agent.RunSubagent(ctx.EffectiveContext(), parentInput, agent.SubagentParams{
+	params := agent.SubagentParams{
 		Mode:           agent.SpawnBuiltin,
 		Task:           in.Task,
 		PermissionMode: permMode,
 		Background:     in.Background,
 		MaxTurns:       safeAgentToolMaxTurns(in.MaxTurns),
 		SessionID:      t.session,
-	}, t.client, t.registry, t.config)
+	}
+	if t.supervisor == nil {
+		result, err := agent.RunSubagent(ctx.EffectiveContext(), parentInput, params, t.client, t.registry, t.config)
+		if err != nil {
+			return tools.Result{}, err
+		}
+		return tools.Result{Display: result}, nil
+	}
+	result, err := t.runTracked(ctx, parentInput, params, in, model)
 	if err != nil {
 		return tools.Result{}, err
 	}
 	return tools.Result{Display: result}, nil
 }
+
+// runTracked runs a normal (non-coordinator) sub-agent as a supervisor task so
+// it is announced to the browser like a coordinator worker. The call still
+// blocks until the sub-agent ends, and the permission clamp is unchanged: the
+// same parentInput and params reach agent.RunSubagent.
+func (t *Tool) runTracked(ctx tools.Context, parentInput agent.Input, params agent.SubagentParams, in Input, model string) (string, error) {
+	var (
+		result string
+		runErr error
+		done   = make(chan struct{})
+		idCh   = make(chan string, 1)
+		paths  = map[string]struct{}{}
+		names  = map[string]string{}
+		tgts   = map[string]string{}
+	)
+	sup := t.supervisor
+	taskID, err := sup.Start(ctx.EffectiveContext(), types.KindAgent, "sub-agent", func(runCtx context.Context, _ *tasks.OutputWriter) (int, error) {
+		defer close(done)
+		// Runs before close(done): record the panic for the caller, then let
+		// it propagate so the supervisor marks the task failed (one finished).
+		defer func() {
+			if r := recover(); r != nil {
+				runErr = fmt.Errorf("sub-agent failed: panic: %v", r)
+				panic(r)
+			}
+		}()
+		var id string
+		select {
+		case id = <-idCh:
+		case <-runCtx.Done():
+			runErr = runCtx.Err()
+			return 137, runErr
+		}
+		p := params
+		p.OnEvent = func(e agent.Event) {
+			switch ev := e.(type) {
+			case agent.ToolUseStart:
+				target, path := tasks.WorkerToolTarget(ev.Input)
+				names[ev.ID], tgts[ev.ID] = ev.Name, target
+				if path != "" {
+					paths[path] = struct{}{}
+				}
+				sup.ReportWorkerProgress(id, ev.Name, target, "running")
+			case agent.ToolUseResult:
+				status := "completed"
+				if ev.Err != nil {
+					status = "failed"
+				}
+				sup.ReportWorkerProgress(id, names[ev.ID], tgts[ev.ID], status)
+			case agent.Terminal:
+				sup.ReportWorkerUsage(id, ev.Usage, len(paths))
+			}
+		}
+		result, runErr = runSubagentFn(runCtx, parentInput, p, t.client, t.registry, t.config)
+		if runErr != nil {
+			return 1, runErr
+		}
+		return 0, nil
+	})
+	if err != nil {
+		return "", err
+	}
+	sup.SetWorkerMeta(taskID, tasks.WorkerMeta{Name: strings.TrimSpace(in.Name), Task: in.Task, Model: model, Parent: "main"})
+	idCh <- taskID
+	<-done
+	return result, runErr
+}
+
+// runSubagentFn is replaceable so tests can force a panic.
+var runSubagentFn = agent.RunSubagent
 
 func safeAgentToolMaxTurns(maxTurns int) int {
 	if maxTurns > 0 && maxTurns < 20 {

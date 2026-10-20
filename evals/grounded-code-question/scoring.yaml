@@ -1,0 +1,48 @@
+version: 1
+id: grounded-code-question
+description: Answer a code question from repository evidence (search, read, cite) without inventing paths; measures the grounding system prompt.
+tags:
+  - deterministic
+  - grounding
+  - go
+execution:
+  timeout: 90s
+  max_turns: 8
+  max_tool_calls: 12
+  permission_mode: default
+  approval_strategy: allow
+model:
+  live:
+    temperature: 0
+  recorded:
+    recording: default
+workspace:
+  forbidden_changes:
+    - "**"
+  must_exist:
+    - "server/model.go"
+    - "server/routes.go"
+  must_not_exist: []
+  max_changed_files: 0
+golden:
+  compare: exact
+checks:
+  final_answer_contains:
+    - "POST /v1/sessions/{id}/model"
+    - "handleUpdateModel"
+    - "server/model.go"
+    - "403"
+  required_tools:
+    - Grep
+    - FileRead
+  forbidden_tools:
+    - FileWrite
+    - FileEdit
+    - Bash
+weights:
+  task_completion: 0.2
+  tests: 0.0
+  expected_files: 0.0
+  change_scope: 0.2
+  final_answer: 0.6
+pass_threshold: 0.9

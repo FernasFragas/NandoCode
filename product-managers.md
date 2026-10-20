@@ -107,5 +107,5 @@ None open as of 2026-10-06. Decided that day: positioning ("the local agentic en
 - [README.md](README.md): public overview and quickstart.
 - [docs/product/](docs/product/): product thinking and brainstorms.
 - [docs/plans/WEB-UI-UX-PRODUCT-PLAN.md](docs/plans/WEB-UI-UX-PRODUCT-PLAN.md): browser app product plan.
-- [docs/reports/e2e/2026-06-07/E2E-MASTER-REPORT-2026-06-07.md](docs/reports/e2e/2026-06-07/E2E-MASTER-REPORT-2026-06-07.md): latest end-to-end quality run.
+- [docs/phases/PHASE-LOG.md](docs/phases/PHASE-LOG.md): what has shipped and how it was verified.
 - [docs/architecture/ARCHITECTURE.md](docs/architecture/ARCHITECTURE.md): how it's built, if you want the technical picture.

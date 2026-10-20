@@ -50,6 +50,9 @@ type SkillFile struct {
 func (s SkillFile) IsFilesystem() bool { return strings.TrimSpace(s.Path) != "" }
 func (s SkillFile) IsEmbedded() bool   { return strings.TrimSpace(s.EmbedPath) != "" }
 
+// maxScanTokenBytes bounds a single line of a skill file (header or body).
+const maxScanTokenBytes = 1 << 20
+
 type frontmatter struct {
 	Name        string   `yaml:"name"`
 	Description string   `yaml:"description"`
@@ -62,7 +65,9 @@ func parseFrontmatter(r io.Reader) (SkillFile, string, error) {
 	sc := bufio.NewScanner(r)
 	maxLines := 50
 	maxBytes := 4096
-	sc.Buffer(make([]byte, 0, 4096), maxBytes)
+	// Body lines may exceed the 4 KB header limit; the header limit is enforced
+	// by the bytesRead check below, not by the scanner buffer.
+	sc.Buffer(make([]byte, 0, 4096), maxScanTokenBytes)
 
 	var lines []string
 	bytesRead := 0

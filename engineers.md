@@ -129,5 +129,5 @@ Everything else (ideas, UX follow-ups, tech debt, open decisions) is in
 | Docker / server deployment | [README.Docker.md](README.Docker.md) |
 | Everything in `docs/` | [docs/README.md](docs/README.md) |
 
-Phase docs sometimes cite `book/chNN-*.md` and `.codex/` files. Those are not in
+Older phase docs sometimes cite `book/chNN-*.md` and `.codex/` files. Those are not in
 the repository; treat the citations as background reading you can skip.

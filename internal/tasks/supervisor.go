@@ -36,6 +36,11 @@ type Supervisor struct {
 	dreamTaskID       string
 	dreamResult       string
 	dreamCompletedAt  time.Time
+	workerMeta        map[string]WorkerMeta
+	workerObserver    func(WorkerEvent)
+	// emitMu serializes worker events so started precedes everything and
+	// nothing follows finished.
+	emitMu sync.Mutex
 }
 
 func NewSupervisor(sessionDir string, store *state.Store[state.App]) *Supervisor {
@@ -45,6 +50,7 @@ func NewSupervisor(sessionDir string, store *state.Store[state.App]) *Supervisor
 		sessionDir:        sessionDir,
 		store:             store,
 		agentNameRegistry: map[string]string{},
+		workerMeta:        map[string]WorkerMeta{},
 	}
 }
 
@@ -55,33 +61,26 @@ func (s *Supervisor) Start(ctx context.Context, kind types.TaskKind, desc string
 		return "", fmt.Errorf("run func is required")
 	}
 	id := ids.New(kind)
-	p := PendingTask{ID: id, Kind: kind, Description: desc, CreatedAt: time.Now().UTC()}
-	s.mu.Lock()
-	s.tasks[id] = p
-	s.mu.Unlock()
-	s.publish(p.ToSummary())
 
-	taskCtx, cancel := context.WithCancel(ctx)
-	s.mu.Lock()
-	s.cancels[id] = cancel
-	s.mu.Unlock()
-
+	// Do everything that can fail before the task becomes visible, so a
+	// failed Start leaves no pending task, summary or cancel func behind.
 	outputPath := filepath.Join(s.sessionDir, id+".jsonl")
 	if err := os.MkdirAll(filepath.Dir(outputPath), 0o700); err != nil {
-		s.mu.Lock()
-		delete(s.tasks, id)
-		delete(s.cancels, id)
-		s.mu.Unlock()
 		return "", err
 	}
 	out, err := NewOutputWriter(outputPath)
 	if err != nil {
-		s.mu.Lock()
-		delete(s.tasks, id)
-		delete(s.cancels, id)
-		s.mu.Unlock()
 		return "", err
 	}
+
+	p := PendingTask{ID: id, Kind: kind, Description: desc, CreatedAt: time.Now().UTC()}
+	taskCtx, cancel := context.WithCancel(ctx)
+	s.mu.Lock()
+	s.tasks[id] = p
+	s.cancels[id] = cancel
+	s.mu.Unlock()
+	s.publish(p.ToSummary())
+
 	r := RunningTask{PendingTask: p, StartedAt: time.Now().UTC(), OutputFile: outputPath}
 	s.mu.Lock()
 	s.tasks[id] = r
@@ -89,6 +88,7 @@ func (s *Supervisor) Start(ctx context.Context, kind types.TaskKind, desc string
 	s.publish(r.ToSummary())
 
 	go func() {
+		defer cancel()
 		defer out.Close()
 		defer func() {
 			if rec := recover(); rec != nil {
@@ -185,6 +185,9 @@ func (s *Supervisor) List() []TaskState {
 }
 
 func (s *Supervisor) publish(summary types.TaskSummary) {
+	if summary.Kind == types.KindAgent && summary.Status != types.StatusPending && summary.Status != types.StatusRunning {
+		s.reportWorkerFinished(summary)
+	}
 	if s.store == nil {
 		return
 	}
@@ -208,13 +211,14 @@ func (s *Supervisor) publish(summary types.TaskSummary) {
 
 func (s *Supervisor) QueueMessage(taskID string, msg PendingMessage) error {
 	s.mu.Lock()
-	defer s.mu.Unlock()
 	st, ok := s.tasks[taskID]
 	if !ok {
+		s.mu.Unlock()
 		return fmt.Errorf("task %s not found", taskID)
 	}
 	running, ok := st.(RunningTask)
 	if !ok {
+		s.mu.Unlock()
 		return fmt.Errorf("task %s is not running", taskID)
 	}
 	if running.AgentMeta == nil {
@@ -228,15 +232,23 @@ func (s *Supervisor) QueueMessage(taskID string, msg PendingMessage) error {
 	}
 	err := running.AgentMeta.Mailbox.Enqueue(msg)
 	if errors.Is(err, ErrDuplicateMessageID) {
+		s.mu.Unlock()
 		return nil
 	}
 	if err != nil {
+		s.mu.Unlock()
 		return err
 	}
 	if err := appendMailboxJSONL(running.AgentMeta.MailboxFile, msg); err != nil {
+		s.mu.Unlock()
 		return err
 	}
 	s.tasks[taskID] = running
+	s.mu.Unlock()
+	if msg.Timestamp.IsZero() {
+		msg.Timestamp = time.Now().UTC()
+	}
+	s.reportWorkerMessage(taskID, msg)
 	return nil
 }
 
@@ -271,6 +283,29 @@ func appendMailboxJSONL(path string, msg PendingMessage) error {
 	return enc.Encode(msg)
 }
 
+// CheckName reports whether RegisterName would accept name for a new task, so
+// a launch can be refused before any task starts.
+func (s *Supervisor) CheckName(name string) error {
+	trimmed := strings.TrimSpace(name)
+	if trimmed == "" {
+		return fmt.Errorf("agent name is required")
+	}
+	if !agentNamePattern.MatchString(trimmed) {
+		return fmt.Errorf("invalid agent name %q", name)
+	}
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	if existing, ok := s.agentNameRegistry[trimmed]; ok {
+		if st, exists := s.tasks[existing]; exists {
+			status := st.ToSummary().Status
+			if status == types.StatusPending || status == types.StatusRunning {
+				return fmt.Errorf("agent name %q already in use", trimmed)
+			}
+		}
+	}
+	return nil
+}
+
 func (s *Supervisor) RegisterName(name, taskID string) error {
 	trimmed := strings.TrimSpace(name)
 	if trimmed == "" {
@@ -290,6 +325,10 @@ func (s *Supervisor) RegisterName(name, taskID string) error {
 		}
 	}
 	s.agentNameRegistry[trimmed] = taskID
+	if meta, ok := s.workerMeta[taskID]; ok {
+		meta.Name = trimmed
+		s.workerMeta[taskID] = meta
+	}
 	return nil
 }
 
@@ -415,7 +454,7 @@ func agentRunFuncInternal(client llm.Client, registry *tools.Registry, config ag
 			Messages:        []llm.Message{{Role: llm.RoleUser, Content: task}},
 			ToolContext:     ctx,
 			IsSubagent:      true,
-			PermissionMode:  permissions.ModeBubble,
+			PermissionMode:  workerPermissionMode(ctx),
 			PermissionRules: permissions.Rules{},
 		}
 		if supervisor != nil && taskID != "" {
@@ -435,6 +474,10 @@ func agentRunFuncInternal(client llm.Client, registry *tools.Registry, config ag
 		in.ToolContext.Context = runCtx
 		events := ag.Run(runCtx, in)
 		exitCode := 0
+		pathsTouched := map[string]struct{}{}
+		toolTargets := map[string]string{}
+		toolNames := map[string]string{}
+		var runErr error
 		for evt := range events {
 			switch e := evt.(type) {
 			case agent.AssistantTextDelta:
@@ -443,11 +486,31 @@ func agentRunFuncInternal(client llm.Client, registry *tools.Registry, config ag
 				writeJSONL(out, map[string]any{"ts": time.Now().UTC().Format(time.RFC3339Nano), "kind": "thinking_delta", "content": e.Thinking})
 			case agent.ToolUseStart:
 				writeJSONL(out, map[string]any{"ts": time.Now().UTC().Format(time.RFC3339Nano), "kind": "tool_start", "tool_name": e.Name, "tool_id": e.ID})
+				target, path := WorkerToolTarget(e.Input)
+				toolTargets[e.ID] = target
+				toolNames[e.ID] = e.Name
+				if path != "" {
+					pathsTouched[path] = struct{}{}
+				}
+				if supervisor != nil && taskID != "" {
+					supervisor.ReportWorkerProgress(taskID, e.Name, target, "running")
+				}
 			case agent.ToolUseResult:
 				writeJSONL(out, map[string]any{"ts": time.Now().UTC().Format(time.RFC3339Nano), "kind": "tool_result", "tool_id": e.ID, "ok": e.Err == nil})
+				if supervisor != nil && taskID != "" {
+					status := "completed"
+					if e.Err != nil {
+						status = "failed"
+					}
+					supervisor.ReportWorkerProgress(taskID, toolNames[e.ID], toolTargets[e.ID], status)
+				}
 			case agent.Terminal:
+				if supervisor != nil && taskID != "" {
+					supervisor.ReportWorkerUsage(taskID, e.Usage, len(pathsTouched))
+				}
 				if e.Reason != agent.TerminalCompleted {
 					exitCode = 1
+					runErr = fmt.Errorf("worker %s: %s", e.Reason, e.Detail)
 				}
 				writeJSONL(out, map[string]any{"ts": time.Now().UTC().Format(time.RFC3339Nano), "kind": "terminal", "reason": string(e.Reason)})
 				for _, msg := range e.Conversation {
@@ -459,7 +522,7 @@ func agentRunFuncInternal(client llm.Client, registry *tools.Registry, config ag
 				}
 			}
 		}
-		return exitCode, nil
+		return exitCode, runErr
 	}
 }
 
@@ -472,4 +535,22 @@ func writeJSONL(out *OutputWriter, data map[string]any) {
 		return
 	}
 	_ = out.WriteText("stdout", string(b)+"\n")
+}
+
+// workerPermissionMode is the permission mode a background worker runs under.
+// A worker has no prompt to escalate to, so whatever its mode would ask for is
+// denied (Bubble mode asked for every call, so with no prompt every tool call
+// was denied, including read-only ones).
+//
+// The worker does not receive the parent's permission rules or hooks, so it
+// must never be more permissive than the parent can verify: bypass is capped
+// to dontAsk (read-only tools run, everything else is denied); other modes
+// are kept. Full inheritance waits until the parent's rules and hooks
+// (agent.ParentPolicy) are plumbed through to workers.
+func workerPermissionMode(parent tools.Context) permissions.Mode {
+	mode := permissions.FromToolsMode(parent.PermissionMode)
+	if mode == permissions.ModeBypass {
+		return permissions.ModeDontAsk
+	}
+	return mode
 }

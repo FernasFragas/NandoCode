@@ -13,8 +13,6 @@ Status: Pre-implementation plan; final implementation phase
 - Launch positioning (decided 2026-10-06): "the local agentic engineer", with Proof Mode (B5) as the differentiator. The README and docs site lead with it, and include an "ask the codebase" demo with cited answers (no new code needed).
 Source plans and references:
 
-- `.codex/go-ollama-plan-AGENTS.md`
-- `.codex/go-ollama-plan-HUMANS.md`
 - `docs/phases/PHASE-LOG.md`
 - `docs/roadmap/PROJECT-STATUS-AND-ONBOARDING.md`
 - `docs/phases/PHASE-8-DETAILED-PLAN.md`

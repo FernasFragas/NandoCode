@@ -1,0 +1,78 @@
+[
+  {
+    "id": "1",
+    "type": "session_ready",
+    "time": "2026-01-02T03:04:05Z",
+    "session_id": "gallery-basic"
+  },
+  {
+    "id": "2",
+    "type": "run_started",
+    "time": "2026-01-02T03:04:06Z",
+    "session_id": "gallery-basic",
+    "data": {
+      "message_id": "message-1"
+    }
+  },
+  {
+    "id": "3",
+    "type": "assistant_thinking_delta",
+    "time": "2026-01-02T03:04:07Z",
+    "session_id": "gallery-basic",
+    "data": {
+      "thinking": "Checking the project."
+    }
+  },
+  {
+    "id": "4",
+    "type": "tool_use_start",
+    "time": "2026-01-02T03:04:08Z",
+    "session_id": "gallery-basic",
+    "data": {
+      "id": "tool-1",
+      "input": {
+        "path": "src/main.go",
+        "pattern": "TODO"
+      },
+      "name": "Grep"
+    }
+  },
+  {
+    "id": "5",
+    "type": "tool_use_result",
+    "time": "2026-01-02T03:04:09Z",
+    "session_id": "gallery-basic",
+    "data": {
+      "error": "",
+      "id": "tool-1",
+      "result": "src/main.go:1: TODO"
+    }
+  },
+  {
+    "id": "6",
+    "type": "assistant_text_delta",
+    "time": "2026-01-02T03:04:10Z",
+    "session_id": "gallery-basic",
+    "data": {
+      "content": "Done."
+    }
+  },
+  {
+    "id": "7",
+    "type": "terminal",
+    "time": "2026-01-02T03:04:11Z",
+    "session_id": "gallery-basic",
+    "data": {
+      "detail": "",
+      "reason": "completed",
+      "usage": {
+        "PromptEvalCount": 0,
+        "EvalCount": 0,
+        "TotalDuration": 0,
+        "Turns": 2,
+        "ToolCalls": 1,
+        "DoneReason": "stop"
+      }
+    }
+  }
+]

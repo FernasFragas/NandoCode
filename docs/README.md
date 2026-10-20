@@ -20,12 +20,11 @@
 | [`roadmap/`](roadmap/) | Next-phases plan (committed order), backlog, project status snapshot, Gate G0 validation plan. |
 | [`product/`](product/) | Product strategy and brainstorms. Ideas here are not commitments until they reach the roadmap. |
 | [`phases/`](phases/) | Specs for phases that are still open or still need exit-gate evidence (`PHASE-N-DETAILED-PLAN.md`), and `PHASE-LOG.md` (newest first). |
-| [`plans/`](plans/) | Live specs for cross-cutting work: web UI (browser-first steps B1-B4), context/latency and prompt accuracy (CL/PA gate), evaluation framework, performance, cloud API keys, regression testing, E2E testing. |
+| [`plans/`](plans/) | Live specs for cross-cutting work: web UI and browser visual revamp, context/latency and prompt accuracy (CL/PA gate), evaluation framework, performance, regression testing, E2E testing. Design mockups in `UX/`. |
 | [`adr/`](adr/) | Architecture Decision Records. Start with ADR-002 (browser UI is the primary surface). |
 | [`guides/`](guides/) | How-to guides (debug breakpoints). |
-| [`reports/`](reports/) | `e2e/<date>/` E2E run reports, open `bugs/` and `blocks/` from E2E runs, open `investigations/` (root-cause reports). |
+| [`reports/`](reports/) | Open `blocks/` from E2E runs and `investigations/` (root-cause reports) still tied to open work. New E2E runs write to `e2e/<date>/` and open bugs to `bugs/`. |
 | [`manual-tests/`](manual-tests/) | Manual test checklists. |
-| [`archive/`](archive/) | Finished or superseded phase specs, plans, reports, and fix write-ups, kept as history (same sub-folders). Not maintained. |
 
 ## Keeping Docs Honest
 
@@ -33,6 +32,6 @@
 - When code and a doc disagree, the code is right. Fix the doc.
 - Finishing a phase or slice means appending to `phases/PHASE-LOG.md` and updating `roadmap/NEXT-PHASES-IMPLEMENTATION-PLAN.md`.
 - New ideas go in `roadmap/BACKLOG.md`, not in new standalone files.
-- When a phase, plan, or report is finished: update its status line, update `roadmap/PROJECT-STATUS-AND-ONBOARDING.md` if reality changed, close or promote its `BACKLOG.md` items, and move it to the matching `archive/` sub-folder with a one-line "Archived" banner (fix inbound links).
-- Resolved bug reports move to `archive/reports/bugs/` once the fix is verified in source and covered by a test.
-- Phase docs cite `book/` and `.codex/` files that are not in this repository. Treat those citations as background.
+- When a phase, plan, or report is finished: update its status line, update `roadmap/PROJECT-STATUS-AND-ONBOARDING.md` if reality changed, close or promote its `BACKLOG.md` items, and delete it (git history keeps it; fix inbound links). The PHASE-LOG entry is the lasting record.
+- Resolved bug reports are deleted once the fix is verified in source, covered by a test, and recorded in `phases/PHASE-LOG.md`.
+- Older phase docs cite `book/` and `.codex/` files that are not in this repository. Treat those citations as background.

@@ -35,7 +35,7 @@ TUI session: `./bin/nandocodego --model <model> --no-alt-screen` (`--no-alt-scre
 - `docs/phases/PHASE-14-DETAILED-PLAN.md`
 - `docs/phases/PHASE-LOG.md`
 
-The former standalone Phase 14 exit-gate guide is folded into the Phase 14 section below (original archived at `docs/archive/phases/PHASE-14-EXIT-GATE.md`).
+The former standalone Phase 14 exit-gate guide is folded into the Phase 14 section below.
 
 ## Ground Rules
 
@@ -322,7 +322,7 @@ Use `pass`, `fail`, or `blocked`. Do not use vague statuses like "seems ok".
    ```
 
 5. Confirm stdout contains the response and the process exits `0`.
-6. Confirm `--print` with a malformed config exits non-zero with actionable text (decision 2026-10-06, `docs/reports/bugs/BUG-20260607-invalid-config-warning-does-not-fail-print.md`; `blocked` until B1 lands the fix).
+6. Confirm `--print` with a malformed config exits non-zero with actionable text (decision 2026-10-06; fixed in B1-6, 2026-10-20).
 7. Run these commands, each in the browser if an equivalent exists, otherwise in the TUI:
 
    ```text

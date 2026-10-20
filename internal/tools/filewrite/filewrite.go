@@ -2,6 +2,7 @@
 package filewrite
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -98,6 +99,13 @@ func call(ctx tools.Context, input any, progress chan<- tools.ProgressEvent) (to
 	if err != nil {
 		return tools.Result{}, err
 	}
+	lockCtx, cancelLock := context.WithTimeout(ctx.EffectiveContext(), PathLockTimeout)
+	defer cancelLock()
+	unlock, err := LockPath(lockCtx, path)
+	if err != nil {
+		return tools.Result{}, fmt.Errorf("file is being saved from the browser, try again: %w", err)
+	}
+	defer unlock()
 	parent := filepath.Dir(path)
 	if stat, err := os.Stat(parent); err != nil {
 		return tools.Result{}, err

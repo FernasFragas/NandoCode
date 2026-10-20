@@ -1,10 +1,9 @@
 # Browser Visual Revamp Plan (BV)
 
 **Date:** 2026-10-18
-**Status:** BV-0 done; BV-1 to BV-8 not started
+**Status:** BV-0 done (2026-10-18). BV-1 to BV-8b implemented, reviewed (same-provider) and integrated 2026-10-20; **not committed**; Chrome visual approval of the gallery baselines and mockup parity still pending (see PHASE-LOG entries BV-1 to BV-8a/8b). Manual smoke check of the running app by the owner on 2026-10-20: works.
 **Roadmap step:** BV in [`NEXT-PHASES-IMPLEMENTATION-PLAN.md`](../roadmap/NEXT-PHASES-IMPLEMENTATION-PLAN.md)
 **Visual spec:** [`docs/plans/UX/DESIGN-SPEC.md`](UX/DESIGN-SPEC.md) and the two mockups in `docs/plans/UX/`
-**Idea one-pager:** [`docs/ideas/browser-visual-revamp.md`](../ideas/browser-visual-revamp.md)
 **Supersedes:** slice UI-6 of [`WEB-UI-UX-PRODUCT-PLAN.md`](WEB-UI-UX-PRODUCT-PLAN.md). UI-7 panels stay in B3 and render inside the BV shell.
 
 ## Goal
@@ -71,15 +70,15 @@ Order and gates. A slice may start only when every step it waits for is accepted
 | Slice | Waits for | Summary |
 | --- | --- | --- |
 | BV-0 | — | Spec, tokens, icons. **Done 2026-10-18.** |
-| BV-1 | B1-1 | Fixtures, render modules, gallery, visual-check tool |
-| BV-2 | B2 (BF-1 page split) | Shell: header, grid, nav, footer, token handoff |
-| BV-3 | BV-2 | Right rail: status, live usage, todos and tasks, diagnostics, recent events |
-| BV-4 | BV-2 | Transcript cards, composer, permission popover |
-| BV-5 | B2 (BF-2, BF-5, BF-6) | Sessions list, Stop run, Clear, Compact, titles |
-| BV-6 | B2 routing, B1-4 tree walk | Files API, tabs, read-only code viewer, highlighter |
-| BV-7 | BV-6 | Save |
-| BV-8a | B1.5 agent event invariants | `subagent_*` events from the backend |
-| BV-8b | BV-8a, BV-2 | Agents tab UI |
+| BV-1 | B1-1 | Fixtures, render modules, gallery, visual-check tool **Implemented 2026-10-20; pending commit + visual approval.** |
+| BV-2 | B2 (BF-1 page split) | Shell: header, grid, nav, footer, token handoff **Implemented 2026-10-20; pending commit + visual approval.** |
+| BV-3 | BV-2 | Right rail: status, live usage, todos and tasks, diagnostics, recent events **Implemented 2026-10-20; pending commit + visual approval.** |
+| BV-4 | BV-2 | Transcript cards, composer, permission popover **Implemented 2026-10-20; pending commit + visual approval.** |
+| BV-5 | B2 (BF-2, BF-5, BF-6) | Sessions list, Stop run, Clear, Compact, titles **Implemented 2026-10-20; pending commit + visual approval.** |
+| BV-6 | B2 routing, B1-4 tree walk | Files API, tabs, read-only code viewer, highlighter **Implemented 2026-10-20; pending commit + visual approval.** |
+| BV-7 | BV-6 | Save **Implemented 2026-10-20; pending commit + visual approval.** |
+| BV-8a | B1.5 agent event invariants | `subagent_*` events from the backend **Implemented 2026-10-20; pending commit + visual approval.** |
+| BV-8b | BV-8a, BV-2 | Agents tab UI **Implemented 2026-10-20; pending commit + visual approval.** |
 
 BV-3, BV-4, BV-5 and BV-6 may run in parallel once BV-2 has merged.
 

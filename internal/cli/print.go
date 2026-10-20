@@ -12,6 +12,7 @@ import (
 
 	"github.com/FernasFragas/Nandocode/internal/agent"
 	"github.com/FernasFragas/Nandocode/internal/bootstrap"
+	"github.com/FernasFragas/Nandocode/internal/bootstrap/applyconfig"
 	"github.com/FernasFragas/Nandocode/internal/config"
 	"github.com/FernasFragas/Nandocode/internal/contextpack"
 	"github.com/FernasFragas/Nandocode/internal/credentials"
@@ -19,11 +20,10 @@ import (
 	"github.com/FernasFragas/Nandocode/internal/llm/modelresolver"
 	"github.com/FernasFragas/Nandocode/internal/llm/modelruntime"
 	"github.com/FernasFragas/Nandocode/internal/llm/ollama"
-	"github.com/FernasFragas/Nandocode/internal/mentions"
 	"github.com/FernasFragas/Nandocode/internal/observability"
-	"github.com/FernasFragas/Nandocode/internal/retrievalroute"
 	"github.com/FernasFragas/Nandocode/internal/tools"
 	"github.com/FernasFragas/Nandocode/internal/tools/builtin"
+	"github.com/FernasFragas/Nandocode/internal/turnprep"
 	"github.com/spf13/cobra"
 )
 
@@ -86,33 +86,14 @@ func runPrint(ctx context.Context, cmd *cobra.Command, opts printOptions) error 
 	)
 	if loadErr == nil {
 		for _, warning := range cfgRes.Warnings {
+			if strings.Contains(warning, " config parse error at ") || strings.Contains(warning, " config load error at ") {
+				return &cliExitError{code: 3, err: fmt.Errorf("failed to load config: %s", warning)}
+			}
+		}
+		for _, warning := range cfgRes.Warnings {
 			fmt.Fprintln(cmd.ErrOrStderr(), "Config warning:", warning)
 		}
-		initial.DefaultModel = cfgRes.Config.DefaultModel
-		initial.OllamaBaseURL = cfgRes.Config.OllamaBaseURL
-		initial.LLMBaseURL = cfgRes.Config.OllamaBaseURL
-		initial.OllamaCloudEnabled = cfgRes.Config.OllamaCloudEnabled
-		initial.KeepAlive = cfgRes.Config.ChatKeepAlive
-		initial.LLMStreamIdleTimeout = cfgRes.Config.LLMStreamIdleTimeout
-		initial.CloudLLMStreamIdleTimeout = cfgRes.Config.CloudLLMStreamIdleTimeout
-		initial.MaxTurns = cfgRes.Config.MaxTurns
-		initial.MaxConcurrentTools = cfgRes.Config.MaxConcurrentTools
-		initial.BashTimeout = cfgRes.Config.BashTimeout
-		initial.MaxReadChars = cfgRes.Config.MaxReadChars
-		initial.MaxResultChars = cfgRes.Config.MaxResultChars
-		initial.MaxDirFiles = cfgRes.Config.MaxDirFiles
-		initial.MaxPromptFiles = cfgRes.Config.MaxPromptFiles
-		initial.MaxDirBytes = cfgRes.Config.MaxDirBytes
-		initial.MaxPromptBytes = cfgRes.Config.MaxPromptBytes
-		initial.MaxDirDepth = cfgRes.Config.MaxDirDepth
-		initial.MentionDirectorySource = cfgRes.Config.MentionDirectorySource
-		initial.MentionIncludeGitignoredOnExplicit = cfgRes.Config.MentionIncludeGitignoredOnExplicit
-		initial.PromptDumpMode = cfgRes.Config.PromptDumpMode
-		initial.PromptDumpKeep = cfgRes.Config.PromptDumpKeep
-		initial.PromptPreviewChars = cfgRes.Config.PromptPreviewChars
-		initial.PermissionMode = cfgRes.Config.PermissionMode
-		initial.ContextMode = cfgRes.Config.ContextMode
-		initial.MemoryRecallMode = cfgRes.Config.MemoryRecallMode
+		applyconfig.ApplyConfig(&initial, cfgRes.Config, cfgRes.Sources.SlowStageNoticeThreshold)
 	} else {
 		return &cliExitError{code: 3, err: fmt.Errorf("failed to load config: %w", loadErr)}
 	}
@@ -226,68 +207,22 @@ func runPrint(ctx context.Context, cmd *cobra.Command, opts printOptions) error 
 }
 
 func buildPrintInput(input string, toolCtx tools.Context, cfg agent.Config, model, contextMode string, maxOutputTokens int) (agent.Input, error) {
-	packed, _, err := contextpack.BuildCurrentTurnPrompt(input, toolCtx, cfg, agent.Input{
+	// Print mode does not run semantic retrieval itself, but it still inherits
+	// the cheap-prompt tool-mode decision used by interactive flows.
+	prep, err := turnprep.Prepare(turnprep.Request{
+		Prompt:          input,
+		ToolContext:     toolCtx,
+		AgentConfig:     cfg,
 		Model:           model,
 		ContextMode:     contextMode,
 		MaxOutputTokens: maxOutputTokens,
-	}, nil)
+		Routing:         turnprep.RoutingStaticAuto,
+		Grounding:       true,
+	})
 	if err != nil {
 		return agent.Input{}, err
 	}
-	currentTurnPaths := make([]string, 0, len(packed.Files))
-	for _, f := range packed.Files {
-		if strings.TrimSpace(f.Path) == "" {
-			continue
-		}
-		currentTurnPaths = append(currentTurnPaths, f.Path)
-	}
-	currentTurnDirs := make([]string, 0, len(packed.Dirs))
-	for _, d := range packed.Dirs {
-		if strings.TrimSpace(d.Path) == "" {
-			continue
-		}
-		currentTurnDirs = append(currentTurnDirs, d.Path)
-	}
-	// Print mode does not run semantic retrieval itself, but it should still
-	// inherit the same cheap-prompt tool-mode decision used by interactive flows.
-	routeDecision := retrievalroute.Decide(retrievalroute.Input{
-		RawPrompt:            input,
-		ShouldQuery:          true,
-		AttachmentPolicy:     string(packed.ExpansionReport.Intent.AttachmentPolicy),
-		CurrentTurnPaths:     currentTurnPaths,
-		CurrentTurnDirs:      currentTurnDirs,
-		AttachedFileCount:    len(packed.Files),
-		AttachedContextBytes: len(packed.Prompt),
-		IndexKnown:           false,
-		HasIndex:             false,
-		IndexCompatible:      false,
-		SemanticEnabled:      true,
-		SemanticMode:         "auto",
-		PromptIntent:         string(packed.ExpansionReport.Intent.Kind),
-	}, retrievalroute.Config{Mode: "auto"})
-	historyPolicy := agent.HistoryPolicyDefault
-	if packed.ExpansionReport.Intent.AttachmentPolicy == mentions.AttachListingTreeOnly ||
-		packed.ExpansionReport.Intent.Kind == mentions.IntentFileStatus {
-		historyPolicy = agent.HistoryPolicyLatestOnly
-	}
-	evidencePack := packed.PackReport
-	return agent.Input{
-		Model:            model,
-		ContextMode:      contextMode,
-		PromptIntent:     string(packed.ExpansionReport.Intent.Kind),
-		AttachmentPolicy: string(packed.ExpansionReport.Intent.AttachmentPolicy),
-		OriginalUserText: input,
-		HistoryPolicy:    historyPolicy,
-		ToolMode:         string(routeDecision.ToolMode),
-		RouteAction:      string(routeDecision.Action),
-		RouteReason:      string(routeDecision.Reason),
-		RouteProfile:     routeDecision.RequestProfile,
-		ToolContext:      toolCtx,
-		EvidencePack:     &evidencePack,
-		Messages: []llm.Message{
-			{Role: llm.RoleUser, Content: packed.Prompt},
-		},
-	}, nil
+	return prep.Input, nil
 }
 
 func ptrOrNil(s string) *string {

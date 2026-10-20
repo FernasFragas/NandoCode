@@ -8,10 +8,253 @@ This file is the implementation history and acceptance-evidence log, ordered **n
 
 For current routing read [`docs/roadmap/NEXT-PHASES-IMPLEMENTATION-PLAN.md`](../roadmap/NEXT-PHASES-IMPLEMENTATION-PLAN.md) first, then [`docs/roadmap/PROJECT-STATUS-AND-ONBOARDING.md`](../roadmap/PROJECT-STATUS-AND-ONBOARDING.md). Use this log to verify what shipped, what checks ran, and which manual gates still need evidence. Finished phase specs are in `docs/archive/phases/`.
 
+Older entries cite finished specs, plans and reports (`docs/archive/`, completed phase and plan files, the 2026-06-07 E2E reports). Those were removed from the tree on 2026-10-20 and remain in git history.
+
+## Browser Revamp Batch (B1, B1.5, B2, BV-1 to BV-8): Common Status (2026-10-20)
+
+Applies to the eleven entries below (BV-8 down to B1). Per-packet handoffs, RED logs and review notes were agent working files and were not kept; the RED/GREEN summaries in these entries are the record.
+
+- **State:** every packet below is implemented, reviewed and integrated into the staging tree, and **not committed**. Nothing is staged or merged.
+- **Review:** each packet had a same-provider review (Claude Sonnet 5.5, `<ID>.review-claude.md`; Codex reviews exist for a few packets). The owner accepted this instead of the cross-provider review the work-packet protocol asks for. Findings marked CHANGES were fixed test-first and recorded in the packet handoff.
+- **Visual approval not done:** Chrome is not installed where the agents ran, so no screenshot or visual approval was captured. `internal/server/web/dev/baselines/` is empty (no `gallery.png`), so `make visual-check` has nothing to compare. On 2026-10-20 the owner did a manual smoke check of the running app and reported it works; that is not a pixel review against the mockups.
+- **Final integration checks (pass 12b, temp HOME/XDG, `NANDOCODEGO_*_HOME` unset):** gofmt clean; `go build`, `go vet`; `go test ./...`; `go test -race -count=1 ./...` twice; `make check` (gosec and govulncheck skipped, not installed); `make eval` 6/6, score 1.00; `tools/check-allowed-deps.sh`; `tools/check-network-policy.sh`; `node --test 'internal/server/web/js/**/*.test.js' 'internal/server/web/dev/*.test.js'` 349/349. Real-binary `server --dev` smoke: `/` and 55 js/css assets 200, CSP has no `unsafe-inline`, session create/list, files list/PUT (needs_confirm, confirm 200, stale hash 409), cancel 202, clear 200, compact 200, `/dev/` 200 with `--dev` and 404 without.
+- **Flakes:** none in the Go suites. One node run at pass 12a failed once under load (during `make eval`) and passed three reruns; the test was not identified.
+- **Home safety:** a real-HOME `go test ./...` added or changed no file under `~/.local/{state,share}/nandocodego`, but the two directories' mtimes moved. Bisected to `internal/cli` `TestDoctorFailsWhenSecurityBaselineMissing`, which creates and removes a transient entry directly in the real home (not isolated with `t.TempDir`/`Setenv`). Nothing was deleted. Follow-up in the backlog. Separately, an early X4 draft of a checkpoint test wrote `~/.local/state/nandocodego/analysis/latest-checkpoint.json` in the real home before it was fixed to use `NANDOCODEGO_STATE_HOME`; that file may need cleaning by hand.
+- **Network policy:** the one allowlist addition is the XML namespace string `http://www.w3.org/2000/svg` in `tools/check-network-policy.sh` (V1a); it is an identifier, not an endpoint. No new Go dependency, no new network endpoint host (the credential endpoint validates against the existing ollama.com catalog call).
+- **Packet to step map:** B1-1..B1-6 = B1; X1..X7 and X4w = B1.5; B2-P, B2-R, B2-C, B2-K, B2-K2, B2-L, B2-S = B2; V1a..V1f (V1e-1/2/3) = BV-1; BV2 = BV-2 with the B2 page split; V3a/V3b = BV-3; V4a/V4b = BV-4; V5a/V5b = BV-5; V6a/V6b/V6c = BV-6; V7a/V7b = BV-7; V8a/V8b = BV-8a/BV-8b. VZ (the BV final exit gate) is this batch's closing: it waits for the commit and the visual approval.
+
+## BV-8a/8b - Sub-Agent Events And Agents Tab (2026-10-20)
+
+**Status:** Implemented (2026-10-20); pending commit + visual approval. Packets V8a, V8b. See the common status entry above.
+
+### Changes
+
+- V8a: SSE events `subagent_started`, `subagent_progress`, `subagent_usage`, `subagent_message`, `subagent_finished` (`internal/server/events_subagent.go`); `internal/tasks/worker_events.go` (worker observer and tracked-only snapshots); `SessionView.workers`. Both coordinator workers and normal Agent-tool sub-agents emit events; normal sub-agents now appear as `KindAgent` tasks in the task store and are not subject to `MaxWorkers`. Message events carry a summary capped at 200 runes, never the full content.
+- V8b: `features/agents.js`, `agentslog.js` (SSE log store with real event IDs), `ui/agents.js`, `css/agents.css`; Agents tab with list, graph and log views, filter chips, Stop all (reuses the cancel endpoint), nested sub-agent card in the transcript, narrow single-column layout.
+- Review fixes (7 findings in V8a) test-first: `TestSetWorkerMetaAfterKillStillFinishes`, `TestCoordinatorDuplicateNameLaunchesNothing`, `TestWorkerMessageSummaryCappedAndSanitized`, `TestWorkerSnapshotsOnlyListTrackedWorkers`, exactly-once finished and ordering stress, panic returns an error and finishes once.
+
+### Evidence
+
+RED for V8a was a compile failure in a scratch copy, then behavioural failures for the review fixes; RED for V8b was missing modules. GREEN: the common checks.
+
+### Known constraints
+
+- `files_touched` counts only `path`/`file_path`/`filepath` inputs; Bash edits are not counted.
+- `workers` in the session view serialises as `null` (not `[]`) when empty; the UI tolerates it.
+- Replay protection assumes server and browser clocks on the same host.
+- Human visual check pending: Agents tab with 2+ real coordinator workers at 1448x1086 against the mockup crop (graph connectors, Coordinator root, node spacing, aggregation node only after 2 completed workers, list/graph/log layout, filter chips, Stop all); Agents nav opens the tab once; View logs does not double-render with the V6c event log; nested sub-agent card in light and dark; layout below 900px.
+
+## BV-7 - Save From The Browser (2026-10-20)
+
+**Status:** Implemented (2026-10-20); pending commit + visual approval. Packets V7a, V7b.
+
+### Changes
+
+- V7a: `PUT /v1/sessions/{id}/files` (atomic save of an existing UTF-8 file with a `base_sha256` check; 200, 409 stale hash, 423 locked, 403 blocked, 200 `needs_confirm` then re-send with `confirm: once|always`); `file_saved` audit event; Pre/PostToolUse hook dispatch (`hooks/tool_use.go`); path locks shared with `FileWrite`/`FileEdit` (`tools/filewrite/lock.go`); exact-path session allow rules.
+- V7b: `features/editor.js` (textarea editor, dirty and base-hash tracking, Cmd/Ctrl+S, every PUT response path, confirm card in the code pane through the pending store, `hook_notice` toast); tab close guard.
+
+### Evidence
+
+Tests: `TestSaveDenyRuleBlocks`, `TestSaveDenyRuleBlocksNonCanonicalPaths` and the other `handler_files_save_test.go` cases; 22 node tests in `editor.test.js` (RED: module missing). Round-2 review fixes were written test-first. A deny-rule 403 could not be driven against the real binary because this build has no config file for permission rules (only session rules and hooks), so it is covered by in-process tests only.
+
+### Known constraints
+
+- Only existing regular UTF-8 files can be saved; creating new files is not supported. The editor is capped at 256 KB; CR files stay read-only in the code view; no syntax-highlight overlay while editing.
+- Bash writes are not tracked for the 423 response; only `FileWrite`/`FileEdit` calls and path locks are.
+- Rule matching is case-sensitive, so on case-insensitive macOS `SECRETS/k.txt` is not matched by a `secrets/*` rule (the agent loop has the same gap). "always" adds exact-path rules (relative and absolute forms) only.
+- Browser save permission resolution is separate from the agent loop: plan mode blocks even with an allow rule or hook allow; acceptEdits saves without confirm; a hook allow is reported as `decision_source: "rule"`.
+- TOCTOU between the final path re-check and the rename is accepted (localhost, same user).
+- Human visual check pending: textarea fill, fonts and scrolling in both themes; tab dirty dot; conflict banner, diff block, 423/403 notes and the save card at 1448x1086 and narrow widths; Cmd/Ctrl+S does not open the browser Save dialog; tab switch keeps caret, scroll and undo history.
+
+## BV-6 - Files API, Tabs, Code Viewer (2026-10-20)
+
+**Status:** Implemented (2026-10-20); pending commit + visual approval. Packets V6a, V6b, V6c.
+
+### Changes
+
+- V6a: `GET /v1/sessions/{id}/files?path=` replaces `/tree` (one directory or file per request; `tools.ResolvePath` boundary, symlink escape 403, 2 MB cap, binary and invalid UTF-8 415, `sha256` for the save base hash). `tree.js`, `treedata.js`, `composer.js` migrated.
+- V6b: `highlight.js`, lossless tokenizers for Go, JS, JSON, HTML, CSS, YAML, TOML and shell (linear-time CSS property matcher after review).
+- V6c: `features/tabs.js`, `codeview.js`, `css/code.css`; session-restored tabs, read-only code and Markdown views, bounded event log, live reload of clean tabs and a "Changed on disk / Reload / Keep mine" banner for dirty ones. `SessionView.workspace_root` (integrator addition) lets a tool path match a tab.
+
+### Evidence
+
+Seven Go files tests (V6a), tokenizer round-trip tests, `tabs.test.js`; review fixes were written test-first, and the integrator added a RED test for `workspace_root`.
+
+### Known constraints
+
+- Language map is small (go, js, json, html, css, yaml, toml, shell, markdown, else text); directory listing is capped at 500 entries with no truncation flag; no read deny-rule check beyond `tools.ResolvePath`.
+- Without `workspace_root` an absolute tool path is matched to a tab by suffix.
+- Human visual check pending: tree expand/collapse and `@` autocomplete (dir vs file icons); token colours for every class in dark and light themes; tab strip, breadcrumb, line numbers and status bar against mockup B at 1448x1086; reload flash; pane collapse at 0 tabs; Markdown rendering; too-large and binary notices; restore after reload with sessionStorage on and off.
+
+## BV-5 - Sessions, Stop, Clear, Compact (2026-10-20)
+
+**Status:** Implemented (2026-10-20); pending commit + visual approval. Packets V5a, V5b.
+
+### Changes
+
+- V5a: idle, subscriber-free session eviction by `lastActive` (ties by ID) so the session cap no longer blocks New Session; generated titles (`session_titled`), sanitized and capped at 60 runes; starting a run cancels pending title work.
+- V5b: sessions list with select and delete, Stop run (enabled only while running, waits for `terminal`), Clear with a confirmation dialog, Compact (denied, skipped and sizes outcomes); rail mode keeps New session as a sidebar icon.
+
+### Evidence
+
+`runcontrols.test.js`, `sessions_v5b.test.js` (RED: three compact tests); V5a tests cover title/run handoff, deterministic eviction and slot cleanup when eviction races deletion.
+
+### Known constraints and checks
+
+Clear and compact are refused with 409 during a run. Human visual check pending: Stop enabled/disabled look; session rows (active, running, delete icon); Clear/Compact buttons and disabled state; rail mode below 1440px (New session icon, hidden list); Clear confirmation dialog.
+
+## BV-4 - Transcript Cards, Composer, Permission Popover (2026-10-20)
+
+**Status:** Implemented (2026-10-20); pending commit + visual approval. Packets V4a, V4b.
+
+### Changes
+
+- V4a: transcript cards (thinking open then collapse, tool card with Failed pill, capped results, Show all/Show less), incremental render that preserves text selection while streaming, composer, resizable tab split with persisted size (height only), tab event contract.
+- V4b: permission popover at 1200px and wider, inline card below; Esc hides the card without deciding; `permission:open` focuses Allow or reopens a hidden card; pending store keeps the count.
+
+### Evidence
+
+`transcript.test.js`, `split.test.js`, `permission.test.js`; V4b had two saved RED failures for the Esc and reopen behaviour.
+
+### Known constraints
+
+`fakedom` lacks `insertBefore`/`replaceChild`/`replaceWith`, so the transcript falls back to `replaceChildren` in tests. Human visual check pending: split drag and keyboard feel and handle visibility; selection surviving streaming; thinking collapse animation; tool card Failed pill; permission popover at 1448 and inline card below 1200; focus ring on the review button; hidden-card review flow; Esc and Tab order and focus return; alertdialog announcement; transcript and composer against mockup B.
+
+## BV-3 - Right Rail And Event Stores (2026-10-20)
+
+**Status:** Implemented (2026-10-20); pending commit + visual approval. Packets V3a, V3b.
+
+### Changes
+
+- V3a: `agent.TurnUsage` event and SSE `usage_update` (cumulative per run); per-session `todo.TodoList` in the server and `todo_updated` after `TodoWrite`; `/clear` resets the todos (integrator addition).
+- V3b: `eventstore.js`, reworked `features/rail.js` and `css/rail.css`: session status, live usage, todos, diagnostics, last events, index status, pending-permission count.
+
+### Evidence
+
+`TestServerRunEmitsUsageUpdatePerTurn`, `TestServerSessionTodoWriteEmitsTodoUpdated`, `TestServerTodoListsAreSessionScoped`, an event-invariant case for `TurnUsage` (V3a); V3b RED was the missing `eventstore` module plus three rail tests.
+
+### Known constraints
+
+The server `TodoList` is in memory and lost on restart. `/cost` reports last-run usage plus history size, not cumulative session usage (the Meter is server-level; cumulative needs a per-session accumulator). TUI, print and eval ignore the new event safely. Human visual check pending: rail layout at 1448x1086; pending-permission button hover and focus ring; index row states (Not built / Indexing / counts); 5-row event list; the "Last event" row duplicated in Session status and Diagnostics.
+
+## BV-2 - Page Split And Shell (2026-10-20)
+
+**Status:** Implemented (2026-10-20); pending commit + visual approval. Packet BV2 (the B2 BF-1 page split together with the BV-2 shell).
+
+### Changes
+
+`index.html` is now a shell; behaviour lives in ES modules (`app.js`, `ctx.js`, `api.js`, `sse.js`, `delegate.js`, `layout.js`, `pendingstore.js`, `features/*.js`) and `css/*.css` under `internal/server/web/`. The CSP no longer allows `unsafe-inline` (verified in `internal/server/server.go` `securityHeaders` and the pass 12b smoke). Header with model picker, nav, footer, token handoff. The picker lists cloud-only entries and the UI retries on the 428 credential response (B2-K2); narrow layouts keep New session.
+
+### Evidence
+
+Round-1 and round-2 Codex reviews plus a Claude review. `app.test.js` loads the full module graph (21 imports).
+
+### Known constraints
+
+Real-browser visual validation outstanding. Roadmap B4 is therefore further along: the inline-style CSP part is done; ARIA, keyboard and reduced-motion work remain (see the roadmap row).
+
+## BV-1 - Fixtures, Render Modules, Gallery, Visual-Check Tool (2026-10-20)
+
+**Status:** Implemented (2026-10-20); pending commit + visual approval. Packets V1a, V1b, V1c, V1d, V1e-1, V1e-2, V1e-3, V1f.
+
+### Changes
+
+- V1a `web/js/dom.js` (K1 render tree: `h`, `icon`, `mount` with an allowlist; no `on*`, no `javascript:`/`data:` URLs) and the SVG namespace allowlist entry in `tools/check-network-policy.sh`.
+- V1b deterministic session event fixtures recorded with a scripted `AgentRunner`, the real permission broker and the real `TodoWrite` tool (`internal/server/web/dev/fixtures/`).
+- V1c `nandocodego server --dev` and the `/dev/` route (404 without `--dev` for every method).
+- V1d `tools/visualdiff` and `make visual-check`: 1448x1086 local Chrome capture and PNG changed-pixel comparison (exit 2 when Chrome is missing, 1 for a diff over threshold).
+- V1e-1/2/3 pure render modules under `web/js/ui/` (header, nav, sessions, tree, transcript, permission, rail, tabs, agents), class names `bv-<component>__<part>`, hostile-string and empty-state tests.
+- V1f gallery (`web/dev/gallery.{html,js}`), `css/components.css`, `dev/gallery.test.js`.
+
+### Evidence
+
+RED: missing modules (`ERR_MODULE_NOT_FOUND`), payload drift for the fixtures, build failure for `Config.Dev`. GREEN: the common checks.
+
+### Known constraints
+
+- **Baselines and mockup approval are pending a human with Chrome:** `internal/server/web/dev/baselines/` is empty, so the live `make visual-check` comparison has never run.
+- Gallery (`/dev/`) must be checked in both themes for each new sample (permission save card, tabs dirty marker, agents).
+
+## B2 - Browser Parity Blockers (2026-10-20)
+
+**Status:** Implemented (2026-10-20); pending commit. Packets B2-P, B2-R, B2-C, B2-K, B2-K2, B2-L, B2-S (BF-1 is in BV-2 above).
+
+### Changes
+
+- B2-R: `routes()` is one Go 1.22 pattern table (`"METHOD /path/{id}"`); wrong method answers 405 with `Allow`; extra segments and trailing slashes 404; `/dev` is hidden for every method without `--dev`. Test: `routes_test.go` incl. `TestRouteTableDevHiddenForEveryMethod`.
+- B2-C: `POST /v1/sessions/{id}/cancel` (202), exactly one `terminal`, broker released on cancel; server run start/finish go through `runctl.Controller`. Tests: `TestCancelDuringRunEmitsExactlyOneTerminal` and four more, `-race -count=50`.
+- B2-K: `POST .../clear`, `POST .../compact` (dispatches PreCompact/PostCompact; a deny keeps history), `GET .../cost`, `GET .../index/status` (reads only the manifest, P1-8), `POST .../index/build` (async; `semantic.Refresh` re-embeds after an embedding-model change, P1-9).
+- B2-K2: `POST /v1/credentials/ollama-cloud` (key validated against the existing ollama.com catalog, never echoed or logged); a keyless cloud switch now returns 428 (was 400); model switch goes through `modelruntime.Activate`, so limits refresh after a switch; `credentials.Resolver.Remember`. This is the credential test seam for the blocked E2E scenarios B007/B008; they have not been re-run.
+- B2-L: `GET /v1/sessions` and opt-in blank-session reuse (`POST /v1/sessions?reuse=blank`), single-release deletion.
+- B2-S: `permission_resolved` event on every resolution including broker timeout and run cancel (cancel reports `deny`).
+- B2-P: `@main.go?` resolves the file; skill bodies with lines over 4 KB load (cap 1 MB); excerpts stay valid UTF-8. One RED test each.
+
+### Evidence
+
+RED then GREEN per packet. Verified in the staging tree: every endpoint above is registered in `internal/server/server.go`.
+
+### Known constraints
+
+Cost is last-run only; compact refused with 409 during a run; the credential resolver is process-wide, so a key submitted from one browser session unlocks cloud for all sessions of the localhost server; concurrent `reuse=blank` calls can receive the same blank session; the gallery fixture keep-list omits `permission_resolved`; broker timeout is 30 s (unexported field).
+
+## B1.5 - Surface-Neutral Extraction (2026-10-20)
+
+**Status:** Implemented (2026-10-20); pending commit. Some listed items remain open (see "What remains"). Packets X1, X2, X3, X4, X4w, X5, X6, X7.
+
+### Changes
+
+- X1 `internal/turnprep`: one turn-preparation function used by the TUI, server, `--print` and eval, with a grounding system prompt (`grounding.go`) and the eval fixture `evals/grounded-code-question`.
+- X2 `internal/bootstrap/applyconfig`: typed `ApplyConfig` (27 config fields land, 4 are read directly) replacing per-surface mapping; the server now honours the configured tool limits, `BashTimeout`, mention settings and prompt-dump settings (identical defaults, so only customised `config.toml` files see a difference).
+- X3 `modelruntime.Activate`: switch plus limits refresh, non-prompting, returns a credential-required error.
+- X4 `internal/runctl` (`Controller`, `ApplyTerminal`, `ResetConversation`, `CompactConversation` with Pre/PostCompact hooks) and X4w wiring into the TUI, server and print.
+- X5 agent event invariants (`assertEventInvariants`; every tool result has an earlier start, results keep call order, one `Terminal`, `ToolUseProgress` emitted) and runtime bugs: watchdog timeout cancels the upstream request, `Supervisor.Start` rollback leaves no phantom task, coordinator workers can use tools, prompt packer never keeps a tool result without its call, the server closes the MCP manager on shutdown; `TestAgentRunProgressEvents` and `TestSupervisorStop` are real tests. Review fix: workers never inherit bypass (`TestWorkerPermissionModeNeverBypass`, `TestWorkerUnderBypassParentCannotRunMutatingTool`).
+- X6 `internal/tui/fileindex` moved to `internal/fileindex` (pure move; three importers and two architecture docs updated).
+- X7 `internal/memory` characterization tests (88.8% coverage) and four small bugs, RED first: `grep` abort on lines over 64 KB, `grep` searching nested `node_modules`/`.git`/`.svn`, MCP config `#` inside quoted values, `sendmessage` unchecked type assertion.
+
+### Evidence
+
+Characterization tests green on old code before every move; RED was compile failure on missing packages or assertion failures for the bugs. `make eval` 6/6.
+
+### What remains (B1.5 items not done)
+
+- Local-search fallback for uncertain code questions and a visible evidence state (X1: needs an agent/tool-loop change; evidence state exists only in `Prepared`).
+- Grounding is not applied to `/btw`, re-run of the last message, or supervisor sub-agents.
+- Mid-run compaction in `internal/agent` does not dispatch PreCompact/PostCompact (idle compaction does).
+- `Activate` is used by the server; the TUI `applyModelSwitchResult` still has its own copy.
+- The `time.Sleep` synchronization in untouched test files (`internal/tasks/agent_mailbox_test.go`, `dream_test.go`, `replay_test.go`) remains.
+- Blocking sends on the stream error path in `internal/llm/ollama/ollama.go` and `internal/llm/watchdog.go` need a `select` with `ctx.Done()`.
+
+## B1 - P0 Bugs And Security Hardening (2026-10-20)
+
+**Status:** Implemented (2026-10-20); pending commit. Packets B1-1 to B1-6. B1-1 was first recorded on 2026-10-19 and is folded in here. The two bug reports B1 closes were resolved and removed from the tree.
+
+### Changes
+
+- **B1-1 XSS:** `escapeHtml`/`renderMarkdown` extracted to DOM-free `web/js/markdown.js`; quotes and raw HTML escaped, only http/https/mailto links; `//go:embed web` with a JavaScript MIME type; `TestRoutesServeRichEmbeddedUI`; browser-JS CI job (`ci.yml`, `setup-node`, pinned Node). RED: 5 passed, 13 failed (for example `href="javascript:alert"`, attribute injection) against the inline helpers; the server test failed on the missing `<script type="module">`. The literal `node --test internal/server/web/js/` fails with `MODULE_NOT_FOUND`, so the documented command is `node --test 'internal/server/web/js/**/*.test.js' 'internal/server/web/dev/*.test.js'`.
+- **B1-2 permissions and agents:** argument-aware, fail-closed Bash classifier (`find -delete`, `env rm`, `sort -o`, `git branch -D`, `go env -w`, wrapper unwrapping, non-literal words and `VAR=x cmd` not read-only, getopt-abbreviated long options); `*` matches `/` and `**` semantics in rule globs (linear-time matcher; `USER_MANUAL.md` documents it and that allow rules become broader); `permissions.ClampMode` and `agent.ParentPolicy` so sub-agents never exceed the parent's mode and inherit its rules and hooks; project MCP config can no longer set `trusted`. Tests: `TestClampMode`, `TestStarMatchesSlash`, `TestDoubleStarGlob`, `TestDenyRuleCatBlocksSlashPath`, `TestBashPermissionMatrix` (new rows), `TestBashClassifierFailsClosed`, `TestLoadConfigProjectCannotMarkItselfTrusted`, `TestSubagentCannotEscapePlanModeParent`, `TestSubagentInheritsParentDenyRules`, `TestSubagentInheritsParentHook`.
+- **B1-3 network guard:** `internal/netguard` (`Policy`, `ValidateURL`, `NewClient`, `ValidateDialHost`): blocks `0.0.0.0` and mapped IPv6, dials the validated IP (no DNS rebinding), re-checks redirects, caps HTML bodies, disables proxies; used by MCP HTTP validation, HTTP hooks and webfetch.
+- **B1-4 browser sessions:** per-session `RuntimeClient` (`TestSessionsKeepIndependentModelRuntimes`); the cloud-model switch bug fixed as a precise error for a retired cloud stub (`TestResolveStaleLocalCloudStubReportsRetired`, `TestUpdateModelReportsRetiredCloudStub`); history kept across turns (`TestStartRunKeepsConversationAcrossTurns`); Always Allow persists via `permissions.SessionAllowRule` (`TestAlwaysAllowPersistsExactRuleForNextRun`); file-tree walk contained to the workspace (`TestGetTreeRejectsSymlinkEscapingWorkspace`); security-header tests on every response.
+- **B1-5 context and routing:** `@dir/` evidence cannot follow symlinks outside the workspace; `retrievalroute` tool-mode split from the retrieval decision with whole-word matching (`TestDecideToolModeAndAction`, `TestDecideCodeIdentifiersNeverDisableTools`); `semantic.LLMEmbedder` refuses a cloud runtime client (`TestLLMEmbedderRefusesCloudRuntimeClient`).
+- **B1-6 CLI:** `--print` with a malformed user or project config exits 3 with the config path and parse error before model resolution.
+
+### Evidence
+
+RED then GREEN per packet; round-2 fixes (B1-2 fail-closed classifier, B1-5 routing) were written test-first. GREEN: the common checks; `make eval` ran for the agent changes.
+
+### Known constraints
+
+- The cloud-model bug is fixed as a precise error ("option 2"); `/v1/models` still lists stale `:cloud` tags, so the picker should render them unavailable.
+- Always Allow applies from the next run, not later calls inside the current run. The TUI still builds its own Always Allow rule (`internal/tui/app.go`) without `SessionAllowRule` escaping.
+- `internal/hooks/snapshot.go` still calls `mcp.ValidateHTTPDestination`, so `hooks` still imports `mcp`. MCP and hooks deliberately allow loopback destinations; "localhost rejected" holds for webfetch and the zero `Policy`. DNS names are resolved at dial time only.
+- Bash classification is still a static allowlist: `git log` via config can run external tools, `file -C` writes. Coordinator workers do not inherit the parent's rules and hooks, only its mode, and the speculative executor builds requests without rules or hooks.
+- Windows escape handling in rule globs: rules are matched with `/` only; write `/` in rules on every platform.
+- `make check` skipped `gosec` and `govulncheck` (not installed). Routing vocabulary is a heuristic word list.
+- Bug reports closed: BUG-20260607-server-model-endpoint-rejects-listed-cloud-model and BUG-20260607-invalid-config-warning-does-not-fail-print. E2E blocks B007/B008 were meant to wait for B2's credential test seam, which now exists (B2-K2); they were not re-run.
+
 ## BV-0 — Browser Visual Revamp: Spec, Tokens, Icons (2026-10-18)
 
 **Date:** 2026-10-18
-**Status:** BV-0 done; BV-1 waits for B1-1
+**Status:** BV-0 done (2026-10-18); BV-1 to BV-8 implemented 2026-10-20, see the entries above
 **Scope:** Plan and visual spec for making the browser UI match `docs/plans/UX/*.png` with real data only; design tokens and icon sprite. No runtime behaviour change.
 
 ### Completed

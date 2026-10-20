@@ -2,6 +2,12 @@
 
 A Go-language agentic coding CLI powered by local LLMs via [Ollama](https://ollama.com).
 
+## Demo
+
+<!-- DEMO VIDEO: replace this comment with the github.com/user-attachments/assets/... link on its own line (GitHub renders it as a video player). -->
+
+*The browser UI (`nandocodego server`): chat with live hook and thinking events, sessions, and a side rail with usage, tasks and diagnostics.*
+
 ## What is nandocodego?
 
 `nandocodego` is a local-first AI coding assistant that brings the power of large language models to your development workflow without sending your code to cloud services. It:
@@ -22,7 +28,7 @@ The point is not to hide the engineer behind the tools. It is to show what one e
 
 ## Status
 
-**Current Version:** v0.0.0-dev (Phase 29 and the evaluation framework complete; next: P0 security fixes (B1), then browser-first parity and Phase 25 browser session durability, see [ADR-002](docs/adr/ADR-002-BROWSER-UI-PRIMARY-SURFACE.md))
+**Current Version:** v0.0.0-dev (P0 security hardening, browser parity and the browser UI revamp complete; next: core cleanup (C1), then Phase 25 browser session durability, see [ADR-002](docs/adr/ADR-002-BROWSER-UI-PRIMARY-SURFACE.md))
 
 This project is under active development. **Engineers** should start with [engineers.md](engineers.md); **product managers** with [product-managers.md](product-managers.md). The committed roadmap is in [Next Phases Implementation Plan](docs/roadmap/NEXT-PHASES-IMPLEMENTATION-PLAN.md) and everything else is in the [Backlog](docs/roadmap/BACKLOG.md).
 
@@ -43,7 +49,9 @@ This project is under active development. **Engineers** should start with [engin
 - ✅ **Phases 28-29:** Semantic workspace indexing/retrieval and TUI index-progress observability
 - ✅ **Ollama Cloud API key support:** complete
 - ✅ **Evaluation framework:** `nandocodego eval` with deterministic fixtures in CI
-- ⏳ **Next:** browser-first work (the browser UI is now the primary surface, see [ADR-002](docs/adr/ADR-002-BROWSER-UI-PRIMARY-SURFACE.md)), Phase 25 browser session durability, then Phase 17 (distribution) and Phase 18 (hardening and release)
+- ✅ **B1, B1.5, B2:** P0 bug and security hardening, surface-neutral extraction, browser parity (run cancel, `/clear` and `/compact`, session list, cloud key entry)
+- ✅ **Browser UI revamp (BV-1 to BV-8):** component system, new shell under a strict CSP, live rail, transcript, sessions, file tree with code view and editing, sub-agent view
+- ⏳ **Next:** core cleanup (C1), Phase 25 browser session durability, browser management panels and accessibility (B3, B4), then Phase 17 (distribution) and Phase 18 (hardening and release)
 
 ## Prerequisites
 
@@ -302,7 +310,11 @@ See [SECURITY.md](SECURITY.md) for:
 - ✅ **Phases 28-29:** Semantic workspace indexing/retrieval and TUI index-progress observability
 - ✅ **Ollama Cloud API key support:** complete
 - ✅ **Evaluation framework:** `nandocodego eval`
+- ✅ **B1, B1.5, B2:** Security hardening, surface-neutral extraction, browser parity
+- ✅ **Browser UI revamp (BV-1 to BV-8):** New browser shell, file view and editing, sub-agent view
+- ⏳ **C1:** Core cleanup
 - ⏳ **Phase 25:** Browser session durability (rescoped from Remote / Bridge Mode)
+- ⏳ **B3-B5:** Browser management panels, accessibility, Proof Mode run report
 - ⏳ **Phases 17-18:** Distribution, hardening, evals, docs, and release approval
 
 See the [Next Phases Implementation Plan](docs/roadmap/NEXT-PHASES-IMPLEMENTATION-PLAN.md), [Project Status](docs/roadmap/PROJECT-STATUS-AND-ONBOARDING.md), and [Phase Log](docs/phases/PHASE-LOG.md) for detailed implementation progress and current launch-readiness routing.

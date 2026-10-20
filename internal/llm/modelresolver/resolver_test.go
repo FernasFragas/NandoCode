@@ -3,6 +3,7 @@ package modelresolver
 import (
 	"context"
 	"errors"
+	"strings"
 	"testing"
 	"time"
 
@@ -173,5 +174,33 @@ func TestCloudCatalogCacheAvoidsRepeatedCalls(t *testing.T) {
 	}
 	if cloud.listCalls != 1 {
 		t.Fatalf("cloud list calls=%d", cloud.listCalls)
+	}
+}
+
+func TestResolveStaleLocalCloudStubReportsRetired(t *testing.T) {
+	t.Parallel()
+	local := &fakeClient{models: []llm.ModelInfo{{Name: "glm-5.1:cloud"}, {Name: "qwen3"}}}
+	cloud := &fakeClient{models: []llm.ModelInfo{{Name: "glm-5.3"}}}
+	r := &Resolver{LocalClient: local, CloudClient: cloud, CloudEnabled: true}
+	_, err := r.Resolve(context.Background(), "glm-5.1:cloud")
+	if !errors.Is(err, ErrCloudModelRetired) {
+		t.Fatalf("err=%v want ErrCloudModelRetired", err)
+	}
+	if errors.Is(err, ErrModelNotFound) {
+		t.Fatalf("a listed stub must not be reported as plain not found: %v", err)
+	}
+	if want := "model glm-5.1 is no longer available in Ollama Cloud"; err == nil || !strings.Contains(err.Error(), want) {
+		t.Fatalf("err=%v want text %q", err, want)
+	}
+}
+
+func TestResolveUnknownColonCloudNotInLocalListStaysNotFound(t *testing.T) {
+	t.Parallel()
+	local := &fakeClient{models: []llm.ModelInfo{{Name: "qwen3"}}}
+	cloud := &fakeClient{models: []llm.ModelInfo{{Name: "glm-5.3"}}}
+	r := &Resolver{LocalClient: local, CloudClient: cloud, CloudEnabled: true}
+	_, err := r.Resolve(context.Background(), "never-existed:cloud")
+	if !errors.Is(err, ErrModelNotFound) {
+		t.Fatalf("err=%v want ErrModelNotFound", err)
 	}
 }

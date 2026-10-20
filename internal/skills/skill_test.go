@@ -91,3 +91,16 @@ func TestSkillFileLocationHelpers(t *testing.T) {
 		t.Fatal("expected non-embedded skill")
 	}
 }
+
+func TestParseFrontmatterLongBodyLine(t *testing.T) {
+	t.Parallel()
+	long := strings.Repeat("x", 5*1024)
+	raw := "---\nname: sample\ndescription: desc\n---\nfirst\n" + long + "\nlast"
+	sf, body, err := parseFrontmatter(strings.NewReader(raw))
+	if err != nil {
+		t.Fatalf("5 KB body line must load: %v", err)
+	}
+	if sf.Name != "sample" || !strings.Contains(body, long) || !strings.HasSuffix(body, "last") {
+		t.Fatalf("bad body (len %d)", len(body))
+	}
+}

@@ -115,6 +115,23 @@ func (r *Resolver) SetSessionKey(key string) {
 	r.mu.Unlock()
 }
 
+// Remember stores the key for this process and optionally in the keychain.
+// A failed keychain write leaves the session key unchanged.
+func (r *Resolver) Remember(key string, persist bool) error {
+	r.normalize()
+	key = strings.TrimSpace(key)
+	if key == "" {
+		return ErrCredentialRequired
+	}
+	if persist {
+		if err := r.Store.Set(r.Service, r.Account, key); err != nil {
+			return fmt.Errorf("failed to save ollama cloud api key to keychain: %w", err)
+		}
+	}
+	r.SetSessionKey(key)
+	return nil
+}
+
 // Resolve resolves a credential by precedence: session, env, keychain, optional prompt.
 func (r *Resolver) Resolve(ctx context.Context, opts ResolveOptions) (string, KeySource, error) {
 	r.normalize()

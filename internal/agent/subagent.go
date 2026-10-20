@@ -51,6 +51,8 @@ type SubagentParams struct {
 	MaxTurns       int
 	SessionID      string
 	NotifyParent   func(string)
+	// OnEvent, when set, sees every event of the child run (read-only).
+	OnEvent func(Event)
 }
 
 func runSubagent(
@@ -115,6 +117,11 @@ func runSubagent(
 	if permissionMode == "" {
 		permissionMode = permissions.ModeBubble
 	}
+	// Defense in depth: a child is never looser than its parent. An empty
+	// parent mode is left alone so callers that do not set one are unaffected.
+	if parentInput.PermissionMode != "" {
+		permissionMode = permissions.ClampMode(parentInput.PermissionMode, permissionMode)
+	}
 	if parentInput.PermissionMode == permissions.ModeBypass || parentInput.PermissionMode == permissions.ModeDontAsk {
 		permissionMode = parentInput.PermissionMode
 	}
@@ -173,6 +180,9 @@ func runSubagent(
 	lastAssistant := ""
 	sawTerminal := false
 	for evt := range events {
+		if params.OnEvent != nil {
+			params.OnEvent(evt)
+		}
 		switch e := evt.(type) {
 		case AssistantTextDelta:
 			lastAssistant += e.Content

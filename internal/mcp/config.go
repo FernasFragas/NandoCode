@@ -75,6 +75,28 @@ func loadConfigFile(path string, trustedDefault bool) (Config, []string) {
 	return parseTOML(string(b), path, trustedDefault)
 }
 
+// stripComment removes a trailing '#' comment, ignoring '#' inside
+// double-quoted (with backslash escapes) or single-quoted strings.
+func stripComment(line string) string {
+	var quote byte
+	for i := 0; i < len(line); i++ {
+		c := line[i]
+		switch {
+		case quote == '"' && c == '\\':
+			i++
+		case quote != 0:
+			if c == quote {
+				quote = 0
+			}
+		case c == '"' || c == '\'':
+			quote = c
+		case c == '#':
+			return strings.TrimSpace(line[:i])
+		}
+	}
+	return strings.TrimSpace(line)
+}
+
 func parseTOML(data, source string, trustedDefault bool) (Config, []string) {
 	var cfg Config
 	var warnings []string
@@ -88,9 +110,7 @@ func parseTOML(data, source string, trustedDefault bool) (Config, []string) {
 		if line == "" || strings.HasPrefix(line, "#") {
 			continue
 		}
-		if i := strings.Index(line, "#"); i >= 0 {
-			line = strings.TrimSpace(line[:i])
-		}
+		line = stripComment(line)
 		if strings.HasPrefix(line, "[") && strings.HasSuffix(line, "]") {
 			raw := strings.TrimSuffix(strings.TrimPrefix(line, "["), "]")
 			const prefix = "mcp.servers."
@@ -190,6 +210,12 @@ func parseTOML(data, source string, trustedDefault bool) (Config, []string) {
 			}
 			srv.Auth = strings.ToLower(strings.TrimSpace(str))
 		case "trusted":
+			if !trustedDefault {
+				// Project config is untrusted input: a repository must not be able to
+				// mark its own MCP servers trusted (that runs the stdio command on open).
+				warnings = append(warnings, fmt.Sprintf("%s:%d ignoring trusted in project config for server %q; trust a server from the user config", source, lineNo, sectionName))
+				continue
+			}
 			v, err := strconv.ParseBool(value)
 			if err != nil {
 				warnings = append(warnings, fmt.Sprintf("%s:%d invalid trusted value", source, lineNo))

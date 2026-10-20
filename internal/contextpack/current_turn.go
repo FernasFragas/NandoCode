@@ -165,6 +165,15 @@ func resolveMentionRefs(input string, ctx tools.Context) ([]mentionRef, error) {
 		if p == "" {
 			continue
 		}
+		// A trailing "?" is usually punctuation (@main.go?): prefer the trimmed
+		// path, fall back to the literal name (a file named "what?").
+		if trimmed := strings.TrimRight(p, "?"); trimmed != p && trimmed != "" {
+			if abs, err := tools.ResolvePath(ctx, trimmed, tools.PathRead); err == nil {
+				if _, serr := os.Stat(abs); serr == nil {
+					p = trimmed
+				}
+			}
+		}
 		seenKey := p
 		if hasRange {
 			seenKey = fmt.Sprintf("%s#L%d-L%d", p, lineStart, lineEnd)
@@ -271,7 +280,7 @@ func buildEvidenceParts(input string, refs []mentionRef, expandedFiles []mention
 	omitted := make([]agent.OmittedEvidence, 0)
 	for _, ref := range refs {
 		if ref.IsDir {
-			samples, localOmit := selectDirectoryEvidence(ctx, ref, input)
+			samples, localOmit := selectDirectoryEvidence(ctx, toolCtx, ref, input)
 			omitted = append(omitted, localOmit...)
 			for _, s := range samples {
 				if remainingChars <= 0 {
@@ -388,7 +397,7 @@ func buildEvidenceParts(input string, refs []mentionRef, expandedFiles []mention
 	return parts, omitted
 }
 
-func selectDirectoryEvidence(ctx context.Context, ref mentionRef, input string) ([]fileEvidence, []agent.OmittedEvidence) {
+func selectDirectoryEvidence(ctx context.Context, toolCtx tools.Context, ref mentionRef, input string) ([]fileEvidence, []agent.OmittedEvidence) {
 	all := make([]string, 0, 128)
 	_ = filepath.WalkDir(ref.Abs, func(path string, d os.DirEntry, err error) error {
 		if err != nil || d == nil {
@@ -399,6 +408,11 @@ func selectDirectoryEvidence(ctx context.Context, ref mentionRef, input string) 
 			if name == ".git" || name == "node_modules" || strings.HasPrefix(name, ".") {
 				return filepath.SkipDir
 			}
+			return nil
+		}
+		// Symlinked files can point outside the allowed roots; resolve each
+		// candidate so only contained files are ever read.
+		if _, err := tools.ResolvePath(toolCtx, path, tools.PathRead); err != nil {
 			return nil
 		}
 		all = append(all, path)
@@ -612,7 +626,8 @@ func deterministicExcerpt(s string, maxChars int) (string, int) {
 		return s, len(s)
 	}
 	if maxChars < 32 {
-		return s[:maxChars], maxChars
+		cut := runeBoundaryBefore(s, maxChars)
+		return s[:cut], cut
 	}
 	head := maxChars / 2
 	tail := maxChars - head
@@ -622,8 +637,29 @@ func deterministicExcerpt(s string, maxChars int) (string, int) {
 	if tail > len(s)-head {
 		tail = len(s) - head
 	}
-	excerpt := s[:head] + "\n... [omitted for budget] ...\n" + s[len(s)-tail:]
-	return excerpt, head + tail
+	head = runeBoundaryBefore(s, head)
+	tailStart := runeBoundaryAfter(s, len(s)-tail)
+	excerpt := s[:head] + "\n... [omitted for budget] ...\n" + s[tailStart:]
+	return excerpt, head + (len(s) - tailStart)
+}
+
+// runeBoundaryBefore returns the largest index <= i that does not split a rune.
+func runeBoundaryBefore(s string, i int) int {
+	if i >= len(s) {
+		return len(s)
+	}
+	for i > 0 && !utf8.RuneStart(s[i]) {
+		i--
+	}
+	return i
+}
+
+// runeBoundaryAfter returns the smallest index >= i that does not split a rune.
+func runeBoundaryAfter(s string, i int) int {
+	for i < len(s) && !utf8.RuneStart(s[i]) {
+		i++
+	}
+	return i
 }
 
 func renderPackedPrompt(input string, refs []mentionRef, evidence []fileEvidence, omitted []agent.OmittedEvidence) string {

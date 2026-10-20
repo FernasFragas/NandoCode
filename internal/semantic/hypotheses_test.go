@@ -344,3 +344,22 @@ func TestLLMEmbedderPropagatesOptionsThroughRuntimeAndObservabilityWrappers(t *t
 		t.Fatalf("lastOpts.KeepAlive=%q want 30m", base.lastOpts.KeepAlive)
 	}
 }
+
+func TestLLMEmbedderRefusesCloudRuntimeClient(t *testing.T) {
+	t.Parallel()
+	local := &captureOptsClient{}
+	cloud := &captureOptsClient{}
+	runtime := llm.NewRuntimeClient(local, llm.ProviderOllamaLocal, "http://localhost:11434")
+	runtime.Switch(cloud, llm.ProviderOllamaCloudAPI, llm.OllamaCloudBaseURL)
+
+	_, err := LLMEmbedder{Client: runtime}.Embed(context.Background(), EmbedRequest{
+		Model: "qwen3-embedding:8b",
+		Input: []string{"private project snippet"},
+	})
+	if err == nil {
+		t.Fatal("expected an error when the runtime client targets Ollama Cloud")
+	}
+	if cloud.lastOpts != nil {
+		t.Fatal("embedding request reached the cloud client")
+	}
+}

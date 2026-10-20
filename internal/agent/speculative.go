@@ -132,7 +132,7 @@ func (se *SpeculativeExecutor) executeConcurrentBatch(
 		eg.Go(func() error {
 			toolCtx := se.toolCtx
 			toolCtx.Context = egCtx
-			result, err := ic.Tool.Call(toolCtx, ic.Input, nil)
+			result, err := callToolWithProgress(ctx, ic.Tool, ic.ToolID, ic.Input, toolCtx, events)
 			results[i] = batchResult{
 				Index:    ic.Index,
 				ToolName: ic.Call.Function.Name,
@@ -195,7 +195,7 @@ func (se *SpeculativeExecutor) executeSingleCall(
 
 	toolCtx := se.toolCtx
 	toolCtx.Context = ctx
-	result, err := tool.Call(toolCtx, ic.Input, nil)
+	result, err := callToolWithProgress(ctx, tool, ic.ToolID, ic.Input, toolCtx, events)
 	sendEvent(ctx, events, ToolUseResult{
 		ID:     ic.ToolID,
 		Result: result,

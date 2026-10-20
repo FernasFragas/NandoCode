@@ -13,6 +13,7 @@ type serverOptions struct {
 	port                      int
 	token                     string
 	noUI                      bool
+	dev                       bool
 	model                     string
 	ollamaURL                 string
 	numCtx                    int
@@ -43,7 +44,7 @@ func newServerCmd() *cobra.Command {
 				return err
 			}
 			return server.RunUntilSignal(cmd.Context(), loggerFromCommand(cmd), server.Config{
-				Bind: opts.bind, Port: opts.port, Token: opts.token, NoUI: opts.noUI,
+				Bind: opts.bind, Port: opts.port, Token: opts.token, NoUI: opts.noUI, Dev: opts.dev,
 				Model: opts.model, OllamaURL: opts.ollamaURL, NumCtx: opts.numCtx,
 				LLMStreamIdleTimeout: opts.llmStreamIdleTimeout, CloudLLMStreamIdleTimeout: opts.cloudLLMStreamIdleTimeout,
 				MaxSessions: opts.maxSessions, IdleTimeout: idle, ReadTimeout: read, WriteTimeout: write,
@@ -54,6 +55,7 @@ func newServerCmd() *cobra.Command {
 	cmd.Flags().IntVar(&opts.port, "port", 8080, "Port")
 	cmd.Flags().StringVar(&opts.token, "token", "", "Bearer token for API auth")
 	cmd.Flags().BoolVar(&opts.noUI, "no-ui", false, "Disable embedded web UI")
+	cmd.Flags().BoolVar(&opts.dev, "dev", false, "Serve the /dev/ component gallery (development only)")
 	cmd.Flags().StringVar(&opts.model, "model", "", "Default LLM model")
 	cmd.Flags().StringVar(&opts.ollamaURL, "ollama-url", "", "Ollama base URL")
 	cmd.Flags().IntVar(&opts.numCtx, "num-ctx", 0, "Ollama context window size")

@@ -1,6 +1,6 @@
 # Backlog
 
-Last reviewed: 2026-10-06 (docs cleanup after the browser-first re-plan, see [ADR-002](../adr/ADR-002-BROWSER-UI-PRIMARY-SURFACE.md)).
+Last reviewed: 2026-10-20 (after the browser revamp batch B1, B1.5, B2, BV-1 to BV-8b; see [ADR-002](../adr/ADR-002-BROWSER-UI-PRIMARY-SURFACE.md)).
 
 This is the single list of work that is **not** on the committed v0.1 path.
 The committed path (what is being built next, in order) lives in
@@ -13,16 +13,13 @@ How to use this file:
 - When something ships, record it in [PHASE-LOG.md](../phases/PHASE-LOG.md) and delete it here.
 - Priority: **P0** = should block v0.1 release, **P1** = strong v0.1 or immediately-after candidate, **P2** = post-launch, **P3** = moonshot.
 
+B1, B1.5, B2 and BV-1 to BV-8b are implemented in the working tree (2026-10-20, pending commit); validation is recorded in [PHASE-LOG.md](../phases/PHASE-LOG.md) and the shipped items were removed from this file.
+
 ## 1. Open Bugs
 
-From the 2026-06-07 E2E run ([master report](../reports/e2e/2026-06-07/E2E-MASTER-REPORT-2026-06-07.md)). Status was re-verified against source on 2026-10-06. Resolved bugs are archived under [archive/reports/bugs/](../archive/reports/bugs/).
+None open. The two bugs from the 2026-06-07 E2E run (cloud-model switch, malformed config in `--print`) were fixed in B1 (2026-10-20); see [PHASE-LOG.md](../phases/PHASE-LOG.md). Add a row (bug, severity, status, next step) when a new one is found.
 
-| Bug | Severity | Status | Next step |
-| --- | --- | --- | --- |
-| [Server model endpoint rejects a listed cloud model](../reports/bugs/BUG-20260607-server-model-endpoint-rejects-listed-cloud-model.md) | sev2 high, **P0** | **Still reproducible** (retest 2026-10-05): `kimi-k2.6:cloud` now switches, but a stale local `glm-5.1:cloud` tag is listed by `/v1/models` and rejected with `model not found` because Ollama Cloud retired `glm-5.1` | Fix in roadmap step B1 |
-| [Invalid config warning does not fail `--print`](../reports/bugs/BUG-20260607-invalid-config-warning-does-not-fail-print.md) | sev4 low | **Open. Decided 2026-10-06: fail fast** | Roadmap step B1: failing `--print` test with a malformed config first, then exit non-zero with actionable text. The browser should surface the same error. |
-
-Blocked E2E scenarios B007/B008 (cloud credential gate observability) are in [reports/blocks/](../reports/blocks/).
+Blocked E2E scenarios B007/B008 (cloud credential gate observability) are in [reports/blocks/](../reports/blocks/). B2-K2 now provides the credential endpoint they were waiting for; re-run them after the commit.
 
 ## 2. Decisions Needed
 
@@ -83,6 +80,37 @@ From [CODE-COMPLEXITY-AND-ARCHITECTURE-REVIEW-2026-10-06.md](../reports/investig
 | Item | Priority | Notes |
 | --- | --- | --- |
 | Fix-when-touched cleanups: `dirwalk` walkers share one admit policy and honor ctx; `grep` uses `fs.SkipAll` and honors ctx; `webfetch.stripHTML` simplification; `permissions.applyMode` unreachable deny branches; `selfinfo` nondeterministic output order; `hooks.Runner` named wrappers; duplicated semantic/route profile defaults; memory's duplicated filename sanitizer | P2/P3 | Fix the listed issue when you are already changing that file; write the test first. Details in the review report |
+
+### Browser revamp follow-ups (2026-10-20)
+
+Open items from the B1, B1.5, B2 and BV packets (details in [PHASE-LOG.md](../phases/PHASE-LOG.md)). Fix test-first.
+
+| Item | Priority | Notes |
+| --- | --- | --- |
+| `internal/cli` `TestDoctorFailsWhenSecurityBaselineMissing` touches the real home | P1 | Creates and removes a transient entry under `~/.local/{state,share}/nandocodego`. Give it `NANDOCODEGO_DATA_HOME`/`STATE_HOME` temp dirs (AGENTS test rule). Also check `~/.local/state/nandocodego/analysis/latest-checkpoint.json` for a stray test checkpoint |
+| Chrome visual approval of the gallery and mockup parity | P1 | Blocks the BV final gate (VZ). Record `baselines/gallery.png`, run `make visual-check`, go through the per-slice checks in PHASE-LOG |
+| Re-run E2E blocks B007/B008 on the credential endpoint | P1 | Needs B2-K2 committed |
+| Rule matching is case-sensitive | P2 | On case-insensitive macOS `SECRETS/k.txt` is not matched by a `secrets/*` rule, in the browser save path and the agent loop alike |
+| Bash-written files are not detected by the save conflict check | P2 | Only `FileWrite`/`FileEdit` calls and path locks produce the 423; a Bash write can be overwritten by a browser save with a stale-looking hash only caught by `base_sha256` |
+| Browser saves only existing UTF-8 files | P2 | No new-file creation; editor capped at 256 KB; CR files read-only; no highlight overlay while editing |
+| Browser save permission is separate from the agent loop | P2 | Plan mode blocks even with an allow rule; a hook allow reports `decision_source: "rule"` (K2 enum has no hook value) |
+| Permission rules cannot be loaded from a config file | P2 | Only session rules and hooks exist, so a live deny-rule 403 is covered by in-process tests only |
+| Cost view is last run only | P2 | Needs a per-session accumulator (the Meter is server-level) |
+| `workers` field serialises as `null` instead of `[]` | P3 | The UI tolerates it; fix in `SessionView` |
+| Files API limits | P3 | Small language map; 500-entry directory cap with no truncation flag; no read deny-rule check beyond `tools.ResolvePath` |
+| `files_touched` ignores Bash edits; message summary capped at 200 runes | P3 | V8a |
+| Coordinator workers inherit the parent's mode but not its rules and hooks | P2 | Pass `agent.ParentPolicy` into a policy-aware worker RunFunc; the speculative executor also builds requests without rules or hooks |
+| Bash read-only classification is a static allowlist | P2 | `git log` with config-defined external tools, `file -C`, and similar remain |
+| TUI Always Allow rule still unescaped | P2 | `internal/tui/app.go` should call `permissions.SessionAllowRule`; Always Allow applies from the next run only |
+| `internal/hooks/snapshot.go` still imports `mcp` for URL validation | P3 | Switch to `netguard.ValidateURL`; MCP/hooks deliberately allow loopback |
+| Model picker should mark stale `:cloud` tags unavailable | P2 | `/v1/models` still lists them |
+| Credential resolver is process-wide | P3 | A key submitted in one browser session unlocks cloud for all sessions (localhost, single user) |
+| `time.Sleep` synchronization in untouched tests | P3 | `internal/tasks` (`agent_mailbox_test.go`, `dream_test.go`, `replay_test.go`), `internal/server` (`session_test.go`, `permission_test.go`); replace when touched |
+| Blocking sends in the Ollama stream error path and `llm/watchdog.go` | P2 | Add `select` with `ctx.Done()` (review P1-3 second half) |
+| Open B1.5 leftovers | P2 | Local-search fallback for uncertain code questions and visible evidence state; grounding on `/btw`, re-run and sub-agents; PreCompact/PostCompact in mid-run compaction; TUI `Activate` adoption |
+| Server `TodoList` is in memory | P3 | Lost on restart; Phase 25 persistence could cover it |
+| Test and tooling gaps | P3 | `gosec`/`govulncheck` not installed locally so `make check` skips them; `fakedom` lacks `insertBefore`/`replaceChild`/`replaceWith`; one unidentified node test failed once under load (pass 12a) |
+| Agent tool schema still advertises `permission_mode` | P3 | It is now clamped; consider removing it |
 
 ## 6. Parked / Out Of Scope For v0.1
 
