@@ -75,11 +75,13 @@ func (s *Server) handlePutFiles(w http.ResponseWriter, r *http.Request, id strin
 		writeOpsJSON(w, 403, map[string]any{"reason": "path not allowed"})
 		return
 	}
-	target, ok = resolveInsideRoots(app.ToolSettings.WorkingDir, app.ToolSettings.AdditionalWorkingDirs, target)
+	root, rel, ok := openInsideRoots(app.ToolSettings.WorkingDir, app.ToolSettings.AdditionalWorkingDirs, target)
 	if !ok {
 		writeOpsJSON(w, 403, map[string]any{"reason": "path not allowed"})
 		return
 	}
+	defer root.Close()
+	target = filepath.Join(root.Name(), rel)
 	if sess.writePending(target, toolCtx) {
 		writeOpsJSON(w, 423, map[string]any{"reason": "agent is writing this file"})
 		return
@@ -94,12 +96,12 @@ func (s *Server) handlePutFiles(w http.ResponseWriter, r *http.Request, id strin
 		writeOpsJSON(w, 423, map[string]any{"reason": "agent is writing this file"})
 		return
 	}
-	info, err := os.Stat(target)
+	info, err := root.Stat(rel)
 	if err != nil || !info.Mode().IsRegular() {
 		writeOpsJSON(w, 403, map[string]any{"reason": "not a regular file"})
 		return
 	}
-	prior, err := os.ReadFile(target)
+	prior, err := root.ReadFile(rel)
 	if err != nil {
 		http.Error(w, "read failed", 500)
 		return
@@ -167,7 +169,7 @@ func (s *Server) handlePutFiles(w http.ResponseWriter, r *http.Request, id strin
 		return
 	}
 	// Hooks may have changed the file while permission was being checked.
-	latest, err := os.ReadFile(target)
+	latest, err := root.ReadFile(rel)
 	if err != nil {
 		http.Error(w, "read failed", 500)
 		return
@@ -232,14 +234,16 @@ func (s *Server) handleGetFiles(w http.ResponseWriter, r *http.Request, id strin
 		}
 		return
 	}
-	// Re-resolve and re-check the final path, then use only that path, so a
-	// symlink swapped after ResolvePath cannot redirect the read.
-	target, ok = resolveInsideRoots(app.ToolSettings.WorkingDir, app.ToolSettings.AdditionalWorkingDirs, target)
+	// Re-resolve and re-check the final path, then read through an os.Root, so
+	// a symlink swapped after ResolvePath cannot redirect the read.
+	root, rel, ok := openInsideRoots(app.ToolSettings.WorkingDir, app.ToolSettings.AdditionalWorkingDirs, target)
 	if !ok {
 		http.Error(w, "path not allowed", http.StatusForbidden)
 		return
 	}
-	info, err := os.Stat(target)
+	defer root.Close()
+	target = filepath.Join(root.Name(), rel)
+	info, err := root.Stat(rel)
 	if err != nil {
 		http.Error(w, "path not found", http.StatusNotFound)
 		return
@@ -275,7 +279,7 @@ func (s *Server) handleGetFiles(w http.ResponseWriter, r *http.Request, id strin
 		writeFilesJSON(w, map[string]any{"kind": "file", "too_large": true, "size": info.Size()})
 		return
 	}
-	f, err := os.Open(target)
+	f, err := root.Open(rel)
 	if err != nil {
 		http.Error(w, "path not found", http.StatusNotFound)
 		return
@@ -339,19 +343,46 @@ func filesLanguage(path string) string {
 // withinAnyRoot reports whether the already-resolved path lies inside one of
 // the already-resolved roots.
 func withinAnyRoot(resolved string, roots []string) bool {
+	_, _, ok := containingRoot(resolved, roots)
+	return ok
+}
+
+// containingRoot returns the first already-resolved root holding the
+// already-resolved path, and the path relative to it.
+func containingRoot(resolved string, roots []string) (string, string, bool) {
 	for _, root := range roots {
 		rel, err := filepath.Rel(root, resolved)
 		if err == nil && rel != ".." && !strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
-			return true
+			return root, rel, true
 		}
 	}
-	return false
+	return "", "", false
 }
 
 func resolveInsideRoots(workDir string, extra []string, target string) (string, bool) {
+	resolved, _, _, ok := locateInsideRoots(workDir, extra, target)
+	return resolved, ok
+}
+
+// openInsideRoots is resolveInsideRoots plus an os.Root for the containing
+// workspace root, so reads through it cannot leave that root even if a
+// symlink is swapped after the check. The caller closes the root.
+func openInsideRoots(workDir string, extra []string, target string) (*os.Root, string, bool) {
+	_, root, rel, ok := locateInsideRoots(workDir, extra, target)
+	if !ok {
+		return nil, "", false
+	}
+	r, err := os.OpenRoot(root)
+	if err != nil {
+		return nil, "", false
+	}
+	return r, rel, true
+}
+
+func locateInsideRoots(workDir string, extra []string, target string) (resolved, root, rel string, ok bool) {
 	resolved, err := filepath.EvalSymlinks(target)
 	if err != nil {
-		return "", false
+		return "", "", "", false
 	}
 	var roots []string
 	for _, r := range append([]string{workDir}, extra...) {
@@ -364,8 +395,9 @@ func resolveInsideRoots(workDir string, extra []string, target string) (string, 
 			}
 		}
 	}
-	if !withinAnyRoot(resolved, roots) {
-		return "", false
+	root, rel, ok = containingRoot(resolved, roots)
+	if !ok {
+		return "", "", "", false
 	}
-	return resolved, true
+	return resolved, root, rel, true
 }

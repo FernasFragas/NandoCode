@@ -1109,7 +1109,7 @@ func (m *Model) handleWindowSize(msg tea.WindowSizeMsg) tea.Cmd {
 	// Resize renderer
 	if m.renderer != nil {
 		newWidth := msg.Width - 4
-		m.renderer.Resize(newWidth)
+		_ = m.renderer.Resize(newWidth)
 		if newWidth != m.markdownRenderWidth {
 			m.markdownRenderWidth = newWidth
 			m.invalidateAssistantMarkdownCache()
@@ -3052,7 +3052,7 @@ func (m *Model) transcriptMutationSignature() uint64 {
 		sig *= prime
 		sig ^= boolToUint64(item.Streaming)
 		sig *= prime
-		sig ^= uint64(item.CharCount)
+		sig ^= uint64(item.CharCount) // #nosec G115 -- hash input; wraparound is harmless
 		sig *= prime
 		sig = hashStringSample(sig, item.Content)
 		sig = hashStringSample(sig, item.Error)
@@ -3620,7 +3620,7 @@ func (m *Model) handleMemoryEdit(args []string) tea.Cmd {
 	if editor == "" {
 		editor = "vi"
 	}
-	cmd := exec.Command(editor, path)
+	cmd := exec.Command(editor, path) // #nosec G204 G702 -- runs the user's own $EDITOR on a memory file
 	return tea.ExecProcess(cmd, func(err error) tea.Msg {
 		return memoryEditDoneMsg{Path: path, Err: err}
 	})

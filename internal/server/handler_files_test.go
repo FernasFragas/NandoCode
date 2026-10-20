@@ -248,3 +248,27 @@ func mustEval(t *testing.T, p string) string {
 	}
 	return r
 }
+
+func TestOpenInsideRootsConfinesReads(t *testing.T) {
+	ws, extra, outside := t.TempDir(), t.TempDir(), t.TempDir()
+	if err := os.WriteFile(filepath.Join(extra, "a.txt"), []byte("extra"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(outside, "secret"), []byte("no"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	root, rel, ok := openInsideRoots(ws, []string{extra}, filepath.Join(extra, "a.txt"))
+	if !ok {
+		t.Fatal("file in an additional root was rejected")
+	}
+	defer root.Close()
+	if got, err := root.ReadFile(rel); err != nil || string(got) != "extra" {
+		t.Fatalf("ReadFile(%q)=%q,%v", rel, got, err)
+	}
+	if _, err := root.ReadFile(filepath.Join("..", filepath.Base(outside), "secret")); err == nil {
+		t.Fatal("root allowed a read outside itself")
+	}
+	if _, _, ok := openInsideRoots(ws, []string{extra}, filepath.Join(outside, "secret")); ok {
+		t.Fatal("file outside every root was accepted")
+	}
+}

@@ -79,7 +79,7 @@ func diff(baseline, actual image.Image) (float64, error) {
 }
 
 func readPNG(path string) (image.Image, error) {
-	f, err := os.Open(path)
+	f, err := os.Open(path) // #nosec G304 -- dev tool; path is the developer's -baseline flag or its own temp dir
 	if err != nil {
 		return nil, err
 	}
@@ -89,7 +89,7 @@ func readPNG(path string) (image.Image, error) {
 
 func chromePath() (string, error) {
 	if configured := os.Getenv("CHROME"); configured != "" {
-		if _, err := os.Stat(configured); err == nil {
+		if _, err := os.Stat(configured); err == nil { // #nosec G703 -- dev tool; CHROME is the developer's own setting
 			return configured, nil
 		}
 		return "", fmt.Errorf("%w: CHROME=%q does not exist", errChromeMissing, configured)
@@ -133,11 +133,11 @@ func run() error {
 	if err != nil {
 		return fmt.Errorf("gallery unavailable at %s: %w (start the server with --dev)", u, err)
 	}
-	response.Body.Close()
+	_ = response.Body.Close()
 	if response.StatusCode != http.StatusOK {
 		return fmt.Errorf("gallery returned HTTP %d at %s (start the server with --dev)", response.StatusCode, u)
 	}
-	if err := os.MkdirAll(*cacheDir, 0o755); err != nil {
+	if err := os.MkdirAll(*cacheDir, 0o750); err != nil {
 		return err
 	}
 	workDir, err := os.MkdirTemp(*cacheDir, "visualdiff-")
@@ -146,7 +146,7 @@ func run() error {
 	}
 	defer os.RemoveAll(workDir)
 	screenshotPath := filepath.Join(workDir, "gallery.png")
-	cmd := exec.Command(chrome, "--headless", "--disable-gpu", "--no-first-run", "--virtual-time-budget=2000", "--user-data-dir="+filepath.Join(workDir, "profile"), "--screenshot="+screenshotPath, "--window-size=1448,1086", u.String())
+	cmd := exec.Command(chrome, "--headless", "--disable-gpu", "--no-first-run", "--virtual-time-budget=2000", "--user-data-dir="+filepath.Join(workDir, "profile"), "--screenshot="+screenshotPath, "--window-size=1448,1086", u.String()) // #nosec G204 -- dev tool; chrome comes from CHROME or PATH lookup
 	if output, err := cmd.CombinedOutput(); err != nil {
 		return fmt.Errorf("chrome screenshot failed: %w: %s", err, output)
 	}

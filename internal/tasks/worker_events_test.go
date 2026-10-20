@@ -14,20 +14,27 @@ import (
 type eventRecorder struct {
 	mu       sync.Mutex
 	events   []WorkerEvent
-	finished chan string
+	finished map[string]bool
+	// changed is closed and replaced on every finished event so all
+	// waiters re-check, whatever order workers finish in.
+	changed chan struct{}
 }
 
 func newRecorder(sup *Supervisor) *eventRecorder {
-	r := &eventRecorder{finished: make(chan string, 1024)}
-	sup.SetWorkerObserver(func(e WorkerEvent) {
-		r.mu.Lock()
-		r.events = append(r.events, e)
-		r.mu.Unlock()
-		if e.Type == "finished" {
-			r.finished <- e.Worker.TaskID
-		}
-	})
+	r := &eventRecorder{finished: map[string]bool{}, changed: make(chan struct{})}
+	sup.SetWorkerObserver(r.observe)
 	return r
+}
+
+func (r *eventRecorder) observe(e WorkerEvent) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.events = append(r.events, e)
+	if e.Type == "finished" {
+		r.finished[e.Worker.TaskID] = true
+		close(r.changed)
+		r.changed = make(chan struct{})
+	}
 }
 
 func (r *eventRecorder) types(id string) []string {
@@ -52,11 +59,14 @@ func (r *eventRecorder) waitFinished(t *testing.T, id string) {
 	t.Helper()
 	deadline := time.After(5 * time.Second)
 	for {
+		r.mu.Lock()
+		done, changed := r.finished[id], r.changed
+		r.mu.Unlock()
+		if done {
+			return
+		}
 		select {
-		case got := <-r.finished:
-			if got == id {
-				return
-			}
+		case <-changed:
 		case <-deadline:
 			t.Fatalf("no finished event for %s; events=%v", id, r.types(id))
 		}
@@ -86,6 +96,15 @@ func startBlocked(t *testing.T, sup *Supervisor, run RunFunc) string {
 		t.Fatal(err)
 	}
 	return id
+}
+
+func TestRecorderWaitFinishedOutOfOrder(t *testing.T) {
+	sup := NewSupervisor(t.TempDir(), nil)
+	rec := newRecorder(sup)
+	rec.observe(WorkerEvent{Type: "finished", Worker: WorkerSnapshot{TaskID: "b"}})
+	rec.observe(WorkerEvent{Type: "finished", Worker: WorkerSnapshot{TaskID: "a"}})
+	rec.waitFinished(t, "a")
+	rec.waitFinished(t, "b")
 }
 
 func TestSetWorkerMetaAfterKillStillFinishes(t *testing.T) {

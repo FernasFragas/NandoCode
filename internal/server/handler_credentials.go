@@ -23,7 +23,7 @@ type credentialRequest struct {
 func writeCredentialRequired(w http.ResponseWriter) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusPreconditionRequired)
-	_ = json.NewEncoder(w).Encode(map[string]any{
+	_ = json.NewEncoder(w).Encode(map[string]any{ // #nosec G101 -- names the env var to set; carries no secret
 		"error":      "requires_credential",
 		"provider":   string(llm.ProviderOllamaCloudAPI),
 		"credential": "OLLAMA_API_KEY",

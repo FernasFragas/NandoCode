@@ -10,6 +10,27 @@ For current routing read [`docs/roadmap/NEXT-PHASES-IMPLEMENTATION-PLAN.md`](../
 
 Older entries cite finished specs, plans and reports (`docs/archive/`, completed phase and plan files, the 2026-06-07 E2E reports). Those were removed from the tree on 2026-10-20 and remain in git history.
 
+## PR #14 CI Fixes - Worker Test Flake And gosec Alerts (2026-10-20)
+
+**Status:** Implemented (2026-10-20); pending commit. Fixes the two failing checks on PR #14 (`Go Build & Test (macos-latest)` and the `gosec` code-scanning check).
+
+### Changes
+
+- **Test flake (test-only bug):** `internal/tasks/worker_events_test.go`. `eventRecorder.waitFinished` read from one shared channel and dropped IDs it was not waiting for, so `TestWorkerEventOrderingStress` timed out whenever workers finished out of order (CI log: `no finished event for a-...; events=[started finished]`). The recorder now keeps a set of finished IDs and wakes all waiters on each finish; the observer is a method (`observe`) so it can be driven directly. Supervisor behaviour is unchanged.
+- **File endpoints read through `os.Root`:** `internal/server/handler_files.go`. New `openInsideRoots` returns an `os.Root` for the containing workspace root plus the relative path; GET and PUT stat and read through it, so a symlink swapped after the containment check cannot redirect the read. `resolveInsideRoots` and `withinAnyRoot` keep their behaviour (shared `locateInsideRoots`/`containingRoot`). Clears the G304/G703 alerts at lines 97, 102, 170, 242, 278.
+- **Other new gosec alerts:** `handler_credentials.go` G101 is the env var name, `#nosec` with reason; `tools/visualdiff/main.go` cache dir `0o750`, `Body.Close` error assigned, `#nosec` with reasons for the developer-supplied flag/env paths and the Chrome subprocess; `internal/tui/app.go` `Resize` error assigned, `#nosec` with reasons for the hash `int -> uint64` and the user's own `$EDITOR`.
+- **CI:** `.github/workflows/ci.yml` Go matrix sets `fail-fast: false` so one OS failure no longer cancels the others.
+
+### Evidence
+
+- RED: `TestRecorderWaitFinishedOutOfOrder` failed with `no finished event for b; events=[finished]`, the CI symptom. `TestOpenInsideRootsConfinesReads` failed to build (`undefined: openInsideRoots`).
+- GREEN: `go test -race -count=200 -cpu 1,2,4 -run 'TestWorker|TestRecorder|TestSetWorkerMeta' ./internal/tasks/`; existing traversal/symlink tests (`TestFilesRejects*`, `TestSave*`) unchanged and passing; `go test -race ./...`; `make check`; `tools/check-allowed-deps.sh`; `tools/check-network-policy.sh`. gosec v2.29.0 (the CI version) reports no findings for `internal/server`, `internal/tui`, `tools/visualdiff`.
+
+### Known constraints
+
+- Remaining code-scanning alerts on the PR are older code (`tasks/supervisor.go:277,380` from 5fdceed, `agent/subagent.go`, `hooks/snapshot.go`, `mcp/config.go`, `mentions/expand.go`, `tools/fileedit`, `filewrite`, `grep`) flagged because the diff is large. They stay in the gosec backlog (Phase 18).
+- Not yet confirmed on GitHub Actions; needs a push.
+
 ## Browser Revamp Batch (B1, B1.5, B2, BV-1 to BV-8): Common Status (2026-10-20)
 
 Applies to the eleven entries below (BV-8 down to B1). Per-packet handoffs, RED logs and review notes were agent working files and were not kept; the RED/GREEN summaries in these entries are the record.
