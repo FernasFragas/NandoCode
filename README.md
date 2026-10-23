@@ -4,7 +4,7 @@ A Go-language agentic coding CLI powered by local LLMs via [Ollama](https://olla
 
 ## Demo
 
-<!-- DEMO VIDEO: replace this comment with the github.com/user-attachments/assets/... link on its own line (GitHub renders it as a video player). -->
+[<!-- DEMO VIDEO: replace this comment with the github.com/user-attachments/assets/... link on its own line (GitHub renders it as a video player). -->](https://github.com/user-attachments/assets/b02101d9-6589-4888-9dcc-50e061567a35)
 
 *The browser UI (`nandocodego server`): chat with live hook and thinking events, sessions, and a side rail with usage, tasks and diagnostics.*
 
